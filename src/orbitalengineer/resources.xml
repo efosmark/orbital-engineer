@@ -1,0 +1,5 @@
+<gresources>
+  <gresource prefix="/orbital-engineer">
+    <file>styles.css</file>
+  </gresource>
+</gresources>

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orbital-engineer"
+version = "0.1.0"
+description = "Orbital Engineer"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.2.6",
+  "numba>=0.61.2",
+]
+
+[project.optional-dependencies]
+gtk = [
+    "PyGObject>=3.52.3",
+    "pycairo>=1.28.0"
+]
+dev = [
+  "pygobject-stubs>=2.13.0",
+  "requirements-parser>=0.13.0",
+  "tomli>=2.2.1"
+]
+
+[project.gui-scripts]
+orbital-engineer = "orbitalengineer.app:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]

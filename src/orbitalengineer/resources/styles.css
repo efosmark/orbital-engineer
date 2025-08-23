@@ -1,0 +1,75 @@
+
+
+/* #tag-nabbit-dialog {
+    background-color: rgba(0, 0, 0, 0.8);
+    opacity: 0.95;
+    min-width: 200px;
+    font-family: monospace;
+}
+.tag_list_scroll {
+    border: 1px solid #666666;
+    border-radius: 5px;
+}
+
+.tag_list {
+        border-radius: 5px;
+    padding: 5px;
+}
+
+.tag_list row {
+
+    border-radius: 5px;
+    padding: 0;
+    margin: 0;
+}
+
+.tag_list row check {
+    border: 1px solid #000000;
+    padding: 5px;
+} */
+
+/* entry {
+    border: 1px solid #666666;
+    border-radius: 5px;
+} */
+
+/* .tag-row {
+    padding-right: 5px;
+}
+
+.tag-row button {
+    border: none;
+    background: none;
+    padding: 0;
+}
+
+.tag-row button image {
+    -gtk-icon-size: 24px;
+    opacity: 0.05;
+    -gtk-icon-filter: grayscale(100%) brightness(80%);
+}
+
+.tag-row.active,
+.tag-row button.favorited image {
+    -gtk-icon-filter: none;
+}
+
+.tag-row:hover button image {
+    opacity: 0.7;
+}
+.tag-row:hover button:hover image {
+    opacity: 1;
+}
+
+.tag-row {
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    padding: 5px;
+    margin: 2px;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.tag-row check {
+    min-height: 20px;
+        min-width: 20px;
+} */

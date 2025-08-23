@@ -1,0 +1,6 @@
+.venv/
+scratch/
+*.pyc
+__pycache__/
+flatpak/dist/
+flatpak/python3-deps/wheels/

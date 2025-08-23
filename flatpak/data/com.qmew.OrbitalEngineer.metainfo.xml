@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.qmew.OrbitalEngineer</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://qmew.com/orbital-engineer</url>
+
+  <name>Orbital Engineer</name>
+  <summary>Interactive orbital mechanics sandbox</summary>
+
+  <description>
+    <p>Design and simulate orbits with live visualization, integrator choices (Euler, Leapfrog KDK), and export of elements/plots.</p>
+    <ul>
+      <li>N-body 2D with fast NumPy/Numba kernels</li>
+      <li>Adwaita/GTK4 UI with shortcuts and toasts</li>
+      <li>Import/export of scenarios</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">com.qmew.OrbitalEngineer.desktop</launchable>
+
+  <developer id="com.qmew">
+    <name>Your Name or Org</name>
+  </developer>
+
+  <icon type="stock">com.qmew.OrbitalEngineer</icon>
+
+  <categories>
+    <category>Education</category>
+    <category>Science</category>
+  </categories>
+
+  <keywords>
+    <keyword>orbit</keyword>
+    <keyword>n-body</keyword>
+    <keyword>physics</keyword>
+  </keywords>
+
+  <url type="homepage">https://qmew.com/orbital-engineer</url>
+  <url type="bugtracker">https://github.com/efosmark/orbital-engineer/issues</url>
+  <url type="vcs-browser">https://github.com/efosmark/orbital-engineer/repo</url>
+  <url type="donation">https://qmew.com/donate</url>
+
+  <releases>
+    <release version="0.1.0" date="2025-08-22">
+      <description>
+        <p>Initial Flatpak release.</p>
+      </description>
+    </release>
+  </releases>
+
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">none</content_attribute>
+    <content_attribute id="violence-fantasy">none</content_attribute>
+    <content_attribute id="violence-realistic">none</content_attribute>
+    <content_attribute id="language-humor">none</content_attribute>
+    <content_attribute id="language-profanity">none</content_attribute>
+    <content_attribute id="social-chat">none</content_attribute>
+    <content_attribute id="money-purchasing">none</content_attribute>
+  </content_rating>
+
+  <translation type="gettext">com.qmew.OrbitalEngineer</translation>
+</component>

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Orbital Engineer
+Exec=orbital-engineer
+Icon=com.qmew.OrbitalEngineer
+Categories=Science;Education;
+StartupNotify=true

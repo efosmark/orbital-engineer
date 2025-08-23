@@ -1,0 +1,24 @@
+app-id: com.qmew.OrbitalEngineer
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+command: orbital-engineer
+finish-args:
+  - --socket=wayland
+  - --socket=x11
+  - --share=ipc
+  - --device=dri
+  - --talk-name=org.freedesktop.portal.*
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-download
+
+
+modules:
+  - python3-deps/python3-deps.json
+  - name: orbital-engineer
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --find-links="file://${PWD}/python3-deps/wheels" --prefix=/app ${PWD}/dist/*.whl
+    sources:
+      - type: dir
+        path: .
