@@ -95,6 +95,10 @@ class OrbitalSimController:
     def _init_worker_processes(self):
         init_start = time.perf_counter()
         
+        # If we precompile in the parent process, the worker processes shouldnt need to.
+        worker.precompile_njit()
+        logger.info("Precompiling the kernel took %.2f ms.", (time.perf_counter() - init_start) * 1000.0)
+        
         # Used for syncing the worker loop with the tick loop
         barrier_loop = Barrier(self.num_processes)
         
@@ -212,6 +216,8 @@ class OrbitalSimController:
         dt_step = self.dt_base           # <- for now, fixed cap
         steps = 0
         MAX_STEPS_PER_FRAME = 32
+        if self.step_id < 100:
+            MAX_STEPS_PER_FRAME = 1
         
         while self.accum >= dt_step and steps < MAX_STEPS_PER_FRAME:
             self.step(dt_step)

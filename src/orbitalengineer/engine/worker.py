@@ -81,6 +81,39 @@ def worker_filter_jit(body_ids, velocity, mass, radius, interaction, distance, s
         radius[i] = 0
 
 
+@njit
+def precompile_njit():
+    """ Execute all of the integrator functions, in order to signal numba to compile them.
+
+    Compiling prior to spinning up the workers allows us to avoid having each worker
+    compile their own. Instead, they will use the ones handled by the parent process.    
+    """
+    dt = 0.1
+    body_ids = np.array([0, 1, 2, 3], dtype=np.uint)
+    status = np.array([0, 0, 0, 0], dtype=np.uint)
+    position = np.array([10, 20, 30, 40], dtype=np.complex128)
+    velocity = np.array([0, 0, 0, 0], dtype=np.complex128)
+    mass = np.array([1, 1, 1, 1], dtype=np.float64)
+    radius = np.array([1, 1, 1, 1], dtype=np.float64)
+    interaction = np.array([
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+    ], dtype=np.uint)
+    distance = np.array([
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+    ], dtype=np.float64)
+
+    worker_kick_jit(body_ids, velocity, mass, position, interaction, radius, dt/2, velocity, distance)
+    worker_drift_jit(body_ids, radius, velocity, dt, position)
+    worker_collide_jit(body_ids, velocity, mass, radius, interaction, distance, status)
+    worker_filter_jit(body_ids, velocity, mass, radius, interaction, distance, status)
+
+
 def worker_integrator_kdk(N, name:str, barrier_loop:Barrier_T, barrier_sync:Barrier_T, process_id:int, num_processes:int):
     # Core 0-4 are reserved for GTK & tick loop
     os.sched_setaffinity(0, {process_id+4})

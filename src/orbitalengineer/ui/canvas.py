@@ -32,7 +32,7 @@ MAX_HISTORY_DEG_CHANGE = 30.0
 ## High values can reduce performance.
 MAX_HISTORY_POINTS = int(60 // MIN_HISTORY_DEG_CHANGE)
 
-PANEL_PADDING = 2
+PANEL_PADDING = 8
 
 @dataclass
 class BodyMeta:
@@ -196,13 +196,12 @@ class OrbitalCanvas(Gtk.DrawingArea):
             ("name",     f"{self.body_meta[foc_idx].name} ({self.body_meta[foc_idx].id})"),
             ("mass",     f"{mag_format(shm.mass[foc_idx])}"),
             ("radius",   f"{mag_format(shm.radius[foc_idx])}"),
-            ("vx",       f"{mag_format(vx)}/s"),
-            ("vy",       f"{mag_format(vy)}/s"),
+            ("(vx, vy)", f"({mag_format(vx)}/s, {mag_format(vy)}/s)"),
             ("|v|",      f"{mag_format(mag)}/s"),
             #("|a|",      f"{mag_format(np.abs(shm.a[foc_idx]))}/s²"),
             ("angle",    f"{angle:>.1f}°")
         ]
-        lines = [f"{label:<8} {value:>10}" for label, value in disp]
+        lines = [f"{label:<8} {value:>18}" for label, value in disp]
         return create_panel(name, lines)
 
     def _draw_force_lines(self, cr:cairo.Context, i, forces, color=(1.0,1.0,1.0), N=10, scale=1.0):
@@ -231,11 +230,10 @@ class OrbitalCanvas(Gtk.DrawingArea):
 
     def _draw_reticle(self, cr:cairo.Context, idx, scale):
         body = self.orbital.body(idx)
-        if np.isnan(body.x) or np.isnan(body.y):
-            return
-        cr.set_line_width(1.0/scale)
-        cr.set_source_rgba(0.2, 0.2, 0.2, 1)
-        ring_radius = body.radius + (2 / scale)
+        cr.set_line_cap(cairo.LineCap.ROUND)
+        cr.set_line_width(2.5/scale)
+        cr.set_source_rgb(0.7, 0.7, 0.7)
+        ring_radius = body.radius + (self.body_meta[body.idx].stroke_width/self.camera.zoom) + (10.0 / scale)
         cr.arc(body.x, body.y, ring_radius, 0, 2*math.pi)
         cr.stroke()
         cr.save()
@@ -250,8 +248,8 @@ class OrbitalCanvas(Gtk.DrawingArea):
             angle = (2.0*math.pi) / reticle_count
             
             cr.new_path()
-            cr.move_to(0, ring_radius + ( 5 / scale))
-            cr.line_to(0, ring_radius + (15 / scale))
+            cr.move_to(0, ring_radius)
+            cr.line_to(0, ring_radius + (ring_radius / 2))
             cr.stroke()
             cr.rotate(angle)
         
@@ -269,15 +267,19 @@ class OrbitalCanvas(Gtk.DrawingArea):
             m = self.body_meta[b.idx]
             if self.show_history: # and b.idx == self.secondary_idx:
                 hist = [*m.hist, (b.x, b.y)]
-                for (x1, y1), (x2, y2) in zip(hist, hist[1:]):
-                    #cr.set_source_rgb(*[ch*0.2 for ch in m.color_fill])
-                    cr.set_source_rgba(*m.color_fill, 0.1)
+                for i, ((x1, y1), (x2, y2)) in enumerate(zip(hist, hist[1:])):
+                    if i < MAX_HISTORY_POINTS * 0.5:
+                        i = len(m.hist) - i
+                        alpha = (1 - (i/len(m.hist))) * 0.8
+                    else:
+                        alpha = 0.8
+                    cr.set_source_rgba(*m.color_fill, alpha)
                     cr.set_line_width(1.0/self.camera.zoom)
                     cr.move_to(x1,y1)
                     cr.line_to(x2, y2)
                     cr.stroke()
             
-            stroke_width = max(m.stroke_width, 1/self.camera.zoom)
+            stroke_width = m.stroke_width/self.camera.zoom
             radius = max(b.radius, 2/self.camera.zoom) + stroke_width
             cr.set_source_rgb(*m.color_fill)
             cr.arc(b.x, b.y, radius, 0, 2*math.pi)
@@ -308,9 +310,6 @@ class OrbitalCanvas(Gtk.DrawingArea):
         if self.secondary_idx is not None and show_reticle:
             self._draw_reticle(cr, self.secondary_idx, scale)
         
-        if self.primary_idx is not None and show_reticle:
-           self._draw_reticle(cr, self.primary_idx, scale)
-
         self._draw_bodies(cr, 2/scale)
 
     def _compute_average_ellipse(self, primary, secondary):
@@ -453,13 +452,13 @@ class OrbitalCanvas(Gtk.DrawingArea):
             sfc = self._draw_body_info(self.secondary_idx, "focused")
             cr.set_source_surface(sfc, x, y)
             cr.paint()
-            x += sfc.get_width() + PANEL_PADDING
+            y += sfc.get_height() + PANEL_PADDING
         
         if self.primary_idx is not None:
             sfc = self._draw_body_info(self.primary_idx, "primary")
             cr.set_source_surface(sfc, x, y)
             cr.paint()
-            x += sfc.get_width() + PANEL_PADDING
+            y += sfc.get_height() + PANEL_PADDING
         
         if self.secondary_idx is not None and self.primary_idx is not None:
             secondary = self.orbital.body(self.secondary_idx)
@@ -472,14 +471,11 @@ class OrbitalCanvas(Gtk.DrawingArea):
             disp = [
                 ("distance",      f"{mag_format(math.hypot(dx, dy))}"),
                 ("", ""),
-                #("dx",            f"{mag_format(dx)}"),
-                #("dy",            f"{mag_format(dy)}"),
-                ("Δvx",           f"{mag_format(dvx)}"),
-                ("Δvy",           f"{mag_format(dvy)}"),
+                ("(Δvx, Δvy)",    f"({mag_format(dvx)}/s {mag_format(dvy)}/s"),
                 ("|Δv|",          f"{mag_format(math.hypot(dvy,dvx))}/s"),
                 ("rel angle",     f"{math.degrees(math.atan2(dvy, dvx)):.1f}°")
             ]
-            lines = [f"{label:<10} {value:>10}" for label, value in disp]
+            lines = [f"{label:<10} {value:>16}" for label, value in disp]
             sfc = create_panel("focused vs primary", lines)
             cr.set_source_surface(sfc, x, y)
             cr.paint()

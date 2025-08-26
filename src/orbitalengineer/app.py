@@ -7,14 +7,14 @@ def on_activate(app: App):
     app.canvas.add_element(sol, color=(1, 0.8, 0))
     app.canvas.primary_idx = 0
     
-    N = 1000
-    r_min, r_max = 5000, 6000
+    N = 200
+    r_min, r_max = 1000, 10000
     
     u = rng.uniform(r_min*r_min, r_max*r_max, size=N)
     for r_b in np.sqrt(u):
         secondary = create_secondary(
             sol,
-            mass=rng.uniform(100, 100),
+            mass=rng.uniform(100, 1000),
             min_radius=float(r_b),
             max_radius=float(r_b)
         )

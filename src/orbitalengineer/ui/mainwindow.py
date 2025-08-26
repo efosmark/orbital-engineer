@@ -28,7 +28,6 @@ class App(Gtk.Application):
         self.tick = 0
         self._tick_duration = deque(maxlen=100)
         self._tick_steps = deque(maxlen=100)
-        self._kernel_ready = False
         
         self.orbital = OrbitalSimController()
         self.canvas = canvas.OrbitalCanvas(self.orbital)
@@ -41,11 +40,6 @@ class App(Gtk.Application):
     
     def do_startup(self):
         Gtk.Application.do_startup(self)
-        
-        # Precompile kernel
-        #self.orbital.step(1)
-        #logger.debug("Kernel is ready.")
-        self._kernel_ready = True
     
     def start_simulation(self):
         self.orbital.init_sim()
@@ -269,7 +263,7 @@ class App(Gtk.Application):
         return False
     
     def on_simulation_tick(self, widget, frame_clock:Gdk.FrameClock|None):
-        if not self._kernel_ready or self.paused:
+        if self.paused:
             return True
         
         start = time.perf_counter()
@@ -312,6 +306,6 @@ class App(Gtk.Application):
         logger.debug("idle_loop()")
         clock = win.get_frame_clock()
         self.on_simulation_tick(self.canvas, clock)
-        #GLib.idle_add(self.compute_history)
+        GLib.idle_add(self.compute_history)
         GLib.idle_add(self.idle_loop)
         

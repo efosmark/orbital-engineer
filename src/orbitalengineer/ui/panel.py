@@ -7,9 +7,9 @@ FONT_FAMILY = "Liberation Mono"
 TITLE_FONT_SIZE = 11
 CONTENT_FONT_SIZE = 11
 
-X_PAD = 5
-Y_PAD = 5
-LINE_SPACING = 5
+X_PAD = 4
+Y_PAD = 4
+LINE_SPACING = 0
 LINE_HEIGHT = CONTENT_FONT_SIZE
 
 def create_background(width:int, height:int) -> cairo.RecordingSurface:
@@ -30,13 +30,11 @@ def create_background(width:int, height:int) -> cairo.RecordingSurface:
 
 def create_title(title:str):
     rec = cairo.RecordingSurface(cairo.Content.COLOR_ALPHA, None)
-    
     ctx = cairo.Context(rec)
     ctx.select_font_face(FONT_FAMILY, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
     ctx.set_font_size(TITLE_FONT_SIZE)
     ctx.set_source_rgb(*BG_COLOR)
     ctx.show_text(title.upper())
-    
     return rec
 
 
@@ -60,21 +58,21 @@ def create_contents(lines:list[str]):
     return rec
 
 
-def create_panel(title:str|None, lines:list[str]) -> cairo.ImageSurface:
+def create_panel(title:str|None, lines:list[str], fixed_width:None|int=None) -> cairo.ImageSurface:
     rec_title = None
     if title:
         rec_title = create_title(title)
         _, _, title_w, title_h = rec_title.ink_extents()
         full_title_height = title_h + (Y_PAD * 2)
+    
     else:
         title_w, title_h, full_title_height = 0, 0, 0
     
     rec_content = create_contents(lines)
     content_x, content_y, content_w, content_h = rec_content.ink_extents()
-    
     full_content_height = content_h + (Y_PAD * 2)
     
-    width = int(max(title_w, content_w)) + (X_PAD * 2)
+    width = int(max(title_w, content_w, fixed_width or 0)) + (X_PAD * 2)
     height = int(full_title_height + full_content_height)
     
     img = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)

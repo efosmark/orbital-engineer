@@ -133,7 +133,7 @@ class OrbitalMemory:
             # Create shared memory block
             self._shm = shared_memory.SharedMemory(create=True, size=(self.buffer_size * 2))
             atexit.register(lambda: self._shm.unlink())
-            logger.debug(f"Allocated {mag_format(self.buffer_size)}B of shared memory.")
+            logger.info(f"Allocated {mag_format(self.buffer_size)}B of shared memory.")
 
         offset = 0 if not second_buffer else self.buffer_size
         for field, f in FIELDS.items():
