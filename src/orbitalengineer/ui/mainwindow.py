@@ -303,7 +303,6 @@ class App(Gtk.Application):
         if win is None:
             return False
         
-        logger.debug("idle_loop()")
         clock = win.get_frame_clock()
         self.on_simulation_tick(self.canvas, clock)
         GLib.idle_add(self.compute_history)

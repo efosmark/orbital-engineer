@@ -1,5 +1,6 @@
 import atexit
 from collections import OrderedDict
+import math
 from multiprocessing import shared_memory
 from typing import ClassVar
 import numpy as np
@@ -20,67 +21,65 @@ FIELDS = OrderedDict()
 
 # Step info [step_id, dt]
 FIELDS['step'] = lambda N: {
-    'bytesize': 2 * np.dtype(np.float64).itemsize,
     'dtype': np.float64,
     'shape': (2,)
 }
 
 # Overall status of the body (0=normal, 1=deleted)
 FIELDS['status'] = lambda N: {
-    'bytesize': N * np.dtype(np.uint8).itemsize,
     'dtype': np.uint8,
     'shape': (N,)
 }
 
 # Absolute positon
 FIELDS['r'] = lambda N: {
-    'bytesize': N * np.dtype(np.complex128).itemsize,
     'dtype': np.complex128,
     'shape': (N,)
 }
 
 # Absolute velocity
 FIELDS['v'] = lambda N: {
-    'bytesize': N * np.dtype(np.complex128).itemsize,
     'dtype': np.complex128,
     'shape': (N,)
 }
 
 # Absolute acceleration
 FIELDS['a'] = lambda N: {
-    'bytesize': N * np.dtype(np.complex128).itemsize,
     'dtype': np.complex128,
     'shape': (N,)
 }
 
 # Mass
 FIELDS['mass'] = lambda N: {
-    'bytesize': N * np.dtype(np.float64).itemsize,
     'dtype': np.float64,
     'shape': (N,)
 }
 
 # Radius
 FIELDS['radius'] = lambda N: {
-    'bytesize': N * np.dtype(np.float64).itemsize,
     'dtype': np.float64,
     'shape': (N,)
 }
 
 # Distance between two bodies
 FIELDS['distance'] = lambda N: {
-    'bytesize': N**2 * np.dtype(np.float64).itemsize,
     'dtype': np.float64,
     'shape': (N, N)
 }
 
 # Interaction state between two bodies
 FIELDS['interaction'] = lambda N: {
-    'bytesize': N**2 * np.dtype(np.uint8).itemsize,
     'dtype': np.uint8,
     'shape': (N, N)
 }
 
+
+def get_size(field):
+    return math.prod([
+        np.dtype(field["dtype"]).itemsize * axis_size
+        for axis_size in field["shape"]
+    ])
+    
 class OrbitalMemory:
     _shm:shared_memory.SharedMemory
     N:int
@@ -119,7 +118,7 @@ class OrbitalMemory:
         self.N = N
         self.second_buffer = second_buffer
         self.buffer_size = sum([
-            field['bytesize']
+            get_size(field)
             for field in [
                 f(N) for f in FIELDS.values()
             ]
@@ -141,7 +140,7 @@ class OrbitalMemory:
             setattr(self, field, np.ndarray(f['shape'], dtype=f['dtype'], buffer=self._shm.buf, offset=offset))
             if name is None:
                 getattr(self, field).fill(0)
-            offset += f['bytesize']
+            offset += get_size(f)
 
 
 class BodyProxy:
