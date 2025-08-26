@@ -21,12 +21,16 @@ def eng_format(x, sig=3):
 def mag_format(x, sig=1):
     if abs(x) < 1e-6:
         return f"0"
-    if 1 <= abs(x) <= 1000:
+    elif abs(x) <= 1:
+        return f"{x:.2f}"
+    elif abs(x) <= 1000:
         return f"{x:.0f}"
+    
     exp = int(math.floor(math.log10(abs(x)) / 3) * 3)
     mant = round(x / (10 ** exp), sig)
     if exp in magnitudes:
         return f"{mant:.{sig}f}{magnitudes[exp]}"
+    
     return f"{mant:.{sig}f}e{exp:+}"
 
 

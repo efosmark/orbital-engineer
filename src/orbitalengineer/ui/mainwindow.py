@@ -5,16 +5,19 @@ import threading
 import time
 
 import numpy as np
-#os.sched_setaffinity(0, {0, 1, 2})
+os.sched_setaffinity(0, {0, 1, 2})
 
+from orbitalengineer.engine import logger
 from orbitalengineer.engine.orbitalnp import OrbitalSimController
-from orbitalengineer.ui.gtk4 import Gtk, Gdk, Gio, GLib, Adw
+from orbitalengineer.ui.gtk4 import Gtk, Gdk, Gio, GLib #, Adw
 from orbitalengineer.ui import canvas
 
 
 APP_ID = "com.qmew.OrbitalEngineer"
+WINDOW_DEFAULT_SIZE = (800, 600)
 
-class App(Adw.Application):
+
+class App(Gtk.Application):
 
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
@@ -25,9 +28,9 @@ class App(Adw.Application):
         self.tick = 0
         self._tick_duration = deque(maxlen=100)
         self._tick_steps = deque(maxlen=100)
+        self._kernel_ready = False
         
         self.orbital = OrbitalSimController()
-        
         self.canvas = canvas.OrbitalCanvas(self.orbital)
         self.canvas.set_hexpand(True)
         self.canvas.set_vexpand(True)
@@ -35,6 +38,18 @@ class App(Adw.Application):
         self.canvas.set_valign(Gtk.Align.FILL)
         
         self.__init_menu_actions()
+    
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        
+        # Precompile kernel
+        #self.orbital.step(1)
+        #logger.debug("Kernel is ready.")
+        self._kernel_ready = True
+    
+    def start_simulation(self):
+        self.orbital.init_sim()
+        GLib.idle_add(self.idle_loop)
     
     def __init_menu_actions(self):
         def add_toggle_action(name: str, initial: bool, handler):
@@ -111,33 +126,41 @@ class App(Adw.Application):
         return top
 
     def do_activate(self):
-        # Build UI
-        self.win = Adw.ApplicationWindow(application=self)
-        self.win.set_default_size(800, 600)
-        #self.win.set_title("Orbital")
+        Gtk.Application.do_activate(self)
+        win = self.props.active_window 
+        if not win:
+            win = self._build_window()
+            win.set_default_size(*WINDOW_DEFAULT_SIZE)
+            win.set_child(self.canvas)
+            #win.add_tick_callback(self.on_tick)
+        win.present()
+        if self.start_maximized:
+            win.maximize()
+    
+    def _build_window(self) -> Gtk.ApplicationWindow:
+        win = Gtk.ApplicationWindow(application=self, title=APP_ID)
+        win.set_default_size(*WINDOW_DEFAULT_SIZE)
+        win.set_child(self.canvas)
         
         # Key controller
         controller = Gtk.EventControllerKey.new()
         controller.connect("key-pressed", self.on_key_pressed)
         controller.connect("key-released", self.on_key_released)
-        self.win.add_controller(controller)
+        win.add_controller(controller)
+        
+        header = Gtk.HeaderBar()
         
         # Menu button wired to our Gio.MenuModel
         menu_button = Gtk.MenuButton(icon_name="open-menu-symbolic")
         menu_button.set_menu_model(self.__build_menu())
-        
-        header = Adw.HeaderBar()
         header.pack_end(menu_button)
-        #self.win.set_titlebar(header)
 
-        #self._tick_rate_opts = [ 1e-3, 1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3 ]
-        
         # Adjustment controls range/step/value
         adj = Gtk.Adjustment(
             value=1,
-            lower=1,
+            lower=0.1,
             upper=100,
-            step_increment=1,
+            step_increment=0.1,
             page_increment=10
         )
         
@@ -145,37 +168,21 @@ class App(Adw.Application):
         self.scale_speed.set_vexpand(True)
         self.scale_speed.set_size_request(250, 25)      #  width, height
         self.scale_speed.set_value_pos(Gtk.PositionType.RIGHT)
-        self.scale_speed.connect("value-changed", self.on_speed_slider_value_changed)
-        
         #for mark in self._tick_rate_opts:
         #    self.scale_speed.add_mark(self._tick_rate_opts.index(mark)+1, Gtk.PositionType.RIGHT, None)
         header.pack_start(self.scale_speed)
         
-        self.lbl_speed = Gtk.Label(label=f"{self.canvas.orbital.speed:4.1f}x")
-        self.lbl_speed.set_size_request(60, 25)
-        header.pack_start(self.lbl_speed)
+        lbl_speed = Gtk.Label(label=f"{self.canvas.orbital.speed:4.1f}x")
+        lbl_speed.set_size_request(60, 25)
+        header.pack_start(lbl_speed)
+        win.set_titlebar(header)
         
-        # Precompile kernel
-        self.orbital.frame(time.perf_counter())
-        
-        toolbar = Adw.ToolbarView()
-        self.win.set_content(toolbar)
-        toolbar.add_top_bar(header)
-        toolbar.set_content(self.canvas)
-        
-        #self.win.set_child(self.canvas)
-        self.win.set_content(self.canvas)
-        self.win.present()
-        if self.start_maximized:
-            self.win.maximize()
-    
-        #threading.Thread(target=self.decoupled_tick_loop, daemon=True).start()
-
-        
-    def on_speed_slider_value_changed(self, scale: Gtk.Scale):
-        value = scale.get_value()
-        self.canvas.orbital.speed = value
-        self.lbl_speed.set_text(f"{value:4.1f}x")
+        def on_speed_slider_value_changed(scale: Gtk.Scale):
+            value = scale.get_value()
+            self.canvas.orbital.speed = value
+            lbl_speed.set_text(f"{value:4.1f}x")
+        self.scale_speed.connect("value-changed", on_speed_slider_value_changed)
+        return win
 
     def on_escape(self):
         if self.canvas.secondary_idx is not None:
@@ -203,6 +210,7 @@ class App(Adw.Application):
         WASD_KEYS = [Gdk.KEY_w, Gdk.KEY_a, Gdk.KEY_s, Gdk.KEY_d]
         self.pressed_keys.add(keyval)
         ctrl_held = state & Gdk.ModifierType.CONTROL_MASK
+        mod_held = state & Gdk.ModifierType.ALT_MASK
         
         if keyval == Gdk.KEY_Escape:
             self.on_escape()
@@ -212,7 +220,7 @@ class App(Adw.Application):
             try:
                 idx_current = valid_indices.index(self.canvas.secondary_idx)
                 idx_new = idx_current + (-1 if keyval == Gdk.KEY_ISO_Left_Tab else 1)
-                if idx_new > len(valid_indices):
+                if idx_new >= len(valid_indices):
                     self.canvas.secondary_idx = valid_indices[0]
                 elif idx_new < 0:
                     self.canvas.secondary_idx = valid_indices[-1]
@@ -241,23 +249,46 @@ class App(Adw.Application):
             self.canvas.paused = not self.canvas.paused
         
         elif keyval == Gdk.KEY_f:
-            if self.win.is_fullscreen():
-                self.win.unfullscreen()
+            win = self.get_active_window()
+            if win is None:
+                return False
+            if mod_held:
+                if win.is_maximized():
+                    win.unmaximize()
+                else:
+                    win.maximize()
             else:
-                self.win.fullscreen()
-        
+                if win.is_fullscreen():
+                    win.unfullscreen()
+                else:
+                    win.fullscreen()
         return False
 
     def on_key_released(self, controller, keyval, keycode, state):
         self.pressed_keys.discard(keyval)
         return False
     
-    def on_tick(self, widget, frame_clock:Gdk.FrameClock|None):
-        if self.paused or frame_clock is None or frame_clock.get_frame_counter() < 100:
-            self.canvas.queue_draw()
+    def on_simulation_tick(self, widget, frame_clock:Gdk.FrameClock|None):
+        if not self._kernel_ready or self.paused:
             return True
         
         start = time.perf_counter()
+        
+        # (Temporary)
+        # Lock the speed to the computed max speed
+        if frame_clock is not None and frame_clock.get_fps() and len(self.canvas.t_render) > 0 and len(self.orbital.t_step) > 0:
+            t_render = statistics.mean(self.canvas.t_render)
+            t_step = statistics.mean(self.orbital.t_step)
+            
+            #fps = frame_clock.get_fps()
+            #frame_time = 1/fps
+            #margin = frame_time * 0.2
+            #speed_max = ((frame_time - margin - t_render) / t_step) * (self.orbital.dt_base / frame_time)
+            #self.scale_speed.set_value(speed_max)
+            
+            self.canvas.avg_step_duration = t_step
+            self.canvas.avg_render_duration = t_render
+        
         steps = self.orbital.frame(start)
 
         self.tick += 1
@@ -265,22 +296,22 @@ class App(Adw.Application):
         self._tick_duration.append(time.perf_counter() - start)
         
         self.canvas.frame_clock = frame_clock
-        self.canvas.avg_tick_per_sec = 1/statistics.mean(self._tick_duration) if len(self._tick_duration) else 0
-        self.canvas.avg_steps_per_tick = statistics.mean(self._tick_steps) if len(self._tick_steps) else 0
-        
-        for idx in self.canvas.body_meta:
-           self.canvas.compute_history(idx)
-        
-        self.canvas.queue_draw()
         return True
 
-    def decoupled_tick_loop(self):
-        target_hz = 20
-        timestep = 1.0 / target_hz
-
-        while True:
-            start = time.perf_counter()
-            self.on_tick(self.canvas, self.win.get_frame_clock())
-            elapsed = time.perf_counter() - start
-            sleep_time = max(0, timestep - elapsed)
-            time.sleep(sleep_time)    
+    def compute_history(self):
+        for idx in range(self.orbital.shm.mass.size):
+            if self.orbital.shm.mass[idx] == 0:
+                continue
+            self.canvas.compute_history(idx)
+            
+    def idle_loop(self):
+        win = self.get_active_window()
+        if win is None:
+            return False
+        
+        logger.debug("idle_loop()")
+        clock = win.get_frame_clock()
+        self.on_simulation_tick(self.canvas, clock)
+        #GLib.idle_add(self.compute_history)
+        GLib.idle_add(self.idle_loop)
+        

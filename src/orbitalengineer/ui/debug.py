@@ -10,33 +10,32 @@ Y_PADDING = 4
 
 FONT_SIZE = 10
 BG_COLOR = (0, 0, 0.1)
-TEXT_COLOR = (0.55, 0, 0.45)
+TEXT_COLOR = (0.65, 0.1, 0.55)
 
 
-def create_debug_info(accum, body_count, fps, frame_no, tick_per_sec, steps_per_tick, width, height):
+def create_debug_info(accum, body_count, fps, frame_no, t_step, t_render, width, height):
     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
     ctx = cairo.Context(surface)
     ctx.set_hairline(True)
     ctx.select_font_face("Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
     ctx.set_font_size(FONT_SIZE)
-
-    if accum > 1000:
-        accum = mag_format(accum, sig=0)
-    else:
-        accum = f"{accum:.0f}"
+    
+    t_step_ms = t_step * 1000.0
+    t_render_ms = t_render * 1000.0
     
     labels = [
-        f"accum={accum}",
         f"{body_count:.0f} bodies",
         f"{fps=:.1f}",
-        f"{tick_per_sec=:.0f}",
-        f"{steps_per_tick=:.0f}",
+        f"{t_step_ms=:.2f} ({1/(t_step or 1):.1f} Hz)",
+        f"{t_render_ms=:.2f}",
         f"[T+{frame_no:.0f}]"
     ]
     
-    r_height = max([
-        ctx.text_extents(l).height for l in labels
-    ]) + (Y_PADDING * 2)
+    if accum > t_step_ms*3:
+        accum = mag_format(accum, sig=1)
+        labels.insert(0, f"ACCUM OVERFLOW ({accum})")
+    
+    r_height = FONT_SIZE + (Y_PADDING*2)
     
     r_width = sum([
         ctx.text_extents(l).x_advance for l in labels

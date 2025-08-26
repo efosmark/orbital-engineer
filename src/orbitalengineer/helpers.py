@@ -1,10 +1,11 @@
 import math
-import random
+import numpy as np
 
 from orbitalengineer.engine.body import OrbitalBody
 from orbitalengineer.engine.compute import r_from_mass, vis_viva_velocity_vector
 
-
+seed=0xf00d
+rng = np.random.default_rng(seed)
 
 def random_color() -> tuple[float, float, float]:
     """Create a random color in the form of (r, g, b, a).
@@ -15,21 +16,14 @@ def random_color() -> tuple[float, float, float]:
     Returns:
         tuple[float, float, float, float]: The RGBA color tuple.
     """
-    red = 0.2 + (random.random() * 0.8)
-    green = 0.2 + (random.random() * 0.8)
-    blue = 0.2 + (random.random() * 0.8)
-    return (red, green, blue)
+    return (0.2 + (rng.random(size=3) * 0.8)).tolist()
 
-def rand_point_annulus(r_min, r_max):
-    u = random.random()
-    r = math.sqrt(u * (r_max*r_max - r_min*r_min) + r_min*r_min)
-    theta = random.uniform(0.0, 2.0*math.pi)
-    return (r*math.cos(theta), r*math.sin(theta), r)
 
-def _random_xy(min_distance, max_distance):
+def random_position(min_distance, max_distance):
+    """Generates a random x+yj point on an annulus."""
     #return rand_point_annulus(min_distance, max_distance)
-    r = math.sqrt(random.uniform(min_distance**2, max_distance**2))
-    theta = random.uniform(0, 2.0 * math.pi)
+    r = math.sqrt(rng.uniform(min_distance**2, max_distance**2))
+    theta = rng.uniform(0, 2.0 * math.pi)
     x = r * math.cos(theta)
     y = r * math.sin(theta)
     return (x, y, r)
@@ -45,7 +39,7 @@ def create_primary(*, radius:float|None=None, mass:float = 332000) -> OrbitalBod
     )
 
 def create_secondary(primary_body:OrbitalBody, *, min_radius:float=1, max_radius=1e5, prograde:bool=True, color=None, mass:float=0, ecc:float|None=None):
-    x, y, dist = _random_xy(primary_body.radius + min_radius, max_radius )
+    x, y, dist = random_position(primary_body.radius + min_radius, primary_body.radius + max_radius )
     x, y = primary_body.x + x, primary_body.y + y
     vx, vy = vis_viva_velocity_vector(
         x,
@@ -79,25 +73,25 @@ def create_random_body(*,
         raise ValueError("Either both x and y need to be specified, or dist range.")
 
     if mass is None:
-        mass = random.randint(1, 1000)
+        mass = rng.uniform(0, 1000)
     
     if radius is None:
         radius = r_from_mass(mass)
     
     if dist is not None:
-        x, y, _ = _random_xy(dist[0], dist[1])
+        x, y, _ = random_position(dist[0], dist[1])
     else:
-        rx, ry, _ = _random_xy(0, radius * 10.0)
+        rx, ry, _ = random_position(0, radius * 10.0)
         if x is None:
             x = rx 
         if y is None:
             y = ry 
 
     if vx is None:
-        vx = random.uniform(-10, 10)
+        vx = 10 - (rng.random()*10.0)
     
     if vy is None:
-        vy = random.uniform(-10, 10)
+        vy = 10 - (rng.random()*10.0)
         
     return OrbitalBody(
         x, y,

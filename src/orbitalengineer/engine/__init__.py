@@ -5,7 +5,7 @@ logging.basicConfig(level=logging.WARN)
 logger = logging.getLogger("orbit.engine")
 from logging.handlers import RotatingFileHandler
 
-file_handler = RotatingFileHandler("/tmp/ebug.log", maxBytes=5_000_000, backupCount=3)
+file_handler = RotatingFileHandler("/tmp/debug.log", maxBytes=5_000_000, backupCount=3)
 file_handler.setFormatter(logging.Formatter(
     "%(asctime)s [%(levelname)s] %(name)s %(filename)s:%(lineno)d: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -13,7 +13,7 @@ file_handler.setFormatter(logging.Formatter(
 logger.addHandler(file_handler)
 
 if os.environ.get("VERBOSE", False):
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     logger.propagate = False
     handler = logging.StreamHandler()
 

@@ -1,12 +1,10 @@
 from numpy.typing import NDArray
 import numpy as np
 from numba import njit, prange
-from orbitalengineer.engine.memory import ST_COLLIDING, ST_COLLIDED, ST_NOMINAL, fp
-
-ENABLE_PARALLEL = True
+from orbitalengineer.engine.memory import INTERACTION_COLLIDING, INTERACTION_COLLIDED, INTERACTION_NONE
 
 
-@njit(parallel=False)
+@njit
 def compute_collisions(
     ix: NDArray, 
     jx: NDArray,
@@ -20,11 +18,11 @@ def compute_collisions(
         i = ix[k]
         j = jx[k]
         
-        if state[i,j] != state[j,i] != ST_NOMINAL:
+        if state[i,j] != state[j,i] != INTERACTION_NONE:
             continue
         
         if distance[i,j] < (radius[i] + radius[j]):
-            state[i,j] = state[j,i] = ST_COLLIDING
+            state[i,j] = state[j,i] = INTERACTION_COLLIDING
             
             mi = mass[i]
             mj = mass[j]
@@ -49,44 +47,59 @@ def compute_collisions(
             radius[big] = np.sqrt(mass[big] / np.pi)
             if radius[big] < 1:
                 radius[big] = 1
-            state[big, small] = ST_COLLIDED
+            state[big, small] = INTERACTION_COLLIDED
             
             v[small] = 0
             mass[small] = 0
             radius[small] = 0
-            state[small, big] = ST_COLLIDED
+            state[small, big] = INTERACTION_COLLIDED
 
-@njit(parallel=ENABLE_PARALLEL)
+@njit
 def compute_accel(
     ix: NDArray, 
     jx: NDArray,
-    a: NDArray[np.complex128],
-    r: NDArray[np.complex128],
-    mass: NDArray,
-    distance: NDArray[np.float64]
+    a_out: NDArray[np.complex128],
+    r_in: NDArray[np.complex128],
+    mass_in: NDArray,
+    distance_out: NDArray[np.float64]
 ):
-    a.fill(0)
+    a_out.fill(0)
+    a_out.fill(0)
     for k in prange(ix.size):
         i = ix[k]
         j = jx[k]
                 
         # https://en.wikipedia.org/wiki/Newton's_law_of_universal_gravitation#Vector_form
-        # TODO move this to a separate njit
-        d = r[j] - r[i]
+        d = r_in[j] - r_in[i]
         dist = np.abs(d)
-        F = -1.0 * ((mass[i] * mass[j]) / (dist**3)) * d
+        if not dist:
+            continue
+        F = -1.0 * ((mass_in[i] * mass_in[j]) / (dist**3)) * d
         
-        if not mass[i] or not mass[j]:
+        if not mass_in[i] or not mass_in[j]:
             continue
         
-        a[i] -= F / mass[i]
-        a[j] += F / mass[j]
+        a_out[i] -= F / (mass_in[i] + 1e-8)
+        a_out[j] += F / (mass_in[j] + 1e-8)
         
-        distance[i,j] = dist
-        distance[j,i] = dist
+        distance_out[i,j] = dist
+        distance_out[j,i] = dist
 
+@njit
+def update_velocity(
+    ix: NDArray,
+    jx: NDArray,
+    v_in: NDArray[np.complex128],
+    v_out: NDArray[np.complex128],
+    a_in: NDArray[np.complex128],
+    dt_half_step: np.float64
+):
+    for k in prange(ix.size):
+        i, j = ix[k], jx[k]
+        v_out[i] = v_in[i] + (a_in[i] * dt_half_step)
+        v_out[j] = v_in[j] + (a_in[j] * dt_half_step)
 
-@njit(parallel=ENABLE_PARALLEL)
+@njit
 def kick(
     ix: NDArray,
     jx: NDArray,
@@ -98,24 +111,22 @@ def kick(
     dt_half_step: np.float64
 ):
     compute_accel(ix, jx, a, r, mass, distance)
-    for k in prange(ix.size):
-        i, j = ix[k], jx[k]
-        v[i] += a[i] * dt_half_step
-        v[j] += a[j] * dt_half_step    
+    update_velocity(ix, jx, v, v, a, dt_half_step) 
 
 
-@njit(parallel=ENABLE_PARALLEL)
+@njit
 def drift(
     ix: NDArray,
     jx: NDArray,
-    v: NDArray[np.complex128],
-    r: NDArray[np.complex128],
+    v_in: NDArray[np.complex128],
+    r_in: NDArray[np.complex128],
+    r_out: NDArray[np.complex128],
     dt_step: np.float64
 ):
     for k in prange(ix.size):
         i, j = ix[k], jx[k]
-        r[i] += v[i] * dt_step
-        r[j] += v[j] * dt_step
+        r_out[i] = r_in[i] + (v_in[i] * dt_step)
+        r_out[j] = r_in[j] + (v_in[j] * dt_step)
 
 
 @njit
@@ -129,12 +140,12 @@ def integrator_leapfrog_kdk_njit(
     mass: NDArray[np.float64],
     distance: NDArray[np.float64],
     state: NDArray[np.uint8],
-    dt_step: np.float64
+    dt_step: np.float64,
 ):
-    half_step = fp(dt_step / 2.0)
+    half_step = np.float64(dt_step / 2.0)
 
     kick(ix, jx, v, a, r, mass, distance, half_step)
-    drift(ix, jx, v, r, dt_step)
+    drift(ix, jx, v, r, r, dt_step)
     kick(ix, jx, v, a, r, mass, distance, half_step)
 
     compute_collisions(ix, jx, v, radius, mass, distance, state)    

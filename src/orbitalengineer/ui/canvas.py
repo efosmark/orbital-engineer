@@ -15,14 +15,14 @@ from orbitalengineer.ui.grid import create_grid_surface
 from orbitalengineer.ui.panel import create_panel
 from orbitalengineer.ui.ea4 import draw_ellipse
 from orbitalengineer.ui.ell import ellipse_center_focus_primary
-from orbitalengineer.ui.gtk4 import Gtk, Gdk
+from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene
 from orbitalengineer.ui.pz import Camera2D, Camera2DController
 from orbitalengineer.engine.orbitalnp import OrbitalSimController, OrbitalBody
 
 ## The minimum number of degrees betweeen each history point.
 ## Subsequent points below this threshold will be omitted.
 ## Setting this too high will cause history to be too short
-MIN_HISTORY_DEG_CHANGE = 3.0
+MIN_HISTORY_DEG_CHANGE = 2.25
 
 ## Maximum history difference. If two history points are greater than 
 ## this, the history will be cleared.
@@ -30,8 +30,7 @@ MAX_HISTORY_DEG_CHANGE = 30.0
 
 ## The maximum number of points of history to track.
 ## High values can reduce performance.
-MAX_HISTORY_POINTS = int(120 // MIN_HISTORY_DEG_CHANGE)
-
+MAX_HISTORY_POINTS = int(60 // MIN_HISTORY_DEG_CHANGE)
 
 PANEL_PADDING = 2
 
@@ -40,7 +39,7 @@ class BodyMeta:
     id:int
     name:str
     color_fill:tuple[float,float,float]
-    color_stroke:tuple[float,float,float] = (1,1,1)
+    color_stroke:tuple[float,float,float] = (1, 1, 1)
     stroke_width:int = 1
     hist_rec:cairo.RecordingSurface|None = None
     hist_ctx:cairo.Context|None = None
@@ -52,15 +51,11 @@ class OrbitalCanvas(Gtk.DrawingArea):
 
     def __init__(self, orbital:OrbitalSimController):
         super().__init__()
-        self.set_draw_func(self.on_draw)
         self.camera = Camera2D()
         self.controller = Camera2DController(self, self.camera)
         self.orbital = orbital
         self.body_meta:dict[int, BodyMeta] = {}
         self.frame_clock:Gdk.FrameClock|None = None
-        
-        self.avg_tick_per_sec = 0
-        self.avg_steps_per_tick = 0
         
         # State fields
         self.secondary_idx:int|None = None
@@ -77,9 +72,15 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.show_frame_clock = True
         self.show_focus_info = True
         
+        self.t_render = deque(maxlen=10)
+        self.avg_step_duration = 0
+        self.avg_render_duration = 0
+        
         # 
         self._grid_cache_key = None
         self._grid_surface = None
+        
+        self._texture = None
         
         click_controller = Gtk.GestureClick.new()
         click_controller.connect("pressed", self.on_click)
@@ -89,6 +90,19 @@ class OrbitalCanvas(Gtk.DrawingArea):
         motion.connect("motion", self.on_motion)
         self.add_controller(motion)
         self.mouse = (0, 0)
+
+        draw_rate_hz = 20
+        self.draw_interval = 1.0 / draw_rate_hz
+        self.last_draw_time = 0.0
+
+        self.add_tick_callback(self.on_tick)
+        self._cached_surface = None
+
+    def on_tick(self, widget, frame_clock):
+        now = time.monotonic()
+        if now - self.last_draw_time >= self.draw_interval:
+            self.queue_draw()
+        return True
 
     def compute_history(self, idx):
         """Only write a new history point if there has been a significant change."""
@@ -108,9 +122,9 @@ class OrbitalCanvas(Gtk.DrawingArea):
         prev_arg = math.degrees( math.atan2(y2, x2))
         
         diff = abs(h_arg - prev_arg)
-        if diff > MAX_HISTORY_DEG_CHANGE:
-            m.hist.clear()
-        elif diff > MIN_HISTORY_DEG_CHANGE:
+        #if diff > MAX_HISTORY_DEG_CHANGE:
+        #    m.hist.clear()
+        if diff > MIN_HISTORY_DEG_CHANGE:
             m.hist.append((b.x, b.y))
         if len(m.hist) > MAX_HISTORY_POINTS:
             m.hist = m.hist[-MAX_HISTORY_POINTS:]
@@ -179,12 +193,13 @@ class OrbitalCanvas(Gtk.DrawingArea):
         angle = math.degrees(math.atan2(vy, vx))
         
         disp = [
-            #("(x, y)",   f"({shm.x[foc_idx]:>.1f}, {shm.y[foc_idx]:>.1f})"),
+            ("name",     f"{self.body_meta[foc_idx].name} ({self.body_meta[foc_idx].id})"),
             ("mass",     f"{mag_format(shm.mass[foc_idx])}"),
             ("radius",   f"{mag_format(shm.radius[foc_idx])}"),
             ("vx",       f"{mag_format(vx)}/s"),
             ("vy",       f"{mag_format(vy)}/s"),
             ("|v|",      f"{mag_format(mag)}/s"),
+            #("|a|",      f"{mag_format(np.abs(shm.a[foc_idx]))}/s²"),
             ("angle",    f"{angle:>.1f}°")
         ]
         lines = [f"{label:<8} {value:>10}" for label, value in disp]
@@ -248,20 +263,21 @@ class OrbitalCanvas(Gtk.DrawingArea):
 
     def _draw_bodies(self, cr:cairo.Context, min_radius=1):
         for b in self.orbital:
-            if b.radius == 0 or b.mass == 0 or b.idx is None:
+            if b.radius == 0 or b.mass == 0:
                 continue
             
             m = self.body_meta[b.idx]
-            if self.show_history:
+            if self.show_history: # and b.idx == self.secondary_idx:
                 hist = [*m.hist, (b.x, b.y)]
                 for (x1, y1), (x2, y2) in zip(hist, hist[1:]):
-                    cr.set_source_rgba(*m.color_fill, 0.07)
-                    cr.set_line_width(2/self.camera.zoom)
+                    #cr.set_source_rgb(*[ch*0.2 for ch in m.color_fill])
+                    cr.set_source_rgba(*m.color_fill, 0.1)
+                    cr.set_line_width(1.0/self.camera.zoom)
                     cr.move_to(x1,y1)
                     cr.line_to(x2, y2)
                     cr.stroke()
-
-            stroke_width = max(m.stroke_width, 1)
+            
+            stroke_width = max(m.stroke_width, 1/self.camera.zoom)
             radius = max(b.radius, 2/self.camera.zoom) + stroke_width
             cr.set_source_rgb(*m.color_fill)
             cr.arc(b.x, b.y, radius, 0, 2*math.pi)
@@ -283,12 +299,12 @@ class OrbitalCanvas(Gtk.DrawingArea):
         ):
         
         if show_orbital_ellipse:
-           self.draw_ellipse(cr, scale)
+          self.draw_ellipse(cr, scale)
     
         #if self.secondary_idx is not None and show_force_vectors:
         #    forces = compute_forces(self.orbital.shm.x.size, self.orbital.shm, self.secondary_idx)
         #    self._draw_force_lines(cr, self.secondary_idx, forces, color=(1.0, 1, 1), N=5, scale=scale)        
-        
+         
         if self.secondary_idx is not None and show_reticle:
             self._draw_reticle(cr, self.secondary_idx, scale)
         
@@ -300,7 +316,6 @@ class OrbitalCanvas(Gtk.DrawingArea):
     def _compute_average_ellipse(self, primary, secondary):
         if secondary.mass > primary.mass:
             primary, secondary = secondary, primary
-        
         r1 = primary.x, primary.y
         v1 = primary.vx, primary.vy
 
@@ -310,8 +325,12 @@ class OrbitalCanvas(Gtk.DrawingArea):
         M1 = primary.mass
         M2 = secondary.mass
         
+        if not M1 or not M2:
+            return
+        
         result = ellipse_center_focus_primary(r1, v1, r2, v2, M1, M2)
-                
+        return result
+        
         if not hasattr(self, "_ellipse_history"):
             self._ellipse_history = defaultdict(list)
         
@@ -328,6 +347,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
             hist.append({**result, "pidx": primary.idx})
         else:
             hist.clear()
+
         #elif len(hist) > 0:
         #    hist.append({**hist[-1]})
         
@@ -350,17 +370,17 @@ class OrbitalCanvas(Gtk.DrawingArea):
         primary = self.orbital.body(self.primary_idx)
         
         result = self._compute_average_ellipse(primary, secondary)
-        if result is None:
+        if result is None or not result['a'] or not result['b']:
             return
         
-        cr.set_source_rgb(0.1*0.2, 0.4*0.2, 0.2*0.2)
+        cr.set_source_rgba(1, 1, 1, 0.3)
         
         # We are ready to draw the ellipse. 
         # To make rotation simpler, we're set the reference to cx,cy
         cr.save()
         cr.translate(result["cx"], result["cy"])
         cr.rotate(result["theta"])
-        cr.set_line_width(1/scale)
+        cr.set_line_width(2/scale)
         draw_ellipse(cr, 0, 0, result["a"], result["b"], show_semimajor_axis=True)
         cr.restore()
 
@@ -374,9 +394,15 @@ class OrbitalCanvas(Gtk.DrawingArea):
         frame_no = self.frame_clock.get_frame_counter()
 
         surface = create_debug_info(accum,
-            body_count, fps, frame_no, self.avg_tick_per_sec,
-            self.avg_steps_per_tick, self.get_width(), self.get_height()
+            body_count,
+            fps,
+            frame_no,
+            self.avg_step_duration,
+            self.avg_render_duration,
+            self.get_width(),
+            self.get_height()
         )
+        
         cr.set_source_surface(surface)
         cr.paint()
 
@@ -469,34 +495,58 @@ class OrbitalCanvas(Gtk.DrawingArea):
         cr.set_source(self._grid_surface)
         cr.paint()
 
-    def on_draw(self, area, cr:cairo.Context, width, height):
-        self._draw_background(cr, width, height)
+    def do_snapshot(self, snapshot: Gtk.Snapshot):
+        width = self.get_allocated_width()
+        height = self.get_allocated_height()
 
-        if self.secondary_idx is not None and self.track_focused:
-            f = self.orbital.body(self.secondary_idx)
-            self.camera.offset = [f.x, f.y]
+        if self._cached_surface is None or \
+           self._cached_surface.get_width() != width or \
+           self._cached_surface.get_height() != height:
+            self._cached_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
 
-        if self.show_map:
-            self._draw_grid(cr, width, height)
 
-        cr.save()
-        cr.transform(self.camera.get_matrix(width, height))  
-        self._draw_scene(
-            cr,
-            self.camera.zoom,
-            self.show_force_vectors,
-            self.show_history,
-            self.show_orbital_ellipse,
-            self.show_reticle
-        )
-        cr.restore()
+        now = time.monotonic()
+        if now - self.last_draw_time >= self.draw_interval:
+            self.last_draw_time = now
+            cr = cairo.Context(self._cached_surface)
+            
+            start = time.perf_counter()
+            self._draw_background(cr, width, height)
+
+            if self.secondary_idx is not None and self.track_focused:
+                f = self.orbital.body(self.secondary_idx)
+                self.camera.offset = [f.x, f.y]
+
+            if self.show_map:
+                self._draw_grid(cr, width, height)
+
+            cr.save()
+            cr.transform(self.camera.get_matrix(width, height))  
+            self._draw_scene(
+                cr,
+                self.camera.zoom,
+                self.show_force_vectors,
+                self.show_history,
+                self.show_orbital_ellipse,
+                self.show_reticle
+            )
+            cr.restore()
+            
+            if self.show_focus_info:
+                self._draw_focus_info(cr)
+
+            if self.show_frame_clock:
+                self._draw_frame_clock(cr)
+
+            #if self.show_magnifier and self.secondary_idx is not None:
+            #   self.draw_magnifier(cr, self.secondary_idx, 10, 120, 100, 100, 1)
         
-        if self.show_focus_info:
-          self._draw_focus_info(cr)
-
-        if self.show_frame_clock:
-           self._draw_frame_clock(cr)
-
-        #if self.show_magnifier and self.secondary_idx is not None:
-        #   self.draw_magnifier(cr, self.secondary_idx, 10, 120, 100, 100, 1)
-    
+            elapsed = time.perf_counter() - start
+            self.t_render.append(elapsed)
+        
+        # Push cached surface into snapshot every frame
+        rect = Graphene.Rect()
+        rect.init(0, 0, width, height)
+        cr_out = snapshot.append_cairo(rect)
+        cr_out.set_source_surface(self._cached_surface, 0, 0)
+        cr_out.paint()

@@ -5,15 +5,32 @@ from typing import ClassVar
 import numpy as np
 from numpy.typing import NDArray
 
+from orbitalengineer.engine import logger
 from orbitalengineer.ui.fmt import mag_format
 
-fp = np.float64
 
-ST_NOMINAL   = 0
-ST_COLLIDING = 1
-ST_COLLIDED  = 2
+STATUS_NOMINAL = 0
+STATUS_DELETED = 1
+
+INTERACTION_NONE   = 0
+INTERACTION_COLLIDING = 1
+INTERACTION_COLLIDED  = 2
 
 FIELDS = OrderedDict()
+
+# Step info [step_id, dt]
+FIELDS['step'] = lambda N: {
+    'bytesize': 2 * np.dtype(np.float64).itemsize,
+    'dtype': np.float64,
+    'shape': (2,)
+}
+
+# Overall status of the body (0=normal, 1=deleted)
+FIELDS['status'] = lambda N: {
+    'bytesize': N * np.dtype(np.uint8).itemsize,
+    'dtype': np.uint8,
+    'shape': (N,)
+}
 
 # Absolute positon
 FIELDS['r'] = lambda N: {
@@ -38,36 +55,41 @@ FIELDS['a'] = lambda N: {
 
 # Mass
 FIELDS['mass'] = lambda N: {
-    'bytesize': N * np.dtype(fp).itemsize,
-    'dtype': fp,
+    'bytesize': N * np.dtype(np.float64).itemsize,
+    'dtype': np.float64,
     'shape': (N,)
 }
 
 # Radius
 FIELDS['radius'] = lambda N: {
-    'bytesize': N * np.dtype(fp).itemsize,
-    'dtype': fp,
+    'bytesize': N * np.dtype(np.float64).itemsize,
+    'dtype': np.float64,
     'shape': (N,)
 }
 
 # Distance between two bodies
 FIELDS['distance'] = lambda N: {
-    'bytesize': N**2 * np.dtype(fp).itemsize,
-    'dtype': fp,
+    'bytesize': N**2 * np.dtype(np.float64).itemsize,
+    'dtype': np.float64,
     'shape': (N, N)
 }
 
 # Interaction state between two bodies
-FIELDS['state'] = lambda N: {
-    'bytesize': N**2 * np.dtype(np.int8).itemsize,
+FIELDS['interaction'] = lambda N: {
+    'bytesize': N**2 * np.dtype(np.uint8).itemsize,
     'dtype': np.uint8,
     'shape': (N, N)
 }
 
-
 class OrbitalMemory:
     _shm:shared_memory.SharedMemory
     N:int
+    
+    #
+    step:NDArray[np.float64]
+    
+    #
+    status:NDArray[np.uint8]
     
     # Position in the complex plane (X+Yj)
     r:NDArray[np.complex128]
@@ -91,28 +113,34 @@ class OrbitalMemory:
     # The state of the interaction between bodies.
     # Shape (N, N)
     # See the constants at the top of this file for more info.
-    state:NDArray[np.uint8]
+    interaction:NDArray[np.uint8]
     
-    def __init__(self, N:int, name:str|None=None):
+    def __init__(self, N:int, name:str|None=None, second_buffer:bool=False):
         self.N = N
+        self.second_buffer = second_buffer
         self.buffer_size = sum([
-            f(N)['bytesize']
-            for f in FIELDS.values()
+            field['bytesize']
+            for field in [
+                f(N) for f in FIELDS.values()
+            ]
         ])
         
         if name is not None:
+            logger.info("Connecting to existing shared memory '%s' (%s buffer)", name, 'second' if second_buffer else 'first')
             self._shm = shared_memory.SharedMemory(name=name)
+        
         else:
             # Create shared memory block
-            self._shm = shared_memory.SharedMemory(create=True, size=self.buffer_size)
+            self._shm = shared_memory.SharedMemory(create=True, size=(self.buffer_size * 2))
             atexit.register(lambda: self._shm.unlink())
-            print(f"Allocated {mag_format(self.buffer_size)}B of shared memory.")
+            logger.debug(f"Allocated {mag_format(self.buffer_size)}B of shared memory.")
 
-        offset = 0
+        offset = 0 if not second_buffer else self.buffer_size
         for field, f in FIELDS.items():
             f = f(N)
             setattr(self, field, np.ndarray(f['shape'], dtype=f['dtype'], buffer=self._shm.buf, offset=offset))
-            getattr(self, field).fill(0)
+            if name is None:
+                getattr(self, field).fill(0)
             offset += f['bytesize']
 
 
