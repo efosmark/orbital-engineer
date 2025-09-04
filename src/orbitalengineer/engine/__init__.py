@@ -12,8 +12,12 @@ file_handler.setFormatter(logging.Formatter(
 ))
 logger.addHandler(file_handler)
 
-if os.environ.get("VERBOSE", False):
-    logger.setLevel(logging.INFO)
+log_level_env:str|None = os.environ.get("LOG_LEVEL", None)
+if log_level_env:
+    levels_by_name = logging.getLevelNamesMapping()
+    level = levels_by_name[log_level_env.upper()]
+    
+    logger.setLevel(level)
     logger.propagate = False
     handler = logging.StreamHandler()
 

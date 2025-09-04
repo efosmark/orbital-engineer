@@ -9,13 +9,22 @@ from typing import Callable
 
 import numpy as np
 
+np.set_printoptions(
+    precision=2, 
+    edgeitems=1,
+    linewidth=30,
+    suppress=True,
+    threshold=30,
+    floatmode="fixed"
+)
+
 from orbitalengineer.engine import logger, worker
 from orbitalengineer.engine.kernel import integrator_leapfrog_kdk_njit
 from orbitalengineer.engine.body import OrbitalBody
-from orbitalengineer.engine.memory import INTERACTION_NONE, STATUS_DELETED, BodyProxy, OrbitalMemory
+from orbitalengineer.engine.memory import HISTORY_DEPTH, INTERACTION_NONE, STATUS_DELETED, STATUS_NOMINAL, BodyProxy, OrbitalMemory, offset
 
 USE_WORKERS = True
-MAX_NUM_PROCESSES = 2000
+MAX_NUM_PROCESSES = mp.cpu_count() - 1
 MIN_BODIES_PER_PROCESS = 100
 
 def _default_interaction_handler(i:int, j:int, prev:int, curr:int):
@@ -28,10 +37,10 @@ class OrbitalSimController:
         self._on_interaction = _default_interaction_handler
         self._bodies:list[OrbitalBody] = []
         self.inout_queue = []
-        self.step_id = 0
+        self.step_id = 1
         
         self.speed = 1.0     # user slider: 0.1x … 100x
-        self.dt_base = 1/30  # physics step (sec of sim time)
+        self.dt_base = 1/10.0  # physics step (sec of sim time)
         self.accum = 0.0
         
         self.use_workers = USE_WORKERS
@@ -41,7 +50,6 @@ class OrbitalSimController:
         self.sim_initialized = False
 
         self.t_step = deque(maxlen=10)
-        
 
     def set_interaction_callback(self, cb: Callable[[int,int,int,int], bool|None]):
         self.cb = cb
@@ -53,17 +61,16 @@ class OrbitalSimController:
         return idx
     
     def find_bodies_at(self, x:float, y:float, margin:float=10):
-        mask = self.shm.status != STATUS_DELETED
-        indices = np.arange(self.shm.N)[mask]
+        indices = np.arange(self.shm.N)
         
         # Apply a bit of margin to the radius (e.g. if a radius is too small, it cant be clicked)
-        radius = self.shm.radius[indices] + margin
+        radius = self.shm.radius[offset(self.step_id), indices] + margin
 
         # Relative difference between the click and every location
-        d = np.complex128(x, y) - self.shm.r[indices]
+        d = np.complex128(x, y) - self.shm.position[np.int64(self.step_id-1) % HISTORY_DEPTH, indices]
         
         # Create a mask indicating where there is crossover
-        mask = (np.abs(d) <= radius)
+        mask = (np.abs(d) <= radius) & self.shm.status[offset(self.step_id), indices] == STATUS_NOMINAL
         
         # Get the indices 
         return indices[mask]
@@ -80,17 +87,15 @@ class OrbitalSimController:
         return BodyProxy(idx, self.shm)
 
     def __iter__(self):
-        if self.use_workers and not self.workers_ready:
+        if self.use_workers and not self.workers_ready or not self.sim_initialized:
             logger.warning("Cannot iterate over bodies prior to workers being ready.")
             return
-        
-        #body_ids = np.argwhere(self.mask)
-        #for k in np.arange(body_ids.size):
+        step_offset = offset(self.step_id)
         for i in range(self.shm.N):
-            #i = body_ids[k]
-            if self.shm.status[i] == STATUS_DELETED:
+            if self.shm.status[step_offset, i] == STATUS_DELETED:
                 continue
             yield self.body(int(i))
+
 
     def _init_worker_processes(self):
         init_start = time.perf_counter()
@@ -107,11 +112,7 @@ class OrbitalSimController:
         
         logger.info("Starting up %s workers.", self.num_processes)
         for i in range(self.num_processes):
-            p = mp.Process(
-                target=worker.worker_integrator_kdk,
-                args=(self.shm.N, self.shm._shm.name, barrier_loop, self.barrier_sync, i, self.num_processes),
-                daemon=True
-            )
+            p = worker.OrbitalWorker(self.shm.N, self.shm._shm.name, barrier_loop, self.barrier_sync, i, self.num_processes)
             p.start()
             atexit.register(lambda: p.kill())
     
@@ -123,7 +124,6 @@ class OrbitalSimController:
 
     def _tune_strategy(self):
         N = len(self._bodies)
-        
         # No tuning necessary
         if not self.use_workers:
             if N >= MIN_BODIES_PER_PROCESS:
@@ -133,10 +133,6 @@ class OrbitalSimController:
             return
 
         self.num_processes = max(1, len(self._bodies) // MIN_BODIES_PER_PROCESS)
-        if self.num_processes == 1:
-            self.use_workers = False
-            logger.warning("Not enough bodies to use workers. Tuning to sequential mode instead.")
-            return
         
         logger.info("Number of processes reduced to %s", self.num_processes)
         
@@ -146,89 +142,60 @@ class OrbitalSimController:
         self.last_now = time.perf_counter()
 
         # Initialize the memory and populate the arrays
-        shm_A = self.shm = OrbitalMemory(len(self._bodies))
-        shm_B = self.shm_B = OrbitalMemory(self.shm.N, name=self.shm._shm.name, second_buffer=True)
+        self.shm = OrbitalMemory(len(self._bodies))
         
-        shm_A.interaction[:] = INTERACTION_NONE
+        self.shm.interaction[:] = INTERACTION_NONE
+        self.shm.status[0,] = STATUS_NOMINAL
         for i, b in enumerate(self._bodies):
-            shm_A.r[i]      = shm_B.r[i]      = np.complex128(b.x, b.y)
-            shm_A.v[i]      = shm_B.v[i]      = np.complex128(b.vx, b.vy)
-            shm_A.mass[i]   = shm_B.mass[i]   = b.mass
-            shm_A.radius[i] = shm_B.radius[i] = b.radius
-        
+            self.shm.position[0, i] = np.complex128(b.x, b.y)
+            self.shm.velocity[0, i] = np.complex128(b.vx, b.vy)
+            self.shm.mass[0, i] = b.mass
+            self.shm.radius[0, i] = b.radius
         logger.info("Arrays initialized for %s bodies.", len(self._bodies))
         
-        self._tune_strategy()
+        #self._tune_strategy()
         if self.use_workers:
             self._init_worker_processes()
         
         # Full index pairs for use with single-process integrator
-        self.ix, self.jx = np.triu_indices(self.shm.N, k=1)
-        self.mask = (self.shm.status[self.ix] != STATUS_DELETED) & (self.shm.status[self.jx] != STATUS_DELETED)
+        #self.ix, self.jx = np.triu_indices(self.shm.N, k=1)
+        #self.mask = (self.shm.status[self.ix] != STATUS_DELETED) & (self.shm.status[self.jx] != STATUS_DELETED)
         self.current_state = np.copy(self.shm.interaction)
         self.sim_initialized = True
+        logger.info("Sim was initialized.")
     
-    def _step_seq(self, dt_step):
-        self.mask = (self.shm.status[self.ix] != STATUS_DELETED) & (self.shm.status[self.jx] != STATUS_DELETED)
-        self.ix, self.jx = self.ix[self.mask], self.jx[self.mask]      
     
-        integrator_leapfrog_kdk_njit(
-            self.ix,
-            self.jx,
-            self.shm.v,
-            self.shm.r,
-            self.shm.a,
-            self.shm.radius,
-            self.shm.mass,
-            self.shm.distance,
-            self.shm.interaction,
-            np.float64(dt_step)
-        )
-    
-    def _step_mp(self, dt_step):
-        self.shm_B.step[0] = self.shm.step[0] = np.float64(self.step_id)
-        self.shm_B.step[1] = self.shm.step[1] = np.float64(dt_step)
-        self.barrier_sync.wait(timeout=5)
-        self.barrier_sync.wait(timeout=5)
-
-    def step(self, dt_step):
-        start = time.perf_counter()
-        if self.use_workers:
-            self._step_mp(dt_step)
-        else:
-            self._step_seq(dt_step)
-        self.t_step.append(time.perf_counter() - start)
-
-
-    def frame(self, now, init=False):
-        if not init:
-            if not self.sim_initialized:
-                logger.warning("frame() was called before simulation initialization.")
-                return 0
-            
-            if self.use_workers and not self.workers_ready:
-                logger.warning("frame() was called prior to the workers being ready.")
-                return 0
+    def frame(self, now, tick_id):
+        if not self.sim_initialized:
+           logger.warning("frame() was called before simulation initialization.")
+           return 0
+        
+        if self.use_workers and not self.workers_ready:
+           logger.warning("frame() was called prior to the workers being ready.")
+           return 0
 
         wall_dt = now - self.last_now
-        self.accum += wall_dt * (self.speed)
+        self.accum += wall_dt * self.speed
 
-        dt_step = self.dt_base           # <- for now, fixed cap
-        steps = 0
-        MAX_STEPS_PER_FRAME = 32
-        if self.step_id < 100:
-            MAX_STEPS_PER_FRAME = 1
-        
-        while self.accum >= dt_step and steps < MAX_STEPS_PER_FRAME:
-            self.step(dt_step)
+        dt_step = self.dt_base # <- for now, fixed cap
+        MAX_STEPS_PER_FRAME = 45
 
-            self.accum -= dt_step
-            steps += 1
-            self.step_id += 1
-        
-        #self._check_state()
-        self.last_now = now
-        return steps
+        num_steps = min(self.accum // dt_step, MAX_STEPS_PER_FRAME)
+        if num_steps > 0:
+            start = time.perf_counter()
+            self.shm.step[0] = np.float64(self.step_id)
+            self.shm.step[1] = np.float64(num_steps)
+            self.shm.step[2] = np.float64(dt_step)
+                        
+            self.barrier_sync.wait(timeout=10)
+            self.barrier_sync.wait()
+                    
+            self.accum -= (num_steps * dt_step)
+            self.step_id += int(num_steps)
+            self.last_now = now
+            self.t_step.append((time.perf_counter() - start)/num_steps)
+
+        return num_steps
 
     def _check_state(self):
         mask = self.current_state != self.shm.interaction

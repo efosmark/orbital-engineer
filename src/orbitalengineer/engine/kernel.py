@@ -1,7 +1,15 @@
+""" 
+
+SEQUENTIAL KDK Leapfrog
+-----------------------
+
+This is no longer used.
+"""
+
 from numpy.typing import NDArray
 import numpy as np
 from numba import njit, prange
-from orbitalengineer.engine.memory import INTERACTION_COLLIDING, INTERACTION_COLLIDED, INTERACTION_NONE
+from orbitalengineer.engine.memory import INTERACTION_COLLIDING, INTERACTION_COLLISION, INTERACTION_NONE
 
 
 @njit
@@ -47,12 +55,12 @@ def compute_collisions(
             radius[big] = np.sqrt(mass[big] / np.pi)
             if radius[big] < 1:
                 radius[big] = 1
-            state[big, small] = INTERACTION_COLLIDED
+            state[big, small] = INTERACTION_COLLISION
             
             v[small] = 0
             mass[small] = 0
             radius[small] = 0
-            state[small, big] = INTERACTION_COLLIDED
+            state[small, big] = INTERACTION_COLLISION
 
 @njit
 def compute_accel(

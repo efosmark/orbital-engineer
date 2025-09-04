@@ -1,17 +1,17 @@
-from collections import deque
 import os
+#os.sched_setaffinity(0, {0})
+
+from collections import deque
 import statistics
-import threading
 import time
 
 import numpy as np
-os.sched_setaffinity(0, {0, 1, 2})
+np.set_printoptions(precision=3)
 
 from orbitalengineer.engine import logger
 from orbitalengineer.engine.orbitalnp import OrbitalSimController
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Gio, GLib #, Adw
 from orbitalengineer.ui import canvas
-
 
 APP_ID = "com.qmew.OrbitalEngineer"
 WINDOW_DEFAULT_SIZE = (800, 600)
@@ -25,25 +25,18 @@ class App(Gtk.Application):
         self.paused = False
         self.start_maximized = False
 
-        self.tick = 0
+        self.tick_id = 0
         self._tick_duration = deque(maxlen=100)
         self._tick_steps = deque(maxlen=100)
         
         self.orbital = OrbitalSimController()
         self.canvas = canvas.OrbitalCanvas(self.orbital)
-        self.canvas.set_hexpand(True)
-        self.canvas.set_vexpand(True)
-        self.canvas.set_halign(Gtk.Align.FILL)
-        self.canvas.set_valign(Gtk.Align.FILL)
-        
-        self.__init_menu_actions()
     
-    def do_startup(self):
-        Gtk.Application.do_startup(self)
     
     def start_simulation(self):
         self.orbital.init_sim()
-        GLib.idle_add(self.idle_loop)
+        #GLib.timeout_add(33, self.on_simulation_tick)
+        #GLib.idle_add(self.idle_loop)
     
     def __init_menu_actions(self):
         def add_toggle_action(name: str, initial: bool, handler):
@@ -53,14 +46,31 @@ class App(Gtk.Application):
             action.connect("change-state", handler)
             self.add_action(action)
 
+        def on_toggle_changed(action: Gio.SimpleAction, value: GLib.Variant):
+            action.set_state(value)
+            name = action.get_name()
+            state = value.get_boolean()
+            if name == "show_grid":
+                self.canvas.show_map = state
+            elif name == "show_history":
+                self.canvas.show_history = state
+            elif name == "show_force_vectors":
+                self.canvas.show_force_vectors = state
+            elif name == "show_orbital_ellipse":
+                self.canvas.show_orbital_ellipse = state
+            elif name == "track_focused":
+                self.canvas.track_focused = state
+            elif name == "show_magnifier":
+                self.canvas.show_magnifier = state
+
         # Two stateful (boolean) actions to back the checkable menu items.
-        add_toggle_action("pause", False, self.on_toggle_changed)
-        add_toggle_action("show_grid", self.canvas.show_map, self.on_toggle_changed)
-        add_toggle_action("show_force_vectors", self.canvas.show_force_vectors, self.on_toggle_changed)
-        add_toggle_action("show_history", self.canvas.show_history, self.on_toggle_changed)
-        add_toggle_action("show_orbital_ellipse", self.canvas.show_orbital_ellipse, self.on_toggle_changed)
-        add_toggle_action("track_focused", self.canvas.track_focused, self.on_toggle_changed)
-        add_toggle_action("show_magnifier", self.canvas.show_magnifier, self.on_toggle_changed)
+        add_toggle_action("pause", False, on_toggle_changed)
+        add_toggle_action("show_grid", self.canvas.show_map, on_toggle_changed)
+        add_toggle_action("show_force_vectors", self.canvas.show_force_vectors, on_toggle_changed)
+        add_toggle_action("show_history", self.canvas.show_history, on_toggle_changed)
+        add_toggle_action("show_orbital_ellipse", self.canvas.show_orbital_ellipse, on_toggle_changed)
+        add_toggle_action("track_focused", self.canvas.track_focused, on_toggle_changed)
+        add_toggle_action("show_magnifier", self.canvas.show_magnifier, on_toggle_changed)
 
         # A regular (stateless) action just to show contrast.
         act_quit = Gio.SimpleAction.new("quit", None)
@@ -75,23 +85,6 @@ class App(Gtk.Application):
         self.set_accels_for_action("app.show_history", ["h"])
         self.set_accels_for_action("app.track_focused", ["t"])
         self.set_accels_for_action("app.show_magnifier", ["m"])
-
-    def on_toggle_changed(self, action: Gio.SimpleAction, value: GLib.Variant):
-        action.set_state(value)
-        name = action.get_name()
-        state = value.get_boolean()
-        if name == "show_grid":
-            self.canvas.show_map = state
-        elif name == "show_history":
-            self.canvas.show_history = state
-        elif name == "show_force_vectors":
-            self.canvas.show_force_vectors = state
-        elif name == "show_orbital_ellipse":
-           self.canvas.show_orbital_ellipse = state
-        elif name == "track_focused":
-           self.canvas.track_focused = state
-        elif name == "show_magnifier":
-           self.canvas.show_magnifier = state
 
     def __build_menu(self) -> Gio.Menu:
         def bool_item(label: str | None = None, detailed_action: str | None = None):
@@ -116,8 +109,15 @@ class App(Gtk.Application):
         top.append_section("Options", menu)
         top.append_section("Focused", focused_menu)
         top.append_section(None, section)
-        
         return top
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        self.canvas.set_hexpand(True)
+        self.canvas.set_vexpand(True)
+        self.canvas.set_halign(Gtk.Align.FILL)
+        self.canvas.set_valign(Gtk.Align.FILL)        
+        self.__init_menu_actions()
 
     def do_activate(self):
         Gtk.Application.do_activate(self)
@@ -126,15 +126,14 @@ class App(Gtk.Application):
             win = self._build_window()
             win.set_default_size(*WINDOW_DEFAULT_SIZE)
             win.set_child(self.canvas)
-            #win.add_tick_callback(self.on_tick)
+            win.add_tick_callback(self.on_simulation_tick)
+            logger.info("Main window configured and ready to present.")
         win.present()
         if self.start_maximized:
             win.maximize()
     
     def _build_window(self) -> Gtk.ApplicationWindow:
         win = Gtk.ApplicationWindow(application=self, title=APP_ID)
-        win.set_default_size(*WINDOW_DEFAULT_SIZE)
-        win.set_child(self.canvas)
         
         # Key controller
         controller = Gtk.EventControllerKey.new()
@@ -152,9 +151,9 @@ class App(Gtk.Application):
         # Adjustment controls range/step/value
         adj = Gtk.Adjustment(
             value=1,
-            lower=0.1,
+            lower=0.01,
             upper=100,
-            step_increment=0.1,
+            step_increment=0.01,
             page_increment=10
         )
         
@@ -270,41 +269,32 @@ class App(Gtk.Application):
         
         # (Temporary)
         # Lock the speed to the computed max speed
-        if frame_clock is not None and frame_clock.get_fps() and len(self.canvas.t_render) > 0 and len(self.orbital.t_step) > 0:
+        
+        if len(self.canvas.t_render) > 0 and len(self.orbital.t_step) > 0:
             t_render = statistics.mean(self.canvas.t_render)
             t_step = statistics.mean(self.orbital.t_step)
             
-            #fps = frame_clock.get_fps()
-            #frame_time = 1/fps
-            #margin = frame_time * 0.2
-            #speed_max = ((frame_time - margin - t_render) / t_step) * (self.orbital.dt_base / frame_time)
-            #self.scale_speed.set_value(speed_max)
+            fc = self.canvas.get_frame_clock()
+            if fc and fc.get_fps() > 0:
+                fps = fc.get_fps()
+                frame_time = 1/fps
+                margin = frame_time * 0.2
+                speed_max = ((frame_time - margin - t_render) / t_step) * (self.orbital.dt_base / frame_time)
+                #self.scale_speed.set_value(speed_max)
             
             self.canvas.avg_step_duration = t_step
             self.canvas.avg_render_duration = t_render
         
-        steps = self.orbital.frame(start)
-
-        self.tick += 1
-        self._tick_steps.append(steps)
-        self._tick_duration.append(time.perf_counter() - start)
+        self.last_tick_id = self.tick_id
         
-        self.canvas.frame_clock = frame_clock
+        # Run a full sequence of steps at a given tick_id
+        # The tick_id is used for memory offsets, so it is important to keep it sequential.
+        steps = self.orbital.frame(start, self.tick_id)
+        if steps > 0:
+            self.canvas.tick_id = self.tick_id
+            self.canvas.step_id = self.orbital.step_id - 1
+            self.tick_id += 1
+            self._tick_steps.append(steps)
+            self._tick_duration.append(time.perf_counter() - start)
+            self.canvas.queue_draw()
         return True
-
-    def compute_history(self):
-        for idx in range(self.orbital.shm.mass.size):
-            if self.orbital.shm.mass[idx] == 0:
-                continue
-            self.canvas.compute_history(idx)
-            
-    def idle_loop(self):
-        win = self.get_active_window()
-        if win is None:
-            return False
-        
-        clock = win.get_frame_clock()
-        self.on_simulation_tick(self.canvas, clock)
-        GLib.idle_add(self.compute_history)
-        GLib.idle_add(self.idle_loop)
-        

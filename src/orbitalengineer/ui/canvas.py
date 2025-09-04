@@ -8,10 +8,12 @@ import time
 import numpy as np
 import cairo
 
+from orbitalengineer.engine.memory import HISTORY_DEPTH, BodyProxy, offset
 from orbitalengineer.helpers import random_color
 from orbitalengineer.ui.debug import create_debug_info
 from orbitalengineer.ui.fmt import mag_format
 from orbitalengineer.ui.grid import create_grid_surface
+from orbitalengineer.ui.history import offset_index
 from orbitalengineer.ui.panel import create_panel
 from orbitalengineer.ui.ea4 import draw_ellipse
 from orbitalengineer.ui.ell import ellipse_center_focus_primary
@@ -56,6 +58,9 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.orbital = orbital
         self.body_meta:dict[int, BodyMeta] = {}
         self.frame_clock:Gdk.FrameClock|None = None
+        self.step_id = 0
+        self.tick_id = 0
+        self.last_tick = -1
         
         # State fields
         self.secondary_idx:int|None = None
@@ -103,31 +108,6 @@ class OrbitalCanvas(Gtk.DrawingArea):
         if now - self.last_draw_time >= self.draw_interval:
             self.queue_draw()
         return True
-
-    def compute_history(self, idx):
-        """Only write a new history point if there has been a significant change."""
-        m = self.body_meta[idx]
-        b = self.orbital.body(idx)
-        
-        if len(m.hist) <= 2:
-            m.hist.append((b.x, b.y))
-            return 
-
-        n3, n2, n1 = [*m.hist[-2:], (b.x, b.y)]
-        
-        x2, y2 = n2[0] - n3[0], n2[1] - n3[1]
-        x1, y1 = n1[0] - n3[0], n1[1] - n3[1]
-        
-        h_arg = math.degrees(math.atan2(y1, x1))
-        prev_arg = math.degrees( math.atan2(y2, x2))
-        
-        diff = abs(h_arg - prev_arg)
-        #if diff > MAX_HISTORY_DEG_CHANGE:
-        #    m.hist.clear()
-        if diff > MIN_HISTORY_DEG_CHANGE:
-            m.hist.append((b.x, b.y))
-        if len(m.hist) > MAX_HISTORY_POINTS:
-            m.hist = m.hist[-MAX_HISTORY_POINTS:]
 
     def on_click(self, gesture: Gtk.GestureClick, n_press: int, x: float, y: float):
         if n_press < 2:
@@ -188,14 +168,20 @@ class OrbitalCanvas(Gtk.DrawingArea):
     def _draw_body_info(self, foc_idx, name:str):
         shm = self.orbital.shm
         
-        vx, vy = shm.v[foc_idx].real, shm.v[foc_idx].imag
-        mag = math.hypot(vx, vy)
+        b = self.orbital.body(foc_idx)
+        x,y = b.get_xy(self.step_id)
+        
+        velocity = b.get_velocity(self.step_id)
+        vx, vy = velocity.real, velocity.imag
+        
+        mag = np.abs(velocity)
         angle = math.degrees(math.atan2(vy, vx))
         
         disp = [
             ("name",     f"{self.body_meta[foc_idx].name} ({self.body_meta[foc_idx].id})"),
-            ("mass",     f"{mag_format(shm.mass[foc_idx])}"),
-            ("radius",   f"{mag_format(shm.radius[foc_idx])}"),
+            ("(x, y)",    f"({mag_format(x)}, {mag_format(y)})"),
+            ("mass",     f"{mag_format(shm.get_body_mass(self.step_id, foc_idx))}"),
+            ("radius",   f"{mag_format(shm.get_body_radius(self.step_id, foc_idx))}"),
             ("(vx, vy)", f"({mag_format(vx)}/s, {mag_format(vy)}/s)"),
             ("|v|",      f"{mag_format(mag)}/s"),
             #("|a|",      f"{mag_format(np.abs(shm.a[foc_idx]))}/s²"),
@@ -233,14 +219,17 @@ class OrbitalCanvas(Gtk.DrawingArea):
         cr.set_line_cap(cairo.LineCap.ROUND)
         cr.set_line_width(2.5/scale)
         cr.set_source_rgb(0.7, 0.7, 0.7)
-        ring_radius = body.radius + (self.body_meta[body.idx].stroke_width/self.camera.zoom) + (10.0 / scale)
-        cr.arc(body.x, body.y, ring_radius, 0, 2*math.pi)
+        ring_radius = body.get_radius(self.step_id) + (self.body_meta[body.idx].stroke_width/self.camera.zoom) + (10.0 / scale)
+        
+        pos = body.get_position(self.step_id)
+        x, y = pos.real, pos.imag
+        cr.arc(x, y, ring_radius, 0, 2*math.pi)
         cr.stroke()
         cr.save()
         try:
-            cr.translate(body.x, body.y)
+            cr.translate(x, y)
         except cairo.Error:
-            print(f"ERROR. Cannot translate {body.x} and {body.y}")
+            print(f"ERROR. Cannot translate {x} and {y}")
             cr.restore()
             return
         reticle_count = 3
@@ -261,35 +250,61 @@ class OrbitalCanvas(Gtk.DrawingArea):
 
     def _draw_bodies(self, cr:cairo.Context, min_radius=1):
         for b in self.orbital:
-            if b.radius == 0 or b.mass == 0:
+            radius = b.get_radius(self.step_id)
+            if radius == 0 or b.get_mass(self.step_id) == 0:
                 continue
             
+            pos = b.get_position(self.step_id)
+            x,y = pos.real, pos.imag
             m = self.body_meta[b.idx]
-            if self.show_history: # and b.idx == self.secondary_idx:
-                hist = [*m.hist, (b.x, b.y)]
-                for i, ((x1, y1), (x2, y2)) in enumerate(zip(hist, hist[1:])):
-                    if i < MAX_HISTORY_POINTS * 0.5:
-                        i = len(m.hist) - i
-                        alpha = (1 - (i/len(m.hist))) * 0.8
-                    else:
-                        alpha = 0.8
-                    cr.set_source_rgba(*m.color_fill, alpha)
-                    cr.set_line_width(1.0/self.camera.zoom)
-                    cr.move_to(x1,y1)
-                    cr.line_to(x2, y2)
-                    cr.stroke()
+                        
+            radius = max(b.get_radius(self.step_id), 0.5/self.camera.zoom)
             
-            stroke_width = m.stroke_width/self.camera.zoom
-            radius = max(b.radius, 2/self.camera.zoom) + stroke_width
             cr.set_source_rgb(*m.color_fill)
-            cr.arc(b.x, b.y, radius, 0, 2*math.pi)
+            cr.arc(x, y, radius, 0, 2*math.pi)
             cr.fill()
             
-            cr.set_source_rgb(*m.color_stroke)
-            cr.set_line_width(stroke_width)
-            cr.arc(b.x, b.y, radius, 0, 2*math.pi)
-            cr.stroke()
+            #cr.set_source_rgb(*m.color_stroke)
+            #cr.set_line_width(1/self.camera.zoom)
+            #cr.arc(x, y, radius, 0, 2*math.pi)
+            #cr.stroke()
+            
+            if self.show_history:
+                cr.set_line_width(2/self.camera.zoom)
+                hp = self.orbital.shm.position
+                hv = self.orbital.shm.velocity
 
+                last_angle = None
+                last_point = None
+
+                steps = np.arange(max(0, int(self.tick_id-HISTORY_DEPTH+1)), self.tick_id+1) % HISTORY_DEPTH
+                
+                for tid, (v1,p1) in enumerate(zip(hv[steps, b.idx], hp[steps, b.idx])):
+                    if p1 == 0: continue
+
+                    angle = np.degrees(np.atan2(v1.imag, v1.real))
+                    if last_angle is None or last_point is None:
+                        last_angle = angle
+                        last_point = p1
+                        continue
+                    
+                    diff = abs(angle - last_angle)
+
+                    if diff > 2.25:
+                        alpha = float(0.2 + ((tid/min(int(HISTORY_DEPTH), self.tick_id)) * 0.4))
+                        cr.set_source_rgba(*m.color_fill, alpha)
+                        cr.move_to(last_point.real, last_point.imag)
+                        cr.line_to(p1.real, p1.imag)
+                        cr.stroke()
+                        
+                        last_angle = angle
+                        last_point = p1
+
+                if last_point is not None:
+                    cr.move_to(last_point.real, last_point.imag)
+                    cr.line_to(x, y)
+                    cr.stroke()
+                
     def _draw_scene(
         self,
         cr:cairo.Context,
@@ -306,23 +321,31 @@ class OrbitalCanvas(Gtk.DrawingArea):
         #if self.secondary_idx is not None and show_force_vectors:
         #    forces = compute_forces(self.orbital.shm.x.size, self.orbital.shm, self.secondary_idx)
         #    self._draw_force_lines(cr, self.secondary_idx, forces, color=(1.0, 1, 1), N=5, scale=scale)        
-         
+        
         if self.secondary_idx is not None and show_reticle:
             self._draw_reticle(cr, self.secondary_idx, scale)
         
         self._draw_bodies(cr, 2/scale)
 
-    def _compute_average_ellipse(self, primary, secondary):
-        if secondary.mass > primary.mass:
+    def _compute_average_ellipse(self, primary:BodyProxy, secondary:BodyProxy):
+        if secondary.get_mass(self.step_id) > primary.get_mass(self.step_id):
             primary, secondary = secondary, primary
-        r1 = primary.x, primary.y
-        v1 = primary.vx, primary.vy
-
-        r2 = secondary.x, secondary.y
-        v2 = secondary.vx, secondary.vy
         
-        M1 = primary.mass
-        M2 = secondary.mass
+        prim_position = primary.get_position(self.step_id)
+        sec_position = secondary.get_position(self.step_id)
+        
+        prim_velocity = primary.get_velocity(self.step_id)
+        sec_velocity = secondary.get_velocity(self.step_id)
+        
+        
+        r1 = prim_position.real, prim_position.imag
+        v1 = prim_velocity.real, prim_velocity.imag
+
+        r2 = sec_position.real, sec_position.imag
+        v2 = sec_velocity.real, sec_velocity.imag
+        
+        M1 = primary.get_mass(self.step_id)
+        M2 = secondary.get_mass(self.step_id)
         
         if not M1 or not M2:
             return
@@ -384,13 +407,15 @@ class OrbitalCanvas(Gtk.DrawingArea):
         cr.restore()
 
     def _draw_frame_clock(self, cr:cairo.Context):
-        if not self.frame_clock:
-            return
-
         accum = self.orbital.accum
-        body_count = np.count_nonzero(self.orbital.shm.mass)
-        fps = self.frame_clock.get_fps()
-        frame_no = self.frame_clock.get_frame_counter()
+        body_count = np.count_nonzero(self.orbital.shm.mass[offset(self.step_id),])
+        
+        frame_clock = self.get_frame_clock()
+        if frame_clock is None:
+            return
+        
+        fps = frame_clock.get_fps()
+        frame_no = frame_clock.get_frame_counter()
 
         surface = create_debug_info(accum,
             body_count,
@@ -406,6 +431,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
         cr.paint()
 
     def draw_magnifier(self, cr, idx, rx, ry, rwidth, rheight, scale=1.0):
+        raise NotImplementedError()
         cr.set_source_rgb(0, 0, 0)
         cr.rectangle(rx, ry, rwidth, rheight)
         cr.fill()
@@ -423,7 +449,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
         
         min_width = 3.0
         max_width = rwidth * 0.85
-        diam = b.radius * 2.0
+        diam = b.get_radius(self.step_id) * 2.0
         if diam > max_width:
             scale = (max_width / diam)
         elif diam < min_width:
@@ -463,10 +489,19 @@ class OrbitalCanvas(Gtk.DrawingArea):
         if self.secondary_idx is not None and self.primary_idx is not None:
             secondary = self.orbital.body(self.secondary_idx)
             primary = self.orbital.body(self.primary_idx)
+            primary_x, primary_y = primary.get_xy(self.step_id)
+            secondary_x, secondary_y = secondary.get_xy(self.step_id)
             
-            dx, dy = primary.x - secondary.x, primary.y - secondary.y
-            dvx = primary.vx - secondary.vx
-            dvy = primary.vy - secondary.vy
+            dx, dy = primary_x - secondary_x, primary_y - secondary_y
+            
+            p_velocity = primary.get_velocity(self.step_id)
+            primary_vx, primary_vy = p_velocity.real, p_velocity.imag
+            
+            s_velocity = secondary.get_velocity(self.step_id)
+            secondary_vx, secondary_vy = s_velocity.real, s_velocity.imag
+            
+            dvx = primary_vx - secondary_vx
+            dvy = primary_vy - secondary_vy
             
             disp = [
                 ("distance",      f"{mag_format(math.hypot(dx, dy))}"),
@@ -502,7 +537,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
 
 
         now = time.monotonic()
-        if now - self.last_draw_time >= self.draw_interval:
+        if now - self.last_draw_time >= self.draw_interval and self.tick_id > self.last_tick:
             self.last_draw_time = now
             cr = cairo.Context(self._cached_surface)
             
@@ -511,7 +546,9 @@ class OrbitalCanvas(Gtk.DrawingArea):
 
             if self.secondary_idx is not None and self.track_focused:
                 f = self.orbital.body(self.secondary_idx)
-                self.camera.offset = [f.x, f.y]
+                fpos = f.get_position(self.step_id)
+                self.camera.offset = [fpos.real, fpos.imag]
+                #self.camera.offset = [f.x, f.y]
 
             if self.show_map:
                 self._draw_grid(cr, width, height)
