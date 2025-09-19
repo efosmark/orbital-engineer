@@ -1,21 +1,22 @@
+import atexit
 import os
-#os.sched_setaffinity(0, {0})
+os.sched_setaffinity(0, {0})
 
 from collections import deque
 import statistics
+import threading
 import time
-
 import numpy as np
 np.set_printoptions(precision=3)
 
+from orbitalengineer.engine.memory import STATUS_DELETED
 from orbitalengineer.engine import logger
 from orbitalengineer.engine.orbitalnp import OrbitalSimController
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Gio, GLib #, Adw
 from orbitalengineer.ui import canvas
 
 APP_ID = "com.qmew.OrbitalEngineer"
-WINDOW_DEFAULT_SIZE = (800, 600)
-
+WINDOW_DEFAULT_SIZE = (1200, 800)
 
 class App(Gtk.Application):
 
@@ -31,12 +32,22 @@ class App(Gtk.Application):
         
         self.orbital = OrbitalSimController()
         self.canvas = canvas.OrbitalCanvas(self.orbital)
+        
+        self.logic_thread = threading.Thread(target=self.logic_loop, daemon=True)
+        self.logic_running = False
+        
+        @atexit.register
+        def close_thread():
+            self.logic_running = False
     
+    def logic_loop(self):
+        while self.logic_running:
+            self.on_simulation_tick(self.canvas, self.canvas.get_frame_clock())
     
     def start_simulation(self):
         self.orbital.init_sim()
-        #GLib.timeout_add(33, self.on_simulation_tick)
-        #GLib.idle_add(self.idle_loop)
+        self.logic_running = True
+        #self.logic_thread.start()
     
     def __init_menu_actions(self):
         def add_toggle_action(name: str, initial: bool, handler):
@@ -187,7 +198,7 @@ class App(Gtk.Application):
     def on_wasd(self, ctrl_held):
         if not self.canvas.secondary_idx:
             return
-        MAX_THRUST = 10.0
+        MAX_THRUST = 0.05
         ax, ay = 0, 0
         if Gdk.KEY_w in self.pressed_keys:
             ay -= MAX_THRUST
@@ -199,6 +210,7 @@ class App(Gtk.Application):
             ax += MAX_THRUST
         self.canvas.apply_accel(self.canvas.secondary_idx, ax, ay)
 
+    
     def on_key_pressed(self, controller: Gtk.EventControllerKey, keyval: int, keycode: int, state: Gdk.ModifierType) -> bool:
         WASD_KEYS = [Gdk.KEY_w, Gdk.KEY_a, Gdk.KEY_s, Gdk.KEY_d]
         self.pressed_keys.add(keyval)
@@ -207,9 +219,13 @@ class App(Gtk.Application):
         
         if keyval == Gdk.KEY_Escape:
             self.on_escape()
+        
         elif keyval in [Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab] and self.canvas.secondary_idx is not None:    
-            valid_indices:list = np.unique(self.canvas.orbital.ix).tolist()
-            valid_indices.remove(self.canvas.primary_idx)
+            valid_indices:list = self.orbital.get_valid_indices().tolist()
+            
+            if self.canvas.primary_idx:
+                valid_indices.remove(self.canvas.primary_idx)
+
             try:
                 idx_current = valid_indices.index(self.canvas.secondary_idx)
                 idx_new = idx_current + (-1 if keyval == Gdk.KEY_ISO_Left_Tab else 1)
@@ -255,6 +271,9 @@ class App(Gtk.Application):
                     win.unfullscreen()
                 else:
                     win.fullscreen()
+        
+        elif keyval == Gdk.KEY_Delete and self.canvas.secondary_idx is not None:
+            self.orbital.shm.status[self.canvas.secondary_idx] = STATUS_DELETED
         return False
 
     def on_key_released(self, controller, keyval, keycode, state):
@@ -278,9 +297,9 @@ class App(Gtk.Application):
             if fc and fc.get_fps() > 0:
                 fps = fc.get_fps()
                 frame_time = 1/fps
-                margin = frame_time * 0.2
+                margin = frame_time * 0.3
                 speed_max = ((frame_time - margin - t_render) / t_step) * (self.orbital.dt_base / frame_time)
-                #self.scale_speed.set_value(speed_max)
+                self.scale_speed.set_value(min(10, speed_max))
             
             self.canvas.avg_step_duration = t_step
             self.canvas.avg_render_duration = t_render
@@ -289,12 +308,13 @@ class App(Gtk.Application):
         
         # Run a full sequence of steps at a given tick_id
         # The tick_id is used for memory offsets, so it is important to keep it sequential.
-        steps = self.orbital.frame(start, self.tick_id)
+        steps = self.orbital.tick(start, self.tick_id)
         if steps > 0:
             self.canvas.tick_id = self.tick_id
             self.canvas.step_id = self.orbital.step_id - 1
             self.tick_id += 1
             self._tick_steps.append(steps)
             self._tick_duration.append(time.perf_counter() - start)
-            self.canvas.queue_draw()
+            self.orbital._check_state()
+        
         return True

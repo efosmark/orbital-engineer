@@ -7,6 +7,9 @@ from orbitalengineer.engine.compute import r_from_mass, vis_viva_velocity_vector
 seed=0xf00d
 rng = np.random.default_rng(seed)
 
+Color_T = tuple[float, float, float, float]
+
+
 def random_color() -> tuple[float, float, float]:
     """Create a random color in the form of (r, g, b, a).
     
@@ -38,27 +41,29 @@ def create_primary(*, radius:float|None=None, mass:float = 332000) -> OrbitalBod
         radius=r_from_mass(mass) if radius is None else radius,
     )
 
-def create_secondary(primary_body:OrbitalBody, *, min_radius:float=1, max_radius=1e5, prograde:bool=True, color=None, mass:float=0, ecc:float|None=None):
-    x, y, dist = random_position(primary_body.radius + min_radius, primary_body.radius + max_radius )
-    x, y = primary_body.x + x, primary_body.y + y
-    vx, vy = vis_viva_velocity_vector(
-        x,
-        y,
+def create_secondary(primary_body:OrbitalBody, *, dist:float|tuple[float,float]|None=None, prograde:bool=True, mass:float=0, ecc:float|None=None, radius:float|None=None):
+    if dist is None:
+        min_dist, max_dist = 0, primary_body.radius ** 10
+    elif isinstance(dist, tuple):
+        min_dist, max_dist = dist[0], dist[1]
+    else:
+        min_dist = max_dist = dist
+        
+    x, y, dist = random_position(primary_body.radius + min_dist, primary_body.radius + max_dist )
+    vx, vy = vis_viva_velocity_vector(x, y,
         dist,
         primary_body.mass,
         a=dist if ecc is None else dist * ecc,
         prograde=prograde
     )
     return OrbitalBody(
-        x, 
-        y,
+        primary_body.x + x, 
+        primary_body.y + y,
         mass,
-        primary_body.vx+vx,
-        primary_body.vy+vy,
-        r_from_mass(mass),
+        primary_body.vx + vx,
+        primary_body.vy + vy,
+        r_from_mass(mass) if radius is None else radius,
     )
-
-Color_T = tuple[float, float, float, float]
 
 def create_random_body(*,
     x:float|None = None,
@@ -95,10 +100,10 @@ def create_random_body(*,
         
     return OrbitalBody(
         x, y,
-        radius,
+        mass,
         vx,
         vy, 
-        mass
+        radius
     )
     
 

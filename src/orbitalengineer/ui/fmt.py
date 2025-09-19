@@ -25,6 +25,8 @@ def mag_format(x, sig=1):
         return f"{x:.2f}"
     elif abs(x) <= 1000:
         return f"{x:.0f}"
+    elif math.isnan(x):
+        return 'NaN'
     
     exp = int(math.floor(math.log10(abs(x)) / 3) * 3)
     mant = round(x / (10 ** exp), sig)

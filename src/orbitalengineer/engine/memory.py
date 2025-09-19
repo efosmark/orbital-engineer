@@ -7,118 +7,105 @@ import numpy as np
 from numpy.typing import NDArray
 
 from orbitalengineer.engine import logger
+from orbitalengineer.engine.history import HISTORY_DEPTH
 from orbitalengineer.ui.fmt import mag_format
 
-HISTORY_DEPTH = np.int64(10)
 
 STATUS_NOMINAL = 0
 STATUS_DELETING = 1
 STATUS_DELETED = 2
 STATUS_COLLIDING = 3
 
-INTERACTION_NONE   = 0
-INTERACTION_COLLIDING = 1
-INTERACTION_COLLISION  = 2
-
-def offset(step_id):
-    return np.int64(step_id % HISTORY_DEPTH)
-
+INTERACTION_NONE = 0
+OVERLAPPING = 1
+MERGED  = 2
 
 FIELDS = OrderedDict()
 
 # Step info [step_id, num_steps, dt]
-FIELDS['step'] = lambda N: {
-    'dtype': np.float64,
-    'shape': (3,)
+FIELDS['step_id'] = lambda N: {
+    'dtype': np.int64,
+    'shape': (1,)
 }
 
-# Overall status of the body (0=normal, 1=deleted)
-# FIELDS['status'] = lambda N: {
-#     'dtype': np.int64,
-#     'shape': (N,)
-#}
+FIELDS['num_steps'] = lambda N: {
+    'dtype': np.int64,
+    'shape': (1,)
+}
 
-# Absolute positon
-#FIELDS['position'] = lambda N: {
-#    'dtype': np.complex128,
-#    'shape': (N,)
-#}
-
-# Absolute velocity
-#FIELDS['velocity'] = lambda N: {
-#    'dtype': np.complex128,
-#    'shape': (N,)
-#}
-
-# # Mass
-# FIELDS['mass'] = lambda N: {
-#     'dtype': np.float64,
-#     'shape': (N,)
-# }
-
-# Radius
-# FIELDS['radius'] = lambda N: {
-#     'dtype': np.float64,
-#     'shape': (N,)
-# }
-
-# Distance between two bodies
-FIELDS['distance'] = lambda N: {
+FIELDS['dt'] = lambda N: {
     'dtype': np.float64,
+    'shape': (1,)
+}
+
+# Last distance between bodies
+# For KDK integrator, this gets written during the kick
+FIELDS['distance'] = lambda N: {
+    'dtype': np.int64,
     'shape': (N, N)
 }
 
 # Interaction state between two bodies
+# For KDK integrator, this gets written during the drift (see: kernel/drift.py/find_collisions)
 FIELDS['interaction'] = lambda N: {
     'dtype': np.int64,
     'shape': (N, N)
 }
 
-#
-# Hitory params.
 # Each is indexed via `step_id % MAX_HISTORY_DEPTH`
-#
-FIELDS['history_tick_id'] = lambda N: {
-    'dtype': np.int64,
-    'shape': (HISTORY_DEPTH,)
-}
-FIELDS['history_dt_step'] = lambda N: {
-    'dtype': np.float64,
-    'shape': (HISTORY_DEPTH,)
-}
 FIELDS['status'] = lambda N: {
     'dtype': np.int64,
-    'shape': (HISTORY_DEPTH, N)
+    'shape': (N,)
 }
+
 FIELDS['velocity'] = lambda N: {
     'dtype': np.complex128,
-    'shape': (HISTORY_DEPTH, N)
+    'shape': (2, N)
 }
+
 FIELDS['position'] = lambda N: {
     'dtype': np.complex128,
-    'shape': (HISTORY_DEPTH, N)
+    'shape': (2, N)
 }
+
 FIELDS['mass'] = lambda N: {
     'dtype': np.float64,
-    'shape': (HISTORY_DEPTH, N)
+    'shape': (2, N)
 }
+
 FIELDS['radius'] = lambda N: {
     'dtype': np.float64,
-    'shape': (HISTORY_DEPTH, N)
+    'shape': (2, N)
+}
+
+FIELDS['history'] = lambda N: {
+    'dtype': np.complex128,
+    'shape': (N, HISTORY_DEPTH)
+}
+
+FIELDS['history_index'] = lambda N: {
+    'dtype': np.int64,
+    'shape': (N,)
 }
 
 def get_size(field):
+    """Get the full byte size of a field based on its dtype and shape."""
     return math.prod([
         np.dtype(field["dtype"]).itemsize * axis_size
         for axis_size in field["shape"]
     ])
 
-class OrbitalMemory:
-    _shm:shared_memory.SharedMemory
+class OrbitalMemory(shared_memory.SharedMemory):
     N:int
     
-    #
-    step:NDArray[np.float64]
+    # Current master step ID
+    step_id:NDArray[np.float64]
+    
+    # number of steps to process
+    num_steps:NDArray[np.int64]
+    
+    # time per step
+    dt:NDArray[np.float64]
     
     #
     status:NDArray[np.int64]
@@ -144,8 +131,8 @@ class OrbitalMemory:
     # See the constants at the top of this file for more info.
     interaction:NDArray[np.int64]
     
-    history_tick_id:NDArray[np.int64]
-    history_dt_step:NDArray[np.float64]
+    history:NDArray[np.complex128]
+    history_index: NDArray[np.int64]
     
     def __init__(self, N:int, name:str|None=None, second_buffer:bool=False):
         self.N = N
@@ -158,29 +145,26 @@ class OrbitalMemory:
         ])
         
         if name is not None:
-            self._shm = shared_memory.SharedMemory(name=name)
+            shared_memory.SharedMemory.__init__(self, name=name)
         
         else:
             # Create shared memory block
-            self._shm = shared_memory.SharedMemory(create=True, size=(self.buffer_size * 2))
-            atexit.register(lambda: self._shm.unlink())
+            shared_memory.SharedMemory.__init__(self, create=True, size=(self.buffer_size * 2))
+            atexit.register(lambda: self.unlink())
             logger.info(f"Allocated {mag_format(self.buffer_size)}B of shared memory.")
 
         # Zero out the fields
         offset = 0 if not second_buffer else self.buffer_size
         for field, f in FIELDS.items():
             f = f(N)
-            setattr(self, field, np.ndarray(f['shape'], dtype=f['dtype'], buffer=self._shm.buf, offset=offset))
+            setattr(self, field, np.ndarray(f['shape'], dtype=f['dtype'], buffer=self.buf, offset=offset))
             if name is None:
                 getattr(self, field).fill(0)
             offset += get_size(f)
 
-    def get_body_mass(self, step_id:int, body_id:int) -> np.float64:
-        return self.mass[offset(step_id), body_id]
-
-    def get_body_radius(self, step_id:int, body_id:int) -> np.float64:
-        return self.radius[offset(step_id), body_id]
-
+    def get_step_id(self) -> np.float64:
+        return self.step_id[0]
+        
 
 class BodyProxy:
     """ Convenience class for accessing body properties.
@@ -203,17 +187,20 @@ class BodyProxy:
         return cls.instances[idx]
 
     def get_position(self, step_id:int):
-        return self.shm.position[offset(step_id), self.idx]
+        return self.shm.position[step_id % 2, self.idx]
     
     def get_xy(self, step_id:int) -> tuple[float,float]:
-        pos = self.shm.position[offset(step_id), self.idx]
+        pos = self.shm.position[step_id % 2, self.idx]
         return pos.real, pos.imag
 
     def get_velocity(self, step_id:int):
-        return self.shm.velocity[offset(step_id), self.idx]
+        return self.shm.velocity[step_id % 2, self.idx]
 
     def get_mass(self, step_id:int):
-        return self.shm.mass[offset(step_id), self.idx]
+        return self.shm.mass[step_id % 2, self.idx]
 
     def get_radius(self, step_id:int):
-        return self.shm.radius[offset(step_id), self.idx]
+        return self.shm.radius[step_id % 2, self.idx]
+
+    def get_status(self, step_id:int):
+        return self.shm.status[step_id % 2, self.idx]
