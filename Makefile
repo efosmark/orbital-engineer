@@ -68,4 +68,4 @@ flatpak-run:
 	flatpak run $(APP_ID)
 
 distclean: clean
- 	rm -rf $(DIST_DIR) *.egg-info build
+	rm -rf $(DIST_DIR) *.egg-info build
