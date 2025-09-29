@@ -159,33 +159,33 @@ class App(Gtk.Application):
         menu_button.set_menu_model(self.__build_menu())
         header.pack_end(menu_button)
 
-        # Adjustment controls range/step/value
-        adj = Gtk.Adjustment(
-            value=1,
-            lower=0.01,
-            upper=100,
-            step_increment=0.01,
-            page_increment=10
-        )
+        # # Adjustment controls range/step/value
+        # adj = Gtk.Adjustment(
+        #     value=1,
+        #     lower=0.01,
+        #     upper=100,
+        #     step_increment=0.01,
+        #     page_increment=10
+        # )
         
-        self.scale_speed = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj, can_focus=False, focusable=False)
-        self.scale_speed.set_vexpand(True)
-        self.scale_speed.set_size_request(250, 25)      #  width, height
-        self.scale_speed.set_value_pos(Gtk.PositionType.RIGHT)
-        #for mark in self._tick_rate_opts:
-        #    self.scale_speed.add_mark(self._tick_rate_opts.index(mark)+1, Gtk.PositionType.RIGHT, None)
-        header.pack_start(self.scale_speed)
+        # self.scale_speed = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj, can_focus=False, focusable=False)
+        # self.scale_speed.set_vexpand(True)
+        # self.scale_speed.set_size_request(250, 25)      #  width, height
+        # self.scale_speed.set_value_pos(Gtk.PositionType.RIGHT)
+        # #for mark in self._tick_rate_opts:
+        # #    self.scale_speed.add_mark(self._tick_rate_opts.index(mark)+1, Gtk.PositionType.RIGHT, None)
+        # header.pack_start(self.scale_speed)
         
-        lbl_speed = Gtk.Label(label=f"{self.canvas.orbital.speed:4.1f}x")
-        lbl_speed.set_size_request(60, 25)
-        header.pack_start(lbl_speed)
+        # lbl_speed = Gtk.Label(label=f"{self.canvas.orbital.speed:4.1f}x")
+        # lbl_speed.set_size_request(60, 25)
+        # header.pack_start(lbl_speed)
         win.set_titlebar(header)
         
-        def on_speed_slider_value_changed(scale: Gtk.Scale):
-            value = scale.get_value()
-            self.canvas.orbital.speed = value
-            lbl_speed.set_text(f"{value:4.1f}x")
-        self.scale_speed.connect("value-changed", on_speed_slider_value_changed)
+        # def on_speed_slider_value_changed(scale: Gtk.Scale):
+        #     value = scale.get_value()
+        #     self.canvas.orbital.speed = value
+        #     lbl_speed.set_text(f"{value:4.1f}x")
+        # self.scale_speed.connect("value-changed", on_speed_slider_value_changed)
         return win
 
     def on_escape(self):
@@ -242,10 +242,10 @@ class App(Gtk.Application):
             self.on_wasd(ctrl_held)
         
         elif keyval == Gdk.KEY_Left:
-            self.scale_speed.set_value(self.scale_speed.get_value() - 0.1)
+            self.orbital.speed -= 0.1
         
         elif keyval == Gdk.KEY_Right:
-           self.scale_speed.set_value(self.scale_speed.get_value() + 0.1)
+            self.orbital.speed += 0.1
         
         elif keyval == Gdk.KEY_Down:
             self.canvas.zoom_in()
@@ -294,12 +294,13 @@ class App(Gtk.Application):
             t_step = statistics.mean(self.orbital.t_step)
             
             fc = self.canvas.get_frame_clock()
-            if fc and fc.get_fps() > 0:
-                fps = fc.get_fps()
+            if fc:
+                fps = fc.get_fps() or 1
                 frame_time = 1/fps
                 margin = frame_time * 0.3
-                speed_max = ((frame_time - margin - t_render) / t_step) * (self.orbital.dt_base / frame_time)
-                self.scale_speed.set_value(min(10, speed_max))
+                speed_max = ((frame_time - margin) / t_step) * (self.orbital.dt_base / frame_time)
+                
+                self.orbital.speed = min(40, speed_max)
             
             self.canvas.avg_step_duration = t_step
             self.canvas.avg_render_duration = t_render
