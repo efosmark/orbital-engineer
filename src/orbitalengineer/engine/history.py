@@ -10,7 +10,7 @@ MIN_HISTORY_DEG_CHANGE = 2.25
 
 ## The maximum number of points of history to track.
 ## High values can reduce performance.
-HISTORY_DEPTH = int(360 // MIN_HISTORY_DEG_CHANGE)
+HISTORY_DEPTH = int(120 // MIN_HISTORY_DEG_CHANGE)
 
 
 # When we want to show history, but we do not need precision,
