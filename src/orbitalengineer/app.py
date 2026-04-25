@@ -1,24 +1,70 @@
-from orbitalengineer.ui.mainwindow import App
-from orbitalengineer.helpers import random_color, create_primary, create_secondary, rng
-import numpy as np
- 
+#from orbitalengineer.engine.particle import Particle
+from orbitalengineer.ui.mainapp import App
+from orbitalengineer.helpers import angular_position, random_color, create_primary, create_secondary, random_position, rng
+
+import matplotlib.pyplot as plt
+from matplotlib import colors
+
+SOL_COLOR = (1.0, 0.98, 0.45, 1.0)
+
+def brighten(color:tuple[float,float,float,float], amount=0.1) -> tuple[float,float,float,float]:
+    r = [*color]
+    for i in range(len(color) - 1):
+         r[i] = (color[i] + amount)# * color_norms[i]
+    return (r[0], r[1], r[2], color[-1])
+
+cmap = plt.colormaps['gist_rainbow']
+
+Lx = 2
+N = (Lx  * 4)
+mass_min, mass_max = 1e5, 1e5
+vel_min, vel_max = 0, 0
+radius_min, radius_max = 20, 100
+dist_min, dist_max = 1000, 15000
+
+po = 7000
+d = abs(po)
+
 def on_activate(app: App):
-    sol = create_primary(mass=5e5)
-    app.canvas.add_element(sol, color=(1, 0.8, 0))
-    app.canvas.primary_idx = 0
-    
-    N = 1000
-    r_min, r_max = 200, 10000
-    for i in range(N):
-        sec = create_secondary(
+    global dist_min, dist_max
+    sol = create_primary(mass=3e8)
+    app.insert_particle(sol, color=SOL_COLOR)
+    sol._radius = 400 # type: ignore
+
+    dist_norm = colors.Normalize(sol.get_radius() + dist_min, dist_max)
+
+    for i in range(N-1):
+        mass = rng.uniform(mass_min, mass_max)
+
+        pos = random_position(sol.get_radius() + dist_min, dist_max)
+        app.insert_particle(create_secondary(
             sol,
-            mass=rng.uniform(1, 1000),
-            dist=(float(r_min), float(r_max))
-        )
-        app.canvas.add_element(sec, color=random_color())
+            mass=mass,
+            radius=30,
+            position=pos
+        #), color=(1,1,1,1))
+        ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))
     
-    app.canvas.camera.zoom_at(0, 0, 0, 0, 0.2)
-    app.start_simulation()
+    # app.insert_particle(create_secondary(
+    #     sol,
+    #     mass=N * mass_max,
+    #     #dist=dist,
+    #     radius=200,
+    #     #radius=r_from_mass(np.float64(mass))*2.5,
+    #     #ecc=1.3
+    #     position=(po) * -1
+    # ), color=(1,1,1,1))
+
+    app.orbit_ctl.Lx = Lx
+    app.orbit_ctl.speed = 1.0
+    app.orbit_ctl.coef_of_restitution = 0.99
+    #app.view.show_debug_info = False
+    #app.view.show_focus_info = True
+    app.data.secondary_body = 342
+    #app.view.show_plot_at_startup = False
+    app.orbit_ctl.init_sim()
+    app.ticker.start()
+    app.relative_zoom(1/10.0)
 
 def run():
     app = App()

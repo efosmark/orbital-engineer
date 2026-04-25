@@ -1,0 +1,194 @@
+import time
+from typing import Any
+
+from orbitalengineer.engine.simcontroller import OrbitalSimController
+from orbitalengineer.ui.canvas.render.gravfield import GravFieldRenderer
+from orbitalengineer.ui.canvas.render.gridstance import GridstanceRenderer
+from orbitalengineer.ui.canvas.render.groupshadow import GroupShadowRenderer
+from orbitalengineer.ui.canvas.render.particle_aura import ParticleAuraRenderer
+from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, Gsk
+from orbitalengineer.ui import model
+from orbitalengineer.ui.canvas import renderer
+from orbitalengineer.ui.canvas.render.focus_info import FocusInfoRenderer
+from orbitalengineer.ui.canvas.render.force import ForceVectorRenderer
+from orbitalengineer.ui.canvas.render.osd import OSDRenderer
+from orbitalengineer.ui.canvas.pz import Camera2D, Camera2DController
+from orbitalengineer.ui.canvas.render.debug import DebugInfoRenderer
+from orbitalengineer.ui.canvas.render.grid import GridRenderer
+from orbitalengineer.ui.canvas.render.background import BackgroundRenderer
+from orbitalengineer.ui.canvas.render.ellipse import EllipseRenderer
+from orbitalengineer.ui.canvas.render.history import HistoryRenderer
+from orbitalengineer.ui.canvas.render.particle import ParticleRenderer
+from orbitalengineer.ui.canvas.render.pinpoint import PinpointRenderer
+from orbitalengineer.ui.canvas.render.reticle import ReticleRenderer
+
+
+HOVER_MARGIN = 15
+
+
+class MouseController:
+    
+    def __init__(self, canvas, camera, orbital, view_model):
+        self.canvas = canvas
+        self.camera = camera
+        self.orbital = orbital
+        self.view = view_model
+        
+        motion = Gtk.EventControllerMotion.new()
+        motion.connect("motion", self.on_motion)
+        canvas.add_controller(motion)
+
+    def on_motion(self, _ctrl, x, y):
+        self.view.hover_position = (x, y)
+        x, y = self.camera.screen_to_world(x, y, self.view.width, self.view.height)
+        bodies = self.orbital.find_bodies_at(
+            x, y,
+            margin=HOVER_MARGIN/self.camera.zoom,
+            #buffer_id=self.orbital.buffer_static
+        )
+        if len(bodies) == 0:
+            self.view.hovered_over_particle = None
+            return
+        self.view.hovered_over_particle = self.orbital.get_particle(bodies[0])
+
+
+class OrbitalCanvas(Gtk.DrawingArea):
+    _cached_node:Gsk.RenderNode|None = None
+    hud_renderers:list[renderer.Renderer]
+
+    def __init__(self, camera:Camera2D, view: model.ViewModel, data: model.DataModel, orbital:OrbitalSimController):
+        super().__init__()
+        
+        self.camera = camera
+        
+        # Composite surface cache
+        self._cached_surface = None
+        self.last_draw_time = 0
+        
+        self.view = view
+        self.data = data
+
+        self.orbital = orbital
+        self.controller = Camera2DController(self, self.camera)
+        self.mouse_controller = MouseController(self, self.camera, self.orbital, self.view)
+
+        
+        self.hud_renderers = [
+            BackgroundRenderer(self.view, self.data, self.camera, self.orbital),
+            #GravFieldRenderer(self.view, self.data, self.camera, self.orbital),
+            GridRenderer(self.view, self.data, self.camera, self.orbital),
+        ]
+        
+        self.scene_renderers = [
+            #HistoryRenderer(self.view, self.data, self.camera, self.orbital),
+            ForceVectorRenderer(self.view, self.data, self.camera, self.orbital),
+            EllipseRenderer(self.view, self.data, self.camera, self.orbital),
+            #ParticleAuraRenderer(self.view, self.data, self.camera, self.orbital),
+            ParticleRenderer(self.view, self.data, self.camera, self.orbital),
+            ReticleRenderer(self.view, self.data, self.camera, self.orbital),
+            #PinpointRenderer(self.view, self.data, self.camera, self.orbital),
+            #GridstanceRenderer(self.view, self.data, self.camera, self.orbital),
+        ]
+        
+        self.hud_fg_renderers = [
+            DebugInfoRenderer(self.view, self.data, self.camera, self.orbital),
+            FocusInfoRenderer(self.view, self.data, self.camera, self.orbital),
+            #OSDRenderer(self.view, self.data, self.camera, self.orbital),
+        ]
+        
+        click_controller = Gtk.GestureClick.new()
+        click_controller.connect("pressed", self.on_click)
+        self.add_controller(click_controller)
+        
+
+        def on_resize(self, width, height):
+            self.view.width = width
+            self.view.height = height
+        self.connect("resize", on_resize)
+
+        
+        #draw_rate_hz = 60
+        #self.draw_interval = 1.0 / draw_rate_hz
+        self.last_draw_time = 0.0
+
+        self.add_tick_callback(self.on_tick)
+
+    def on_tick(self, widget, frame_clock):
+        self.queue_draw()
+        return True
+
+    def on_click(self, gesture: Gtk.GestureClick, n_press: int, x: float, y: float):
+        if n_press < 2:
+            return
+        
+        event = gesture.get_current_event()
+        if event is None:
+            return
+        state = event.get_modifier_state()
+        ctrl_held = state & Gdk.ModifierType.CONTROL_MASK
+        
+        x, y = self.camera.screen_to_world(x, y, self.get_width(), self.get_height())
+        bodies = self.orbital.find_bodies_at(x, y, margin=15/self.camera.zoom)
+        if len(bodies) > 0:
+            if ctrl_held:
+                self.data.props.primary_body = bodies[0]
+            else:
+                self.data.props.secondary_body = bodies[0]
+        else:
+            if ctrl_held:
+                self.data.props.primary_body = None
+            else:
+                self.data.props.secondary_body = None
+    
+    def zoom_in(self):
+        self.camera.zoom_at(0, 0, 0, 0, 0.9)
+
+    def zoom_out(self):
+        self.camera.zoom_at(0, 0, 0, 0, 1/0.9)
+
+    def do_snapshot(self, snapshot: Gtk.Snapshot):
+        now = time.monotonic()
+        if self.last_draw_time:
+            interval = now - self.last_draw_time
+            #self.data.add_duration('frame', interval, self.data.num_ticks)
+        self.last_draw_time = now
+
+        fps = self.get_frame_clock()
+        if fps:
+            self.view.props.fps = fps
+        
+        width = self.get_allocated_width()
+        height = self.get_allocated_height()
+
+        #if self._cached_node is None or now - self.last_draw_time >= self.draw_interval:
+        
+        if self.data.secondary_body is not None and self.view.follow_tracked_body:
+           f = self.orbital.get_particle(self.data.secondary_body)
+           fpos = f.get_position()
+           self.camera.offset = [fpos.real, fpos.imag]
+
+        cr = snapshot.append_cairo(Graphene.Rect().init(0, 0, width, height))
+        
+        # for r in self.hud_renderers:
+        for r in self.hud_renderers:
+            cr.save()
+            r.draw(cr, width, height)
+            cr.restore()
+        
+        cr.save()
+        cr.transform(self.camera.get_matrix(width, height))        
+
+        for r in self.scene_renderers:
+            cr.save()
+            r.draw(cr, width, height)
+            cr.restore()
+        
+        cr.restore()
+        
+        for r in self.hud_fg_renderers:
+            cr.save()
+            r.draw(cr, width, height)
+            cr.restore()
+        
+        #self.data.add_duration('render', time.monotonic() - now, self.data.num_ticks)
+        

@@ -1,0 +1,143 @@
+#ifndef COMPLEX_CLH_
+#define COMPLEX_CLH_
+
+// -----------------------------------------------------------------------------
+// Complex math library for float2-based complex numbers.
+// Representation: (real, imag)
+// -----------------------------------------------------------------------------
+
+typedef float2 cfloat;
+typedef float4 cfloat2;
+
+
+// -----------------------------------------------------------------------------
+// Constructors / accessors
+// -----------------------------------------------------------------------------
+
+// cfloat_new(re, im): Construct a complex number (re + i*im).
+inline cfloat cfloat_new(float re, float im) {
+    return (cfloat)(re, im);
+}
+
+// creal(z): Extract real component.
+inline float creal(cfloat z) {
+    return z.x;
+}
+
+// cimag(z): Extract imaginary component.
+inline float cimag(cfloat z) {
+    return z.y;
+}
+
+// -----------------------------------------------------------------------------
+// Basic arithmetic
+// -----------------------------------------------------------------------------
+
+// cadd(a, b): Complex addition.
+inline cfloat cadd(cfloat a, cfloat b) {
+    return a + b;
+}
+
+// csub(a, b): Complex subtraction.
+inline cfloat csub(cfloat a, cfloat b) {
+    return a - b;
+}
+
+// cneg(a): Complex negation.
+inline cfloat cneg(cfloat a) {
+    return -a;
+}
+
+// cconj(a): Complex conjugate (re, -im).
+inline cfloat cconj(cfloat a) {
+    return (cfloat)(a.x, -a.y);
+}
+
+// -----------------------------------------------------------------------------
+// Scaling by real scalars
+// -----------------------------------------------------------------------------
+
+// cscale(z, s): Real scalar multiply → (s*re, s*im).
+inline cfloat cscale(cfloat z, float s) {
+    return z * s;
+}
+
+// cscale_inv(z, s): Real scalar divide → (re/s, im/s).
+inline cfloat cscale_inv(cfloat z, float s) {
+    return z / s;
+}
+
+// -----------------------------------------------------------------------------
+// Complex multiplication
+// -----------------------------------------------------------------------------
+
+// cmul(a, b): Complex multiply → (ar*br - ai*bi, ar*bi + ai*br).
+inline cfloat cmul(cfloat a, cfloat b) {
+    return (cfloat)(
+        a.x*b.x - a.y*b.y,
+        a.x*b.y + a.y*b.x
+    );
+}
+
+// cmul_conj(a, b): a * conj(b) → useful for dot products / correlations.
+inline cfloat cmul_conj(cfloat a, cfloat b) {
+    return (cfloat)(
+        a.x*b.x + a.y*b.y,
+        a.y*b.x - a.x*b.y
+    );
+}
+
+// -----------------------------------------------------------------------------
+// Magnitude, magnitude squared
+// -----------------------------------------------------------------------------
+
+// cabs2(a): Squared magnitude → re^2 + im^2.
+// Fast and preferred when comparing magnitudes.
+inline float cabs2(cfloat a) {
+    return dot(a, a);
+}
+
+// cabs(a): Magnitude → sqrt(re^2 + im^2).
+inline float cabs(cfloat a) {
+    return sqrt(dot(a, a));
+}
+
+// -----------------------------------------------------------------------------
+// Normalization
+// -----------------------------------------------------------------------------
+
+// cnormalize(a): Normalize to unit magnitude; returns 0 if |a|=0.
+inline cfloat cnormalize(cfloat a) {
+    float m = cabs(a);
+    return (m > 0.0f) ? a / m : (cfloat)(0.0f, 0.0f);
+}
+
+// cnormalize_safe(a, eps): Normalize with epsilon guard for stability.
+// eps is the *magnitude* threshold (not squared).
+inline cfloat cnormalize_safe(cfloat a, float eps) {
+    float m2 = cabs2(a);
+    float eps2 = eps * eps;
+    if (m2 < eps2)
+        return (cfloat)(0.0f, 0.0f);
+
+    float inv_m = rsqrt(m2);  // Fast and accurate on GPUs.
+    return a * inv_m;
+}
+
+// -----------------------------------------------------------------------------
+// Complex division
+// -----------------------------------------------------------------------------
+
+// cdiv(a, b): Complex division a/b using standard rationalized form.
+// Caller should ensure b ≠ 0 (no guards here for speed).
+inline cfloat cdiv(cfloat a, cfloat b) {
+    float denom = b.x*b.x + b.y*b.y;
+    float inv = 1.0f / denom;
+
+    float real = (a.x*b.x + a.y*b.y) * inv;
+    float imag = (a.y*b.x - a.x*b.y) * inv;
+
+    return (cfloat)(real, imag);
+}
+
+#endif // COMPLEX_CLH_

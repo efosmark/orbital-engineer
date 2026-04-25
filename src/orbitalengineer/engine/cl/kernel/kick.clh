@@ -1,0 +1,164 @@
+#include "kernel/complex.clh"
+#include "kernel/pair.clh"
+#include "kernel/force.clh"
+#include "kernel/toi.clh"
+#include "kernel/scalar_impulse_magnitude.clh"
+#include "kernel/com.clh"
+#include "kernel/nudge.clh"
+
+#define IN_NONE 0
+#define IN_APPROACHING 1
+#define IN_COLLISION 2
+#define IN_DEPARTING 3
+#define IN_ORBITING 4
+#define IN_ORBITED 5
+#define IN_OVERLAPPING 6
+
+inline uint triu_index(uint i, uint j, uint N) {
+    // NOTE: `i` should always be less than `j`
+    return i * (N - 1u) - (i * (i - 1u)) / 2u + (j - i - 1u);
+}
+
+inline float2 clamp_scale(float2 z, float limit) {
+    float mag = length(z);
+    float scale = (mag > 0.0f) ? fmin(1.0f, limit / mag) : 1.0f;
+    return z * scale;
+}
+
+inline float compute_next_interaction_time(
+    const cfloat dV,
+    const cfloat dP,
+    const float  R,
+    const uint   idx
+) {
+    float a = dot(dV, dV);
+    float b = 2.0f * dot(dP, dV);
+    float c = dot(dP, dP) - R * R;
+
+    // Already inside or touching the interaction radius
+    if (c <= 0.0f) {
+        return 0.0f;
+    }
+
+    // No relative motion -> never enters in the future
+    const float eps = 1e-12f;
+    if (a <= eps) {
+        return INFINITY;
+    }
+
+    float D = b * b - 4.0f * a * c;
+    if (a <= eps || D < 0.0f || !isfinite(D))
+        return INFINITY;
+
+    float sqrtD = sqrt(D);
+
+    float inv2a = 0.5f / a;
+    float t1 = (-b - sqrtD) * inv2a;
+    float t2 = (-b + sqrtD) * inv2a;
+
+    return (t1 >= 0.0f) 
+           ? t1
+           : ((t1 >= 0.0f) ? t2 : INFINITY);
+}
+
+
+inline cfloat kick_pair(
+    const uint    i,
+    const uint    j,
+    const cfloat  dV,
+    const cfloat  dP,
+    const  float  R,
+    const float   dt,
+    const cfloat* position,
+    const cfloat* velocity,
+    const float*  mass,
+    const uint    pair_idx,
+          uint*   interaction
+) {
+    cfloat dV_accum = 0;
+
+    float new_min_impact = INFINITY;
+    float dist = distance(position[j], position[i]);
+    float inv_mass_i = 1.0 / mass[i];
+    float inv_mass_j = 1.0 / mass[j];
+
+    cfloat r_norm = normalize(dP);
+    
+    float vn = relative_speed_along_normal(i, j, -r_norm, velocity);
+    float min_possible_dist = length(fabs(vn) * EPS_TIME);
+    bool is_approaching = vn < -DV_MIN;
+    
+    float edge_dist = dist - R;
+    bool is_touching = edge_dist <= min_possible_dist;
+
+    if (edge_dist < -min_possible_dist) {
+        interaction[pair_idx] = IN_OVERLAPPING;
+        cfloat dVi = force(i, j, dP, dist, mass) * inv_mass_i * dt;
+        dV_accum -= (length(dVi) > DV_MIN) ? dVi : 0.0f;
+    }
+
+    if (is_touching && is_approaching) {
+        //interaction[pair_idx] =  IN_COLLIDING;
+        
+        float inv_mass_sum = (inv_mass_i + inv_mass_j);
+        // scalar impulse magnitude
+        float impulse = ((1.0f + COEF_OF_RESTITUTION) * vn) / inv_mass_sum;
+        dV_accum += (r_norm * (impulse * inv_mass_i));
+
+    } else if (!is_touching) {
+        interaction[pair_idx] =  IN_NONE;
+        cfloat dVi = force(i, j, dP, dist, mass) * inv_mass_i * dt;
+        dV_accum += (length(dVi) > DV_MIN) ? dVi : 0.0f;
+    }
+
+    return dV_accum;
+}
+
+__kernel void kick_pairwise(
+               const uint    N,
+               const float   dt,
+    __global         cfloat* position,
+    __global         cfloat* velocity,
+    __global   const float*  mass,
+    __global   const float*  radius,
+    __global         float*  toi,
+    __global         float*  min_impact_time,
+    __global          uint*  interaction
+) {
+    uint node = get_group_id(0);
+    if (node >= N) return;
+    
+    uint lane = get_local_id(0);
+    uint Lx   = get_local_size(0);
+
+    uint i = node;
+
+    float2 dV_accum = (float2)(0.0f, 0.0f);
+    float min_impact = INFINITY;
+
+    for (uint j = lane; j < N; j += Lx) {
+        if (j == node) continue;
+        
+        float R = radius[j] + radius[i];
+        cfloat dV = velocity[j] - velocity[i];
+        cfloat dP = position[j] - position[i];
+
+        const uint idx = triu_index(i, j, N);
+
+        dV_accum += kick_pair(i, j, dV, dP, R, dt, position, velocity, mass, idx, interaction);
+
+        float toi_ij = compute_next_interaction_time(dV, dP, R, idx);
+        if (i < j) {
+            toi[idx] = toi_ij;
+        }
+        min_impact = fmin(min_impact, toi_ij);
+    }
+  
+    float wg_dVx = work_group_reduce_add(dV_accum.x);
+    float wg_dVy = work_group_reduce_add(dV_accum.y);
+    float wg_min_impact = work_group_reduce_min(min_impact);
+    if (lane == 0) { 
+        velocity[node] += (float2)(wg_dVx, wg_dVy);
+        min_impact_time[node] = wg_min_impact;
+    }
+}

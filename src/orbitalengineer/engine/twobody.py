@@ -2,7 +2,7 @@ import math
 import numpy as np
 from typing import Tuple, Optional, Dict
 
-from orbitalengineer.engine import vec
+from scratch import vec
 
 def orbital_energy(mu, r, v):
     """Energy per unit mass of the orbiting body.

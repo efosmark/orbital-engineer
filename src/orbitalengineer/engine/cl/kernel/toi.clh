@@ -1,0 +1,38 @@
+#ifndef TOI_CLH_
+#define TOI_CLH_
+
+inline float discriminant(float a, float b, float c) {
+    return (b * b) - (4 * a * c);
+}
+
+inline float2 solve_quadratic(float a, float b, float discriminant) {
+    float sqrtD = native_sqrt(discriminant);
+    float t1 = (-b - sqrtD)/(2.0f * a);
+    float t2 = (-b + sqrtD)/(2.0f * a);
+    return (float2)(t1, t2);
+}
+
+inline float compute_impact_time(
+    const cfloat  dV,  // Relative velocity
+    const cfloat  dP,  // Relative position
+    const float   R    // Sum of radii
+) {
+    // Coefficients
+    float a = dot(dV, dV);
+    float b = 2.0f * dot(dP, dV);
+    float c = dot(dP, dP) - R*R;
+
+    // Discriminant
+    float D = discriminant(a, b, c);
+
+    // Compute the roots (t1, t2)
+    float2 q = solve_quadratic(a, b, D);
+
+    if (D == 0) return 0.0f;
+    else if (D < 0) return INFINITY;
+
+    return q.s0;
+    //return q.s0 <= 0 ? 0.0f : q.s0;
+}
+
+#endif // TOI_CLH_

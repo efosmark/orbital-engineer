@@ -1,0 +1,11 @@
+#ifndef STATUS_CLH_
+#define STATUS_CLH_
+
+typedef enum {
+    STATUS_NOMINAL  = 0,
+    STATUS_APPROACH = 1,
+    STATUS_TOUCH    = 2,
+    STATUS_OVERLAP  = 3
+} Status;
+
+#endif // STATUS_CLH_

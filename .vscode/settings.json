@@ -1,0 +1,10 @@
+{
+    "OpenCL.explorer.localizedProperties": false,
+    "OpenCL.server.deviceID": 3445375930,
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.venv": true,
+        "**/*.egg-info": true,
+        "**/*.pyc": true
+    }
+}

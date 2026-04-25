@@ -1,13 +1,25 @@
 import math
 import numpy as np
 
-from orbitalengineer.engine.body import OrbitalBody
-from orbitalengineer.engine.compute import r_from_mass, vis_viva_velocity_vector
+from orbitalengineer.engine.particle import Particle, ParticleRaw
 
-seed=0xf00d
+seed = 0xf00d1e11
 rng = np.random.default_rng(seed)
 
 Color_T = tuple[float, float, float, float]
+
+def r_from_mass(m: np.float64) -> np.float64:
+    r = np.cbrt(m / np.pi)
+    if r <= 0:
+        return np.float64(1.0)
+    return r
+
+def vis_viva(position: complex, mu: float, a: float, prograde: bool = True) -> complex:
+    r = abs(position)                              # radius
+    v_mag = math.sqrt(mu * (2.0/r - 1.0/a))        # vis-viva speed
+    r_hat = position / r                           # unit radial (complex)
+    t_hat = r_hat * (1j if prograde else -1j)      # rotate ±90° for tangent
+    return v_mag * t_hat                           # velocity vector (complex)
 
 
 def random_color() -> tuple[float, float, float]:
@@ -21,102 +33,60 @@ def random_color() -> tuple[float, float, float]:
     """
     return (0.2 + (rng.random(size=3) * 0.8)).tolist()
 
+def angular_position(theta:float, r:float) -> complex:
+    x = r * math.cos(theta)
+    y = r * math.sin(theta)
+    return complex(x, y)
 
-def random_position(min_distance, max_distance):
+def random_position(min_distance, max_distance) -> complex:
     """Generates a random x+yj point on an annulus."""
-    #return rand_point_annulus(min_distance, max_distance)
     r = math.sqrt(rng.uniform(min_distance**2, max_distance**2))
     theta = rng.uniform(0, 2.0 * math.pi)
     x = r * math.cos(theta)
     y = r * math.sin(theta)
-    return (x, y, r)
+    return complex(x, y)
 
-def create_primary(*, radius:float|None=None, mass:float = 332000) -> OrbitalBody:
-    return OrbitalBody(
-        x=0,
-        y=0,
+def create_primary(*, mass:float = 332000) -> Particle:
+    return ParticleRaw(
+        position=0+0j,
+        velocity=0+0j,
         mass=mass,
-        vx=0,
-        vy=0,
-        radius=r_from_mass(mass) if radius is None else radius,
+        radius=r_from_mass(np.float64(mass)),
     )
 
-def create_secondary(primary_body:OrbitalBody, *, dist:float|tuple[float,float]|None=None, prograde:bool=True, mass:float=0, ecc:float|None=None, radius:float|None=None):
-    if dist is None:
-        min_dist, max_dist = 0, primary_body.radius ** 10
-    elif isinstance(dist, tuple):
-        min_dist, max_dist = dist[0], dist[1]
+def create_secondary(
+    primary_body:Particle,
+    *,
+    dist:float|tuple[float,float]|None=None,
+    position:complex|None=None,
+    prograde:bool=True,
+    mass:float=0,
+    ecc:float|None=None,
+    radius:float|None=None
+):
+    if dist is not None:
+        if isinstance(dist, tuple):
+            min_dist, max_dist = dist[0], dist[1]
+        elif dist is not None:
+            min_dist = max_dist = dist
+        position = random_position(primary_body.get_radius() + min_dist, primary_body.get_radius() + max_dist)
+    
+    elif position is not None:
+        dist = abs(position)
     else:
-        min_dist = max_dist = dist
-        
-    x, y, dist = random_position(primary_body.radius + min_dist, primary_body.radius + max_dist )
-    vx, vy = vis_viva_velocity_vector(x, y,
-        dist,
-        primary_body.mass,
+        raise Exception("Must specify either dist or position")
+    
+    dist = abs(position)
+    velocity = vis_viva(
+        position=position,
+        mu=primary_body.get_mass(),
         a=dist if ecc is None else dist * ecc,
         prograde=prograde
     )
-    return OrbitalBody(
-        primary_body.x + x, 
-        primary_body.y + y,
-        mass,
-        primary_body.vx + vx,
-        primary_body.vy + vy,
-        r_from_mass(mass) if radius is None else radius,
+    
+    return ParticleRaw(
+        position=primary_body.get_position() + position,
+        velocity=primary_body.get_velocity() + velocity,
+        mass=mass,
+        radius=r_from_mass(np.float64(mass)) if radius is None else radius
     )
-
-def create_random_body(*,
-    x:float|None = None,
-    y:float|None = None,
-    dist:tuple[float,float]|None = None,
-    mass:float|None = None,
-    radius:float|None = None,
-    vx:float|None = None,
-    vy:float|None = None,
-):
-    if dist is None and (x is None or y is None):
-        raise ValueError("Either both x and y need to be specified, or dist range.")
-
-    if mass is None:
-        mass = rng.uniform(0, 1000)
-    
-    if radius is None:
-        radius = r_from_mass(mass)
-    
-    if dist is not None:
-        x, y, _ = random_position(dist[0], dist[1])
-    else:
-        rx, ry, _ = random_position(0, radius * 10.0)
-        if x is None:
-            x = rx 
-        if y is None:
-            y = ry 
-
-    if vx is None:
-        vx = 10 - (rng.random()*10.0)
-    
-    if vy is None:
-        vy = 10 - (rng.random()*10.0)
-        
-    return OrbitalBody(
-        x, y,
-        mass,
-        vx,
-        vy, 
-        radius
-    )
-    
-
-def binary_primary(x, y, mass, dist, prograde=False):
-    x = dist/2
-    y = 0
-    b_radius = r_from_mass(mass/2.0)
-    
-    vx, vy = vis_viva_velocity_vector(-x, y, dist, mass*2, dist, prograde=prograde)
-    b1 = OrbitalBody(x, y, b_radius, vx, vy, mass/2)
-    
-    vx, vy = vis_viva_velocity_vector(x, y, dist, mass*2, dist, prograde=prograde)
-    b2 = OrbitalBody(-x, y, b_radius, vx, vy, mass/2)
-    
-    sol = OrbitalBody(0, 0, mass=mass, radius=r_from_mass(mass), vx=0, vy=0)
-    return b1, b2, sol
