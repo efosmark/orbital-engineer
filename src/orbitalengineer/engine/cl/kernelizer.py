@@ -104,6 +104,12 @@ class KernelBuilder:
             )
 
 
-def get_kernel_src():
+def get_kernel_src(kernel_file: str):
     with open(Path(__file__).parent / kernel_file, 'r') as f:
         return f.read()
+
+def load_kernel(kernel_name:str, kernel_file:str, ctx:cl.Context, build_options:Sequence|None=None):
+    opts = build_options or ['-cl-std=CL2.0']
+    kernel_src = get_kernel_src(kernel_file)
+    prg = cl.Program(ctx, kernel_src).build(options=[*opts])
+    return cl.Kernel(prg, kernel_name)

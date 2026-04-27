@@ -8,11 +8,11 @@ from matplotlib import colors
 
 cmap = plt.colormaps['plasma']
 
-Lx = 2
-N = (Lx  * 4)
+Lx = 256
+N = (Lx  * 1)
 
-mass_min, mass_max = 1e5, 1e5
-dist_min, dist_max = 10, 800
+mass_min, mass_max = 5e2, 5e2
+dist_min, dist_max = 1, 1000
 
 mass_norm = colors.Normalize(mass_min, mass_max)
 
@@ -22,7 +22,7 @@ def on_activate(app: App):
         pos = random_position(dist_min, dist_max)
         #velocity = random_position(0, 20)
         velocity = 0+0j
-        radius = np.cbrt(mass / np.pi) 
+        radius = np.cbrt(mass / np.pi)
         
         app.insert_particle(ParticleRaw(
             position=pos,
@@ -33,7 +33,7 @@ def on_activate(app: App):
         #), color=cmap(mass_norm(mass)))
 
     app.orbit_ctl.Lx = Lx
-    app.orbit_ctl.speed = 5.0
+    app.orbit_ctl.speed = 1.0
     app.orbit_ctl.coef_of_restitution = 0.97
     #app.view.show_debug_info = False
     #app.view.show_focus_info = True
@@ -41,7 +41,7 @@ def on_activate(app: App):
     #app.view.show_plot_at_startup = False
     app.orbit_ctl.init_sim()
     app.ticker.start()
-    app.relative_zoom(4.0)
+    app.relative_zoom(1.0)
  
 def run():
     app = App()

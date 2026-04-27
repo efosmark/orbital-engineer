@@ -23,7 +23,7 @@ class PlotWindow(Gtk.ApplicationWindow):
         max_line_points=180,
         auto_refresh=False,
     ):
-        super().__init__(application=app, title="Duration plots")
+        super().__init__(application=app, title="Duration plots-dialog")
         self.set_default_size(800, 500)
 
         self.model = model

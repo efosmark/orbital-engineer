@@ -17,7 +17,7 @@ from orbitalengineer.engine.simcontroller import Particle
 from orbitalengineer.engine import logger
 
 
-APP_ID = "com.qmew.OrbitalEngineer"
+APP_ID = "com.qmew.OrbitalEngineer-dialog"
 WINDOW_DEFAULT_SIZE = (1200, 800)
 
 class App(Gtk.Application):

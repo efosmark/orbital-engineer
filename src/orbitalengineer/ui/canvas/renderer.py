@@ -10,7 +10,7 @@ class Renderer(GObject.GObject):
     view = GObject.Property(type=object)
     data = GObject.Property(type=object)
     camera = GObject.Property(type=object)
-    orbital:OrbitalSimController = GObject.Property(type=object)
+    orbital:OrbitalSimController = GObject.Property(type=object) # type:ignore
     
     def __init__(self, view:model.ViewModel, data:model.DataModel, camera:pz.Camera2D, orbital:OrbitalSimController):
         super().__init__()

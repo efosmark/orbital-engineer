@@ -3,7 +3,7 @@ import numpy as np
 
 from orbitalengineer.engine.particle import Particle, ParticleRaw
 
-seed = 0xf00d1e11
+seed = 0xf00d1e1
 rng = np.random.default_rng(seed)
 
 Color_T = tuple[float, float, float, float]

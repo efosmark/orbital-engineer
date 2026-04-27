@@ -122,3 +122,9 @@ len = (N - 1) * (N // 2)
 
 
 amdgpu.ppfeaturemask=0xffffffff acpi_mask_gpe=0x4 pcie_aspm=off
+
+
+## Arch Install
+
+
+sudo pacman -Syu rocm-opencl-runtime clpeak clinfo rocminfo

@@ -28,8 +28,7 @@ inline float2 clamp_scale(float2 z, float limit) {
 inline float compute_next_interaction_time(
     const cfloat dV,
     const cfloat dP,
-    const float  R,
-    const uint   idx
+    const float  R
 ) {
     float a = dot(dV, dV);
     float b = 2.0f * dot(dP, dV);
@@ -63,50 +62,51 @@ inline float compute_next_interaction_time(
 
 
 inline cfloat kick_pair(
+    const uint    tick_id,
+    const uint    N,
     const uint    i,
     const uint    j,
+
+    const cfloat* acceleration,
+    const float*  velocity_relative,
     const cfloat  dV,
     const cfloat  dP,
     const  float  R,
     const float   dt,
     const cfloat* position,
     const cfloat* velocity,
-    const float*  mass,
-    const uint    pair_idx,
-          uint*   interaction
+    const float*  mass
 ) {
     cfloat dV_accum = 0;
 
     float new_min_impact = INFINITY;
     float dist = distance(position[j], position[i]);
-    float inv_mass_i = 1.0 / mass[i];
-    float inv_mass_j = 1.0 / mass[j];
+    float inv_mass_i = 1.0f / mass[i];
+    float inv_mass_j = 1.0f / mass[j];
 
     cfloat r_norm = normalize(dP);
     
-    float vn = relative_speed_along_normal(i, j, -r_norm, velocity);
-    float min_possible_dist = length(fabs(vn) * EPS_TIME);
-    bool is_approaching = vn < -DV_MIN;
+    float v_rel = velocity_relative[(i * N) + j];
+    float min_possible_dist = length(fabs(v_rel) * EPS_TIME);
+    bool is_approaching = v_rel < -DV_MIN;
     
     float edge_dist = dist - R;
     bool is_touching = edge_dist <= min_possible_dist;
 
     if (edge_dist < -min_possible_dist) {
-        interaction[pair_idx] = IN_OVERLAPPING;
         cfloat dVi = force(i, j, dP, dist, mass) * inv_mass_i * dt;
         dV_accum -= (length(dVi) > DV_MIN) ? dVi : 0.0f;
     }
 
     if (is_touching && is_approaching) {
-        //interaction[pair_idx] =  IN_COLLIDING;
-        
         float inv_mass_sum = (inv_mass_i + inv_mass_j);
+        
         // scalar impulse magnitude
-        float impulse = ((1.0f + COEF_OF_RESTITUTION) * vn) / inv_mass_sum;
+        float impulse = ((1.0f + COEF_OF_RESTITUTION) * v_rel) / inv_mass_sum;
         dV_accum += (r_norm * (impulse * inv_mass_i));
+        printf("%u :  BOUNCE  %u, %u    impulse=%.6f", tick_id, i, j, impulse);
 
     } else if (!is_touching) {
-        interaction[pair_idx] =  IN_NONE;
         cfloat dVi = force(i, j, dP, dist, mass) * inv_mass_i * dt;
         dV_accum += (length(dVi) > DV_MIN) ? dVi : 0.0f;
     }
@@ -114,19 +114,22 @@ inline cfloat kick_pair(
     return dV_accum;
 }
 
+
 __kernel void kick_pairwise(
+               const uint    tick_id,
                const uint    N,
                const float   dt,
-    __global         cfloat* position,
+    __global   const cfloat* acceleration,
+    __global   const float*  velocity_relative,
+    __global   const cfloat* position,
     __global         cfloat* velocity,
     __global   const float*  mass,
     __global   const float*  radius,
     __global         float*  toi,
-    __global         float*  min_impact_time,
-    __global          uint*  interaction
+    __global         float*  min_impact_time
 ) {
     uint node = get_group_id(0);
-    if (node >= N) return;
+    //if (node >= N) return;
     
     uint lane = get_local_id(0);
     uint Lx   = get_local_size(0);
@@ -136,6 +139,8 @@ __kernel void kick_pairwise(
     float2 dV_accum = (float2)(0.0f, 0.0f);
     float min_impact = INFINITY;
 
+    barrier(CLK_GLOBAL_MEM_FENCE);
+
     for (uint j = lane; j < N; j += Lx) {
         if (j == node) continue;
         
@@ -143,20 +148,25 @@ __kernel void kick_pairwise(
         cfloat dV = velocity[j] - velocity[i];
         cfloat dP = position[j] - position[i];
 
-        const uint idx = triu_index(i, j, N);
+        dV_accum += kick_pair(tick_id, N, i, j, acceleration, velocity_relative, dV, dP, R, dt, position, velocity, mass);
 
-        dV_accum += kick_pair(i, j, dV, dP, R, dt, position, velocity, mass, idx, interaction);
+        barrier(CLK_GLOBAL_MEM_FENCE);
+        //if ((i == 152 || j == 152) && (i == 24 || j == 24)) {
+        //    printf("[%u, %u] = %.8f,%.8f", i, j, dP.x, dP.y);
+        //}
 
-        float toi_ij = compute_next_interaction_time(dV, dP, R, idx);
-        if (i < j) {
-            toi[idx] = toi_ij;
-        }
+        float toi_ij = compute_next_interaction_time(dV, dP, R);
         min_impact = fmin(min_impact, toi_ij);
     }
   
+    barrier(CLK_GLOBAL_MEM_FENCE);
+
     float wg_dVx = work_group_reduce_add(dV_accum.x);
     float wg_dVy = work_group_reduce_add(dV_accum.y);
     float wg_min_impact = work_group_reduce_min(min_impact);
+    
+    barrier(CLK_GLOBAL_MEM_FENCE);
+    
     if (lane == 0) { 
         velocity[node] += (float2)(wg_dVx, wg_dVy);
         min_impact_time[node] = wg_min_impact;
