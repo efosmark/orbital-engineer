@@ -1,10 +1,4 @@
 #include "kernel/complex.clh"
-#include "kernel/pair.clh"
-#include "kernel/force.clh"
-#include "kernel/toi.clh"
-#include "kernel/scalar_impulse_magnitude.clh"
-#include "kernel/com.clh"
-#include "kernel/nudge.clh"
 
 #define IN_NONE 0
 #define IN_APPROACHING 1

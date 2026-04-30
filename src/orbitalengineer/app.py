@@ -15,19 +15,19 @@ def brighten(color:tuple[float,float,float,float], amount=0.1) -> tuple[float,fl
 
 cmap = plt.colormaps['gist_rainbow']
 
-Lx = 2
+Lx = 64
 N = (Lx  * 4)
-mass_min, mass_max = 1e5, 1e5
+mass_min, mass_max = 1e2, 1e2
 vel_min, vel_max = 0, 0
 radius_min, radius_max = 20, 100
-dist_min, dist_max = 1000, 15000
+dist_min, dist_max = 100, 10000
 
 po = 7000
 d = abs(po)
 
 def on_activate(app: App):
     global dist_min, dist_max
-    sol = create_primary(mass=3e8)
+    sol = create_primary(mass=3e5)
     app.insert_particle(sol, color=SOL_COLOR)
     sol._radius = 400 # type: ignore
 
@@ -60,7 +60,7 @@ def on_activate(app: App):
     app.orbit_ctl.coef_of_restitution = 0.99
     #app.view.show_debug_info = False
     #app.view.show_focus_info = True
-    app.data.secondary_body = 342
+    #app.data.secondary_body = 342
     #app.view.show_plot_at_startup = False
     app.orbit_ctl.init_sim()
     app.ticker.start()

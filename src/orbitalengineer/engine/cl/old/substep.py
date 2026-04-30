@@ -1,6 +1,6 @@
 import pyopencl as cl
 import numpy as np
-from orbitalengineer.engine.cl.kernelizer import KernelBuilder
+from orbitalengineer.engine.cl.old.kernelizer import KernelBuilder
 mf = cl.mem_flags
 
 

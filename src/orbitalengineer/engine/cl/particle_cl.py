@@ -1,10 +1,6 @@
 from typing import Any, ClassVar, Sequence
 from orbitalengineer.engine.simcontroller import Particle
 
-#import os
-#os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
-#os.environ['PYOPENCL_CACHE'] = '0'
-
 import numpy as np
 
 

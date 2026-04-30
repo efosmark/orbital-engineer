@@ -3,7 +3,6 @@
 __kernel void compute_distance_edge(
                const uint    N,
     __global   const float2* restrict position,
-    __global   const float*  restrict mass,
     __global   const float*  restrict radius,
     __global         float*  restrict distance_edge
 ) {
@@ -18,8 +17,6 @@ __kernel void compute_distance_edge(
         if (j == i) continue;
         
         float R = radius[j] + radius[i];
-        float inv_mass_j = 1.0f / mass[j];
-
         float dist = distance(position[j], position[i]);
         distance_edge[row_start + j] = dist - R;
     }

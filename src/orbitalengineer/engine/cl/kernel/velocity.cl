@@ -16,11 +16,10 @@ __kernel void compute_velocity(
     uint Lx   = get_local_size(0);
 
     float2 dV_accum = (float2)(0.0f, 0.0f);
-    
+
     uint row_start = i * N;
     for (uint j = lane; j < N; j += Lx) {
-        if (j == i) continue;
-        dV_accum += distance_edge[row_start + j] > 0 ? acceleration[row_start + j] : 0.0f;
+        dV_accum += (j != i && distance_edge[row_start + j] > 0) ? acceleration[row_start + j] : 0.0f;
     }
   
     float wg_dVx = work_group_reduce_add(dV_accum.x);

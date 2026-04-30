@@ -1,24 +1,15 @@
 from dataclasses import dataclass
-from typing import Any, ClassVar, Sequence, cast
+from typing import cast
 
 from orbitalengineer.engine import logger, config
+from orbitalengineer.engine.cl.acceleration import AccelerationStep
+from orbitalengineer.engine.cl.dimension import load_kernel
+from orbitalengineer.engine.cl.merge import Merge
 from orbitalengineer.engine.cl.particle_cl import ParticleCL
-from orbitalengineer.engine.cl.old.substep import SubStep
-from orbitalengineer.engine.simcontroller import OrbitalSimController, Particle
+from orbitalengineer.engine.cl.tracer import EventTracer
+from orbitalengineer.engine.simcontroller import OrbitalSimController
 from orbitalengineer.engine.cl.device import get_device_pci_bdf, map_pci_bdf_to_drm_card
 
-from orbitalengineer.engine.cl.kernelizer import EventTracer, load_kernel
-from orbitalengineer.engine.cl.drift import Drift
-from orbitalengineer.engine.cl.global_reduce_min import GlobalReduceMin
-from orbitalengineer.engine.cl.impact import ComputeImpact
-from orbitalengineer.engine.cl.kick import KickPairwise
-from orbitalengineer.engine.cl.old.nudge import NudgeOverlaps
-from orbitalengineer.engine.cl.pairwise_node_reduce import PairwiseNodeReduce
-from orbitalengineer.engine.cl.pairwise_min_reduce import PairwiseMinReduce
-
-import os
-#os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
-#os.environ['PYOPENCL_CACHE'] = '0'
 
 PLATFORM_ID = 1
 DEVICE_ID = 0
@@ -99,11 +90,7 @@ class SimController_CL(OrbitalSimController):
         self.mass = np.zeros(self.N, dtype=np.float32)
         self.distance_edge = np.zeros(self.N * self.N, dtype=np.float32)
         self.time_to_impact = np.array([np.inf for i in range(self.N)], dtype=np.float32)
-        self.acceleration = np.zeros(self.N * self.N, dtype=np.complex64)
-
-
         self.toi = np.zeros(self.N * self.N, dtype=np.float32)
-        #self.interactions = np.array([0 for i in range(self.pairs_host.size)], dtype=np.float32)
 
         logger.debug("Memory allocated.")
 
@@ -113,18 +100,9 @@ class SimController_CL(OrbitalSimController):
         self.mass_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.mass)        
         self.radius_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.radius)
         self.time_to_impact_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.time_to_impact)
-        self.acceleration_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.acceleration)
         self.velocity_relative_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.velocity_relative)
         self.distance_edge_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.distance_edge)
-
-        #self.pair_vel_ij_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.USE_HOST_PTR, hostbuf=self.pair_vel_ij)
-        #self.pair_vel_ji_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.USE_HOST_PTR, hostbuf=self.pair_vel_ji)
-        
-        #self.pair_pos_ij_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.USE_HOST_PTR, hostbuf=self.pair_pos_ij)
-        #self.pair_pos_ji_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.USE_HOST_PTR, hostbuf=self.pair_pos_ji)
-        
         self.toi_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.USE_HOST_PTR, hostbuf=self.toi)
-        #self.interactions_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.USE_HOST_PTR, hostbuf=self.interactions)
         logger.debug("Buffers were created.")
     
     def _init_device(self):
@@ -164,16 +142,18 @@ class SimController_CL(OrbitalSimController):
         ]
         
         try:
-            self.knl_accel = load_kernel('compute_acceleration', 'kernel/acceleration.cl', self.ctx, build_options)
+            self._acceleration = AccelerationStep(self.N, self.ctx, self.q, build_options)
+            self._merge = Merge(self.N, self.ctx, self.q, build_options)
+            
             self.knl_position = load_kernel('compute_position', 'kernel/position.cl', self.ctx, build_options)
             self.knl_interaction = load_kernel('compute_interactions', 'kernel/interaction.cl', self.ctx, build_options)
             self.knl_velocity = load_kernel('compute_velocity', 'kernel/velocity.cl', self.ctx, build_options)
             self.knl_velocity_relative = load_kernel('compute_velocity_relative', 'kernel/velocity_relative.cl', self.ctx, build_options)
-            self.knl_collide = load_kernel('compute_collision', 'kernel/collide.cl', self.ctx, build_options)
+
+            self.knl_bounce = load_kernel('compute_bouncing_collision', 'kernel/bounce.cl', self.ctx, build_options)
+
             self.knl_distance_edge = load_kernel('compute_distance_edge', 'kernel/distance_edge.cl', self.ctx, build_options)
-            #self.kick_pairwise = KickPairwise(self.ctx, self.q, self.tr, build_options)
-            #self.drift_direct = Drift(self.ctx, self.q, self.tr, build_options)
-            #self.nudge_overlaps = NudgeOverlaps(self.ctx, self.q, self.tr, build_options)
+
             logger.info("Kernels have been created.")
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
             import sys
@@ -190,6 +170,7 @@ class SimController_CL(OrbitalSimController):
         self._allocate_memory()
         self._populate_particle_fields()
         self._create_buffers()
+        self.compute_distance_edge()
         
         self.is_initialized = True
         logger.info("Sim was initialized.")
@@ -229,26 +210,11 @@ class SimController_CL(OrbitalSimController):
 
     def sync(self):
         self.q.finish()
-        cl.enqueue_copy(self.q, self.position, self.pos_cl)
-        cl.enqueue_copy(self.q, self.velocity, self.vel_cl)
-        cl.enqueue_copy(self.q, self.toi, self.toi_cl)
-        self.q.finish()
-
-    def compute_acceleration(self, dt_step):
-        Lx = 256
-        return self.knl_accel(
-            self.q,
-            (self.N * Lx, ),  # global work size
-            (Lx, ),           # local work size
-            
-            # Args
-            np.uint32(self.N),
-            np.float32(dt_step),
-            self.pos_cl,
-            self.mass_cl,
-            self.radius_cl,
-            self.acceleration_cl
-        )
+        self.tr.add("sync", cl.enqueue_copy(self.q, self.position, self.pos_cl))
+        self.tr.add("sync", cl.enqueue_copy(self.q, self.velocity, self.vel_cl))
+        self.tr.add("sync", cl.enqueue_copy(self.q, self.mass, self.mass_cl))
+        self.tr.add("sync", cl.enqueue_copy(self.q, self.radius, self.radius_cl))
+        self.tr.add("sync", cl.enqueue_copy(self.q, self.toi, self.toi_cl))
 
     def compute_interaction(self):
         Lx = 256
@@ -263,8 +229,7 @@ class SimController_CL(OrbitalSimController):
             self.vel_cl,
             self.radius_cl,
             self.toi_cl,
-            self.time_to_impact_cl#,
-            #self.interactions_cl
+            self.time_to_impact_cl
         )
     
     def compute_position(self, dt_step):
@@ -304,7 +269,7 @@ class SimController_CL(OrbitalSimController):
             # Args
             np.uint32(self.N),
             np.float32(dt_step),
-            self.acceleration_cl,
+            self._acceleration.cl,
             self.pos_cl,
             self.vel_cl,
             self.mass_cl,
@@ -321,14 +286,13 @@ class SimController_CL(OrbitalSimController):
             # Args
             np.uint32(self.N),
             self.pos_cl,
-            self.mass_cl,
             self.radius_cl,
             self.distance_edge_cl
         )
     
-    def compute_collision(self):
+    def compute_bounce(self):
         Lx = 256
-        return self.knl_collide(
+        return self.knl_bounce(
             self.q,
             (self.N * Lx, ),  # global work size
             (Lx, ),           # local work size
@@ -341,12 +305,14 @@ class SimController_CL(OrbitalSimController):
             self.mass_cl,
             self.distance_edge_cl
         )
-
+    
     def kick(self, dt_step):
-        self.tr.add("acceleration", self.compute_acceleration(dt_step))
+        self.tr.add("acceleration", self._acceleration(dt_step, self.pos_cl, self.mass_cl, self.radius_cl))
         self.tr.add("velocity", self.compute_velocity(dt_step))
         self.tr.add("v_rel", self.compute_relative_velocity())
-        self.tr.add("collision", self.compute_collision())
+        self._merge(self.velocity_relative_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl, self.distance_edge_cl)
+        #self.tr.add("merge", self.compute_merge())
+        #self.tr.add("collision", self.compute_collision())
 
     def drift(self, dt_step):
         self.tr.add("position", self.compute_position(dt_step))
@@ -362,7 +328,7 @@ class SimController_CL(OrbitalSimController):
     def single_step(self, dt_step):
         dt_step_start = dt_step
         count = 0
-        while dt_step > 0 and count < 12:
+        while dt_step > 0 and count < 20:
             
             cl.enqueue_copy(
                 self.copy_q,
@@ -373,6 +339,7 @@ class SimController_CL(OrbitalSimController):
             try:
                 min_toi = min([t for t in self.time_to_impact if t > 0])
             except ValueError:
+                logger.warning("No min time-of-impact. Using EPS_TIME (%s)", config.EPS_TIME)
                 min_toi = config.EPS_TIME
             
             dt = max(config.EPS_TIME, min(dt_step, min_toi))
@@ -380,7 +347,6 @@ class SimController_CL(OrbitalSimController):
             dt_step -= dt
             self.step_count += 1
             count += 1
-            #break
                 
         return dt_step_start - dt_step
 

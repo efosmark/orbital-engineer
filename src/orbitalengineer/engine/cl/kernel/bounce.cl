@@ -1,6 +1,6 @@
 
 
-__kernel void compute_collision(
+__kernel void compute_bouncing_collision(
                const uint    N,
     __global   const float*  restrict velocity_relative,
     __global   const float2* restrict position,
@@ -22,17 +22,15 @@ __kernel void compute_collision(
     for (uint j = lane; j < N; j += Lx) {
         
         float v_rel = velocity_relative[row_start + j];
-        bool is_touching = distance_edge[row_start + j] <= 0.0f;
+        bool is_touching = distance_edge[row_start + j] <= EPS_DIST;
         if (j == i || v_rel >= 0 || !is_touching) continue;
-
-        float inv_mass_j = 1.0f / mass[j];
-        float inv_mass_sum = (inv_mass_i + inv_mass_j);
         
-        // scalar impulse magnitude
         float2 dP = position[j] - pos_i;
         float2 r_norm = normalize(dP);
-        float impulse = ((1.0f + COEF_OF_RESTITUTION) * v_rel) / inv_mass_sum;
-        dV_accum += (r_norm * (impulse * inv_mass_i));
+        float inv_mass_sum = (inv_mass_i + (1.0f / mass[j]));
+        float scalar_impulse_magnitude = ((1.0f + COEF_OF_RESTITUTION) * v_rel) / inv_mass_sum;
+        float2 impulse = (r_norm * (scalar_impulse_magnitude * inv_mass_i));
+        dV_accum += (j == i || v_rel >= 0 || !is_touching) ? 0.0f : impulse;
     }
   
     float wg_dVx = work_group_reduce_add(dV_accum.x);

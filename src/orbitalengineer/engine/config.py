@@ -1,8 +1,8 @@
 import numpy as np
 
 
-EPS_DIST = 5e-4
-EPS_TIME = 5e-4
+EPS_DIST = 1e-3
+EPS_TIME = 1e-3
 
 DV_MIN = 1e-10
 DV_MAX = 1e10

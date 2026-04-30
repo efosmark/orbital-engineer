@@ -1,7 +1,7 @@
 import numpy as np
 import pyopencl as cl
 
-from orbitalengineer.engine.cl.kernelizer import EventTracer, KernelBuilder
+from orbitalengineer.engine.cl.old.kernelizer import EventTracer, KernelBuilder
 mf = cl.mem_flags
 
 

@@ -3,9 +3,7 @@
 
 typedef enum {
     STATUS_NOMINAL  = 0,
-    STATUS_APPROACH = 1,
-    STATUS_TOUCH    = 2,
-    STATUS_OVERLAP  = 3
+    STATUS_DELETED = 1
 } Status;
 
 #endif // STATUS_CLH_

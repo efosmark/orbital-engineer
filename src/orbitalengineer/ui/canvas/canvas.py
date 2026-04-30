@@ -2,17 +2,17 @@ import time
 from typing import Any
 
 from orbitalengineer.engine.simcontroller import OrbitalSimController
+from orbitalengineer.ui import model
+from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, Gsk
+from orbitalengineer.ui.canvas import renderer
+from orbitalengineer.ui.canvas.pz import Camera2D, Camera2DController
 from orbitalengineer.ui.canvas.render.gravfield import GravFieldRenderer
 from orbitalengineer.ui.canvas.render.gridstance import GridstanceRenderer
 from orbitalengineer.ui.canvas.render.groupshadow import GroupShadowRenderer
 from orbitalengineer.ui.canvas.render.particle_aura import ParticleAuraRenderer
-from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, Gsk
-from orbitalengineer.ui import model
-from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.canvas.render.focus_info import FocusInfoRenderer
 from orbitalengineer.ui.canvas.render.force import ForceVectorRenderer
 from orbitalengineer.ui.canvas.render.osd import OSDRenderer
-from orbitalengineer.ui.canvas.pz import Camera2D, Camera2DController
 from orbitalengineer.ui.canvas.render.debug import DebugInfoRenderer
 from orbitalengineer.ui.canvas.render.grid import GridRenderer
 from orbitalengineer.ui.canvas.render.background import BackgroundRenderer
@@ -82,10 +82,10 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.scene_renderers = [
             #HistoryRenderer(self.view, self.data, self.camera, self.orbital),
             ForceVectorRenderer(self.view, self.data, self.camera, self.orbital),
-            EllipseRenderer(self.view, self.data, self.camera, self.orbital),
+            #EllipseRenderer(self.view, self.data, self.camera, self.orbital),
             #ParticleAuraRenderer(self.view, self.data, self.camera, self.orbital),
             ParticleRenderer(self.view, self.data, self.camera, self.orbital),
-            ReticleRenderer(self.view, self.data, self.camera, self.orbital),
+            #ReticleRenderer(self.view, self.data, self.camera, self.orbital),
             #PinpointRenderer(self.view, self.data, self.camera, self.orbital),
             #GridstanceRenderer(self.view, self.data, self.camera, self.orbital),
         ]
@@ -93,7 +93,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.hud_fg_renderers = [
             DebugInfoRenderer(self.view, self.data, self.camera, self.orbital),
             FocusInfoRenderer(self.view, self.data, self.camera, self.orbital),
-            #OSDRenderer(self.view, self.data, self.camera, self.orbital),
+            OSDRenderer(self.view, self.data, self.camera, self.orbital),
         ]
         
         click_controller = Gtk.GestureClick.new()
