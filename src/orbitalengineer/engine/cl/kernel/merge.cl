@@ -1,4 +1,4 @@
-
+#include "kernel/stride.clh"
 
 __kernel void assign_collision_groups(
                const uint    N,
@@ -7,22 +7,20 @@ __kernel void assign_collision_groups(
     __global   const float*  restrict distance_edge,
     __global         uint*   restrict collision_group
 ) {
-    uint i = get_group_id(0);
-    if (i >= N || mass[i] == 0) return;
-    
-    uint lane = get_local_id(0);
-    uint Lx   = get_local_size(0);
-    
-    uint row_start = i * N;
+    uint i = get_group_id(0);             
+    uint lane = get_local_id(0);          
+    uint Lx   = get_local_size(0);        
     uint max_index = i;
-    for (uint j = lane; j < N; j += Lx) {
-        bool is_touching = distance_edge[row_start + j] <= EPS_DIST;
-        //bool is_approaching = velocity_relative[row_start + j] <= 0.0f;
-        if (is_touching) max_index = max(max_index, j);
-    }
-  
+
+    STRIDE(
+        if (distance_edge[IDX] <= EPS_DIST)
+            max_index = max(max_index, j);
+    );
+
     uint wg_max_index = work_group_reduce_max(max_index);
-    collision_group[i] = wg_max_index;
+    if (lane == 0) {
+        collision_group[i] = wg_max_index;
+    }
 }
 
 __kernel void reduce_collision_groups(
@@ -79,7 +77,7 @@ __kernel void compute_merging_collision(
 
     if (collision_group[i] != i) {
         // this item is part of a different collision_group, so we can safely set its mass to 0 early
-        if (lane == 0) mass_out[i] = 0.0f;
+        if (lane == 0) mass_out[i] = 0;
         return;
     }
     
@@ -100,8 +98,8 @@ __kernel void compute_merging_collision(
   
     bool wg_is_merging = work_group_any(is_merging);
     float wg_mass = work_group_reduce_add(total_mass);
-    float2 wg_mv = (float2)(work_group_reduce_add(total_mv.x), work_group_reduce_add(total_mv.y));
-    float2 wg_mr = (float2)(work_group_reduce_add(total_mr.x), work_group_reduce_add(total_mr.y));
+    float2 wg_mv = FLOAT2_WG_REDUCE_ADD(total_mv);
+    float2 wg_mr = FLOAT2_WG_REDUCE_ADD(total_mr);
 
     if (lane == 0) {
         mass_out[i] = mass[i];

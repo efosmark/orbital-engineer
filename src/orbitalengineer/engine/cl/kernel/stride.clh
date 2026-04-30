@@ -1,0 +1,13 @@
+#define STRIDE( ...)           \
+    do {                                      \
+        if (i >= N) return;                   \
+        uint row_start = i * N;               \
+        for (uint j = lane; j < N; j += Lx) { \
+            if (j == i) continue;             \
+            uint const IDX = row_start + j;   \
+            __VA_ARGS__;                      \
+        }                                     \
+    } while (0)
+
+
+#define FLOAT2_WG_REDUCE_ADD(var) ((float2)(work_group_reduce_add(var.x), work_group_reduce_add(var.y)))
