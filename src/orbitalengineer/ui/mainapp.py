@@ -62,12 +62,12 @@ class App(Gtk.Application):
            win.maximize()
         
         self.plot_win = None
-        # if self.view.show_plot_at_startup:
-        #     self.plot_win = PlotWindow(
-        #         self,
-        #         self.data
-        #     )
-        #     self.plot_win.present()
+        if self.view.show_plot_at_startup:
+            self.plot_win = PlotWindow(
+                self,
+                self.data
+            )
+            self.plot_win.present()
 
     def shift_focus(self, particle_id):
         b = self.orbit_ctl.get_particle(particle_id)

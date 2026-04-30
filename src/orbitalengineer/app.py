@@ -17,7 +17,7 @@ cmap = plt.colormaps['gist_rainbow']
 
 Lx = 64
 N = (Lx  * 4)
-mass_min, mass_max = 1e2, 1e2
+mass_min, mass_max = 1e3, 1e6
 vel_min, vel_max = 0, 0
 radius_min, radius_max = 20, 100
 dist_min, dist_max = 100, 10000
@@ -27,7 +27,7 @@ d = abs(po)
 
 def on_activate(app: App):
     global dist_min, dist_max
-    sol = create_primary(mass=3e5)
+    sol = create_primary(mass=3e8)
     app.insert_particle(sol, color=SOL_COLOR)
     sol._radius = 400 # type: ignore
 
@@ -40,7 +40,7 @@ def on_activate(app: App):
         app.insert_particle(create_secondary(
             sol,
             mass=mass,
-            radius=30,
+            #radius=30,
             position=pos
         #), color=(1,1,1,1))
         ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))

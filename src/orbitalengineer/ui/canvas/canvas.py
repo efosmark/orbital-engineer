@@ -80,12 +80,12 @@ class OrbitalCanvas(Gtk.DrawingArea):
         ]
         
         self.scene_renderers = [
-            #HistoryRenderer(self.view, self.data, self.camera, self.orbital),
+            HistoryRenderer(self.view, self.data, self.camera, self.orbital),
             ForceVectorRenderer(self.view, self.data, self.camera, self.orbital),
-            #EllipseRenderer(self.view, self.data, self.camera, self.orbital),
+            EllipseRenderer(self.view, self.data, self.camera, self.orbital),
             #ParticleAuraRenderer(self.view, self.data, self.camera, self.orbital),
             ParticleRenderer(self.view, self.data, self.camera, self.orbital),
-            #ReticleRenderer(self.view, self.data, self.camera, self.orbital),
+            ReticleRenderer(self.view, self.data, self.camera, self.orbital),
             #PinpointRenderer(self.view, self.data, self.camera, self.orbital),
             #GridstanceRenderer(self.view, self.data, self.camera, self.orbital),
         ]

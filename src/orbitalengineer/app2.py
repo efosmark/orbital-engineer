@@ -11,7 +11,7 @@ cmap = plt.colormaps['plasma']
 Lx = 64
 N = (Lx  * 1)
 
-mass_min, mass_max = 5e3, 5e5
+mass_min, mass_max = 5e3, 5e6
 dist_min, dist_max = 1, 3000
 
 mass_norm = colors.Normalize(mass_min, mass_max)

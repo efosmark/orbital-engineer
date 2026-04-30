@@ -13,15 +13,12 @@ __kernel void assign_collision_groups(
     uint lane = get_local_id(0);
     uint Lx   = get_local_size(0);
     
-    uint max_index = i;
-
     uint row_start = i * N;
+    uint max_index = i;
     for (uint j = lane; j < N; j += Lx) {
         bool is_touching = distance_edge[row_start + j] <= EPS_DIST;
-        bool is_approaching = velocity_relative[row_start + j] <= 0.0f;
-        if (is_touching && is_approaching) {
-            max_index = max(max_index, j);
-        }
+        //bool is_approaching = velocity_relative[row_start + j] <= 0.0f;
+        if (is_touching) max_index = max(max_index, j);
     }
   
     uint wg_max_index = work_group_reduce_max(max_index);
@@ -68,7 +65,6 @@ __kernel void compute_merging_collision(
     __global   const float2* restrict position,
     __global   const float2* restrict velocity,
     __global   const float*  restrict mass,
-
     __global         float2* restrict position_out,
     __global         float2* restrict velocity_out,
     __global         float*  restrict mass_out
@@ -81,18 +77,14 @@ __kernel void compute_merging_collision(
     uint lane = get_local_id(0);
     uint Lx   = get_local_size(0);
 
-
     if (collision_group[i] != i) {
-        //printf("Node %u is in collision_group %u", i, collision_group[i]);
         // this item is part of a different collision_group, so we can safely set its mass to 0 early
-        if (lane == 0) {
-            mass_out[i] = 0.0f;
-        }
+        if (lane == 0) mass_out[i] = 0.0f;
         return;
     }
     
-    float2 total_mv = mass[i] * velocity[i];
-    float2 total_mr = 0; //mass[i] * position[i];
+    float2 total_mv = 0;
+    float2 total_mr = 0;
     float total_mass = 0;
     uint max_index = i;
     bool is_merging = false;
@@ -100,27 +92,16 @@ __kernel void compute_merging_collision(
     uint row_start = i * N;
     for (uint j = lane; j < N; j += Lx) {
         if (j == i || collision_group[j] != i || mass[j] == 0) continue;
-        
         total_mass += mass[j];
-
-
         total_mv += (mass[j] * velocity[j]);
         total_mr += (mass[j] * position[j]);
         is_merging = true;
-
-        //printf("%u -> %u    %.1f   %.1f", i, j, mass[j], total_mass); 
     }
   
     bool wg_is_merging = work_group_any(is_merging);
     float wg_mass = work_group_reduce_add(total_mass);
-
-    // float wg_mr_x = work_group_reduce_add(total_mr.x);
-    // float wg_mr_y = work_group_reduce_add(total_mr.y);
-    // float2 wg_mr = (float2)(wg_mr_x, wg_mr_y);
-  
-    float wg_mv_x = work_group_reduce_add(total_mv.x);
-    float wg_mv_y = work_group_reduce_add(total_mv.y);
-    float2 wg_mv = (float2)(wg_mv_x, wg_mv_y);
+    float2 wg_mv = (float2)(work_group_reduce_add(total_mv.x), work_group_reduce_add(total_mv.y));
+    float2 wg_mr = (float2)(work_group_reduce_add(total_mr.x), work_group_reduce_add(total_mr.y));
 
     if (lane == 0) {
         mass_out[i] = mass[i];
@@ -128,10 +109,13 @@ __kernel void compute_merging_collision(
         position_out[i] = position[i];
 
         if (wg_is_merging) {
-            //printf("[%u] %u MERGED   wg_mass=%.0f   mass[i]=%.0f", wg_max_index, i, wg_mass, mass[i]);
             mass_out[i] = mass[i] + wg_mass;
-            //velocity_out[i] = (wg_mv / (mass[i] + wg_mass));
-            //position_out[i] = position[i] + wg_mr;
+
+            // Center-of-mass velocity
+            velocity_out[i] = (wg_mv + (mass[i] * velocity[i])) / mass_out[i];
+            
+            // Center-of-mass position
+            position_out[i] = (wg_mr + (mass[i] * position[i])) / mass_out[i];
         }
     }
 }
@@ -141,16 +125,12 @@ __kernel void apply_merge(
     __global   const float*  restrict mass_in,
     __global   const float2* restrict velocity_in,
     __global   const float2* restrict position_in,
-
     __global         float*  restrict mass_out,
     __global         float2* restrict velocity_out,
     __global         float2* restrict position_out,
     __global         float*  restrict radius
 ) {
     uint i = get_global_id(0);
-    // if (mass_out[i] != mass_in[i]) {
-    //     printf("mass[%u] set to %.0f (prev=%.0f)", i, mass_in[i], mass_out[i]);
-    // }
     mass_out[i] = mass_in[i];
     velocity_out[i] = velocity_in[i];
     position_out[i] = position_in[i];

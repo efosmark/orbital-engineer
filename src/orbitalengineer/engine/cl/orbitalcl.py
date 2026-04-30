@@ -4,7 +4,7 @@ from typing import cast
 from orbitalengineer.engine import logger, config
 from orbitalengineer.engine.cl.acceleration import AccelerationStep
 from orbitalengineer.engine.cl.dimension import load_kernel
-from orbitalengineer.engine.cl.merge import Merge
+from orbitalengineer.engine.cl.merge import MergePipeline
 from orbitalengineer.engine.cl.particle_cl import ParticleCL
 from orbitalengineer.engine.cl.tracer import EventTracer
 from orbitalengineer.engine.simcontroller import OrbitalSimController
@@ -27,15 +27,6 @@ mf = cl.mem_flags
 
 from pathlib import Path
 kernel_dir = Path(__file__).parent
-
-
-IN_NONE = 0
-IN_APPROACHING = 1
-IN_COLLISION = 2
-IN_DEPARTING = 3
-IN_ORBITING = 4
-IN_ORBITED = 5
-
 
 def round_up(n, l):
     return ((n + l - 1) // l) * l
@@ -142,16 +133,14 @@ class SimController_CL(OrbitalSimController):
         ]
         
         try:
-            self._acceleration = AccelerationStep(self.N, self.ctx, self.q, build_options)
-            self._merge = Merge(self.N, self.ctx, self.q, build_options)
+            self._acceleration = AccelerationStep(self.N, self.ctx, self.q, self.tr, build_options)
+            self._merge = MergePipeline(self.N, self.ctx, self.q, self.tr, build_options)
             
             self.knl_position = load_kernel('compute_position', 'kernel/position.cl', self.ctx, build_options)
             self.knl_interaction = load_kernel('compute_interactions', 'kernel/interaction.cl', self.ctx, build_options)
             self.knl_velocity = load_kernel('compute_velocity', 'kernel/velocity.cl', self.ctx, build_options)
             self.knl_velocity_relative = load_kernel('compute_velocity_relative', 'kernel/velocity_relative.cl', self.ctx, build_options)
-
             self.knl_bounce = load_kernel('compute_bouncing_collision', 'kernel/bounce.cl', self.ctx, build_options)
-
             self.knl_distance_edge = load_kernel('compute_distance_edge', 'kernel/distance_edge.cl', self.ctx, build_options)
 
             logger.info("Kernels have been created.")
@@ -210,11 +199,11 @@ class SimController_CL(OrbitalSimController):
 
     def sync(self):
         self.q.finish()
-        self.tr.add("sync", cl.enqueue_copy(self.q, self.position, self.pos_cl))
-        self.tr.add("sync", cl.enqueue_copy(self.q, self.velocity, self.vel_cl))
-        self.tr.add("sync", cl.enqueue_copy(self.q, self.mass, self.mass_cl))
-        self.tr.add("sync", cl.enqueue_copy(self.q, self.radius, self.radius_cl))
-        self.tr.add("sync", cl.enqueue_copy(self.q, self.toi, self.toi_cl))
+        cl.enqueue_copy(self.q, self.position, self.pos_cl)
+        cl.enqueue_copy(self.q, self.velocity, self.vel_cl)
+        cl.enqueue_copy(self.q, self.mass, self.mass_cl)
+        cl.enqueue_copy(self.q, self.radius, self.radius_cl)
+        cl.enqueue_copy(self.q, self.toi, self.toi_cl)
 
     def compute_interaction(self):
         Lx = 256
