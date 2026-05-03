@@ -1,4 +1,5 @@
 #from orbitalengineer.engine.particle import Particle
+from orbitalengineer.engine.cl.orbitalcl import CollisionStrategy
 from orbitalengineer.ui.mainapp import App
 from orbitalengineer.helpers import angular_position, random_color, create_primary, create_secondary, random_position, rng
 
@@ -20,7 +21,7 @@ N = (Lx  * 4)
 mass_min, mass_max = 1e3, 1e6
 vel_min, vel_max = 0, 0
 radius_min, radius_max = 20, 100
-dist_min, dist_max = 100, 10000
+dist_min, dist_max = 2000, 10000
 
 po = 7000
 d = abs(po)
@@ -44,23 +45,15 @@ def on_activate(app: App):
             position=pos
         #), color=(1,1,1,1))
         ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))
-    
-    # app.insert_particle(create_secondary(
-    #     sol,
-    #     mass=N * mass_max,
-    #     #dist=dist,
-    #     radius=200,
-    #     #radius=r_from_mass(np.float64(mass))*2.5,
-    #     #ecc=1.3
-    #     position=(po) * -1
-    # ), color=(1,1,1,1))
 
     app.orbit_ctl.Lx = Lx
     app.orbit_ctl.speed = 1.0
-    app.orbit_ctl.coef_of_restitution = 0.99
+    app.orbit_ctl.collision_strategy = CollisionStrategy.MERGE
+    app.orbit_ctl.coef_of_restitution = 0.999
+    app.view.show_focused_history = True
     #app.view.show_debug_info = False
     #app.view.show_focus_info = True
-    #app.data.secondary_body = 342
+    app.data.secondary_body = 0
     #app.view.show_plot_at_startup = False
     app.orbit_ctl.init_sim()
     app.ticker.start()

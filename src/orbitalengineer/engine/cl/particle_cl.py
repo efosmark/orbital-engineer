@@ -60,4 +60,4 @@ class ParticleCL(Particle):
         return impact_times # type:ignore
     
     def get_min_toi(self) -> float:
-        return self.ctl.time_to_impact[self.idx]
+        return self.ctl.min_impact_time[self.idx]

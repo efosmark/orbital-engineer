@@ -1,3 +1,4 @@
+from orbitalengineer.engine.cl.orbitalcl import CollisionStrategy
 from orbitalengineer.engine.particle import ParticleRaw
 from orbitalengineer.ui.mainapp import App
 from orbitalengineer.helpers import angular_position, r_from_mass, random_color, create_primary, create_secondary, random_position, rng
@@ -8,11 +9,11 @@ from matplotlib import colors
 
 cmap = plt.colormaps['plasma']
 
-Lx = 64
-N = (Lx  * 1)
+Lx = 256
+N = (Lx  * 4)
 
-mass_min, mass_max = 5e3, 5e6
-dist_min, dist_max = 1, 3000
+mass_min, mass_max = 5e2, 5e5
+dist_min, dist_max = 1, 15000
 
 mass_norm = colors.Normalize(mass_min, mass_max)
 
@@ -35,6 +36,8 @@ def on_activate(app: App):
 
     app.orbit_ctl.Lx = Lx
     app.orbit_ctl.speed = 1.0
+    
+    app.orbit_ctl.collision_strategy = CollisionStrategy.MERGE
     app.orbit_ctl.coef_of_restitution = 0.999
     app.view.show_focused_history = True
     #app.view.show_debug_info = False

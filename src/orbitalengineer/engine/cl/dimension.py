@@ -20,6 +20,7 @@ def load_kernel(kernel_name:str, kernel_file:str, ctx:cl.Context, build_options:
 
 
 class CLPipelineStep:
+    Lx = 256
     
     def __init__(self, N:int, ctx:cl.Context, queue:cl.CommandQueue, tr:EventTracer, build_options:Sequence|None=None):
         self.N = N

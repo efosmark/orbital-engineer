@@ -1,4 +1,7 @@
-#define STRIDE( ...)           \
+#define GRID_STRIDE_INIT() uint i = get_group_id(0); if (i >= N) return; uint lane = get_local_id(0); uint Lx = get_local_size(0);
+
+
+#define GRID_STRIDE_IJ( ...)                  \
     do {                                      \
         if (i >= N) return;                   \
         uint row_start = i * N;               \

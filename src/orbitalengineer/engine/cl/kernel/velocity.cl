@@ -1,31 +1,49 @@
+#include "kernel/stride.clh"
 
+#ifndef G
+#define G 1.0
+#endif
+
+
+inline float2 compute_gravitation(
+    const float2 position_i,
+    const float2 position_j,
+    const float  mass_i,
+    const float  mass_j
+) {
+    // Compute force (Newton's theory of universal gravitation)
+    float2 dr = position_j - position_i;
+    float dist = fast_length(dr);
+    float2 mu = (float)(G) * mass_i * mass_j;
+    return (mu / (dist*dist*dist)) * dr;
+}
 
 __kernel void compute_velocity(
                const uint    N,
                const float   dt,
-    __global   const float2* restrict acceleration,
     __global   const float2* restrict position,
-    __global         float2* restrict velocity,
     __global   const float*  restrict mass,
-    __global   const float*  restrict distance_edge
+    __global         float2* restrict velocity
 ) {
-    uint i = get_group_id(0);
-    if (i >= N) return;
-    
-    uint lane = get_local_id(0);
-    uint Lx   = get_local_size(0);
+    GRID_STRIDE_INIT();
 
     float2 dV_accum = (float2)(0.0f, 0.0f);
+    float inv_mass_i = 1.0f/ mass[i];
 
-    uint row_start = i * N;
-    for (uint j = lane; j < N; j += Lx) {
-        dV_accum += (j != i && distance_edge[row_start + j] > 0) ? acceleration[row_start + j] : 0.0f;
-    }
+    GRID_STRIDE_IJ(
+        if (mass[j] == 0) {
+            continue;
+        }
+
+        float2 force = compute_gravitation(position[i], position[j], mass[i], mass[j]);
+
+        // Apply the acceleration
+        float2 acceleration = force * inv_mass_i;
+        dV_accum += acceleration * dt;
+    );
   
-    float wg_dVx = work_group_reduce_add(dV_accum.x);
-    float wg_dVy = work_group_reduce_add(dV_accum.y);
-    
+    float2 wg_dV = FLOAT2_WG_REDUCE_ADD(dV_accum);
     if (lane == 0) { 
-        velocity[i] += (float2)(wg_dVx, wg_dVy);
+        velocity[i] += wg_dV;
     }
 }
