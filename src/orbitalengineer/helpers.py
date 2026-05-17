@@ -46,12 +46,13 @@ def random_position(min_distance, max_distance) -> complex:
     y = r * math.sin(theta)
     return complex(x, y)
 
-def create_primary(*, mass:float = 332000) -> Particle:
+def create_primary(*, mass:float = 332000, flags=0) -> Particle:
     return ParticleRaw(
         position=0+0j,
         velocity=0+0j,
         mass=mass,
         radius=r_from_mass(np.float64(mass)),
+        flags=flags
     )
 
 def create_secondary(
@@ -62,7 +63,8 @@ def create_secondary(
     prograde:bool=True,
     mass:float=0,
     ecc:float|None=None,
-    radius:float|None=None
+    radius:float|None=None,
+    flags=0
 ):
     if dist is not None:
         if isinstance(dist, tuple):
@@ -88,5 +90,6 @@ def create_secondary(
         position=primary_body.get_position() + position,
         velocity=primary_body.get_velocity() + velocity,
         mass=mass,
-        radius=r_from_mass(np.float64(mass)) if radius is None else radius
+        radius=r_from_mass(np.float64(mass)) if radius is None else radius,
+        flags=flags
     )

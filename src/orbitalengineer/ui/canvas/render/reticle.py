@@ -81,7 +81,7 @@ class ReticleRenderer(renderer.Renderer):
         if radius * self.camera.zoom < 5:
             return
         
-        elif radius * self.camera.zoom < 30:
+        elif radius * self.camera.zoom < 20:
             return
         
         cr.set_source_rgba(*DEFAULT_RETICLE_COLOR)

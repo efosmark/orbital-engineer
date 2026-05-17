@@ -35,7 +35,7 @@ def on_activate(app: App):
     app.orbit_ctl.dt_base = 1/24.0
     app.orbit_ctl.coef_of_restitution = 0.99999
     app.orbit_ctl.init_sim()
-    app.ticker.start()
+    app.tick_ctl.start()
     app.relative_zoom(1.0)
 
 def run():

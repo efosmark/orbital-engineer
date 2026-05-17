@@ -1,4 +1,3 @@
-import time
 from orbitalengineer.ui.canvas import renderer
 
 
@@ -9,17 +8,14 @@ BORDER_COLOR = (0.1, 0.1, 0.1)
 
 class OSDRenderer(renderer.Renderer):
 
-    
     def draw(self, cr, width:int, height:int):
-        if len(self.view.osd_message) == 0:
-            return
+        if len(self.view.osd_message) == 0: return
                 
-        now = time.monotonic()
+        now = self.orbital.clock.time()
         existing_osd_message = []
         for m in self.view.osd_message:
             if 0 < m.until < now:
                 continue
-            
             
             cr.save()
             

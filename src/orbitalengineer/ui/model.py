@@ -1,6 +1,5 @@
 from collections import defaultdict, deque
 from dataclasses import dataclass
-import time
 from typing import Any, Protocol, cast
 
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, GObject, GLib
@@ -8,20 +7,24 @@ import numpy as np
 
 @dataclass
 class Pinpoint:
-    position:np.complex128
+    position:np.complex64|complex
     start:float
     until:float
     radius:float
+    color:tuple[float,float,float] = (1.0, 1.0, 1.0)
 
 class OSDMessage:
     message:str
     start:float
     until:float|None
-    def __init__(self, message:str, duration:float|None):
+    def __init__(self, message:str, start:float, duration:float|None):
         self.message = message
-        self.start = time.monotonic()
+        self.start = start
         self.until = self.start + duration if duration is not None else None
-
+    
+    def __repr__(self):
+        return f"{self.__class__.__name__}(message={repr(self.message)}, start={repr(self.start)}, until={repr(self.until)})"
+    
 class _ViewModelProps(Protocol):
     pinpoint: Any
     particle_colors: Any
@@ -39,17 +42,11 @@ class DataModel(GObject.GObject):
     render = GObject.Property(type=object)
     frame = GObject.Property(type=object)
     bump = GObject.Property(type=object)
-    durations = GObject.Property(type=object)
 
     num_steps = GObject.Property(type=int, default=0)
     num_ticks = GObject.Property(type=int, default=0)
     steps_per_tick = GObject.Property(type=object)
-    
-    def add_duration(self, name, duration, tick_id):
-        self.durations[name].append((tick_id, duration))
-        while len(self.durations[name]) > 0 and self.durations[name][0][0]  < self.num_ticks - 300:
-            self.durations[name].pop(0)
-        
+            
     def __init__(self):
         super().__init__()
         self.durations = defaultdict(list)
@@ -81,6 +78,10 @@ class ViewModel(GObject.GObject):
     
     hover_position = GObject.Property(type=object)
     hovered_over_particle = GObject.Property(type=object)
+    dragging_particle = GObject.Property(type=object)
+    dragging_particle_offset = GObject.Property(type=object)
+    
+    camera_drag_enable = GObject.Property(type=bool, default=True)
     
     width = GObject.Property(type=int, default=0)
     height = GObject.Property(type=int, default=0)
@@ -88,8 +89,7 @@ class ViewModel(GObject.GObject):
     font_family = GObject.Property(type=str, default="Liberation Mono")
     font_size = GObject.Property(type=int, default=10)
     
-    osd_message = GObject.Property(type=object)
-    
+    osd_message = GObject.Property(type=object)    
     
     def __init__(self):
         super().__init__()
@@ -101,8 +101,8 @@ class ViewModel(GObject.GObject):
         props.hovered_over_particle = None
         props.osd_message = []
     
-    def add_osd_message(self, message, duration:float|None=None) -> OSDMessage:
-        m = OSDMessage(message, duration)
+    def add_osd_message(self, message, start, duration:float|None=None) -> OSDMessage:
+        m = OSDMessage(message, start, duration)
         props = cast(_ViewModelProps, self.props)
         props.osd_message.append(m)
         return m

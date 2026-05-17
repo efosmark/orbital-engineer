@@ -1,19 +1,23 @@
-import time
 from typing import Any, cast
 
 from orbitalengineer.engine.simcontroller import OrbitalSimController
 from orbitalengineer.ui import canvas
-from orbitalengineer.ui.gtk4 import Gtk, Gdk, Gio, GLib, GObject #, Adw
+from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib, GObject
+from orbitalengineer.ui.model import Pinpoint, ViewModel #, Adw
 
 APP_ID = "test-app"
 WINDOW_DEFAULT_SIZE = (1200, 800)
 
 class MainWindow(Gtk.ApplicationWindow):
 
-    def __init__(self, application, title, camera, view, data, ctl:OrbitalSimController):
+    def __init__(self, application, title, camera, view: ViewModel, data, ctl:OrbitalSimController):
         Gtk.ApplicationWindow.__init__(self, application=application, title=title)
         self.ctl = ctl
+        self._tick_sound = None
+        self._tick_audio_ready = False
+        
         self.data = data
+        self.view = view
         
         self.canvas = canvas.OrbitalCanvas(camera, view, data, self.ctl)
         self.canvas.set_hexpand(True)
@@ -33,18 +37,9 @@ class MainWindow(Gtk.ApplicationWindow):
         header.pack_end(menu_button)
         self._init_menu_actions()
 
-        # def buffers():
-        #     if self.ctl.is_initialized:
-        #         self.ctl.sync()
-        #         #self.canvas.queue_draw()
-        #         #self.get_application().
-        #     return True
-        # GLib.timeout_add(50, buffers)
-
     def _init_menu_actions(self):
         app = cast(Any, self.get_application())
-        if app is None:
-            return
+        if app is None: return
 
         def add_toggle_action(name: str, initial: bool, handler):
             action = Gio.SimpleAction.new_stateful(
@@ -75,18 +70,18 @@ class MainWindow(Gtk.ApplicationWindow):
             elif name == "show_debug_info":
                 app.view.show_debug_info = state
 
-        add_toggle_action("show_grid",           app.view.show_grid,           on_toggle_changed)
-        add_toggle_action("show_force_vectors",  app.view.show_force_vectors,  on_toggle_changed)
-        add_toggle_action("show_history",        app.view.show_focused_history,on_toggle_changed)
-        add_toggle_action("show_orbital_ellipse",app.view.show_orbital_ellipse,on_toggle_changed)
-        add_toggle_action("track_focused",       app.view.follow_tracked_body, on_toggle_changed)
-        add_toggle_action("show_magnifier",      app.view.show_magnifier,      on_toggle_changed)
-        add_toggle_action("show_debug_info",     app.view.show_debug_info,     on_toggle_changed)
+        add_toggle_action("show_grid",            app.view.show_grid,            on_toggle_changed)
+        add_toggle_action("show_force_vectors",   app.view.show_force_vectors,   on_toggle_changed)
+        add_toggle_action("show_history",         app.view.show_focused_history, on_toggle_changed)
+        add_toggle_action("show_orbital_ellipse", app.view.show_orbital_ellipse, on_toggle_changed)
+        add_toggle_action("track_focused",        app.view.follow_tracked_body,  on_toggle_changed)
+        add_toggle_action("show_magnifier",       app.view.show_magnifier,       on_toggle_changed)
+        add_toggle_action("show_debug_info",      app.view.show_debug_info,      on_toggle_changed)
 
         # Quit on the app as well
         act_quit = Gio.SimpleAction.new("quit", None)
         act_quit.connect("activate", lambda a, p: app.quit())
-        app.add_action(act_quit)  # <-- CHANGED
+        app.add_action(act_quit)
 
         # These now match where the actions live
         app.set_accels_for_action("app.quit", ["<Primary>q"])

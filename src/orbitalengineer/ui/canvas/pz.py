@@ -49,9 +49,11 @@ class Camera2D:
         self.offset[1] += wy - wy2
 
 class Camera2DController:
-    def __init__(self, widget, camera):
+    def __init__(self, widget, camera, view):
         self.widget = widget
         self.camera = camera
+        self.view = view
+        self.drag_enabled = True
         self.pointer_x = 0
         self.pointer_y = 0
         self.drag_start_offset = (0, 0)
@@ -81,10 +83,14 @@ class Camera2DController:
         self.widget.queue_draw()
 
     def on_drag_begin(self, gesture, start_x, start_y):
+        if not self.view.camera_drag_enable:
+            return
         self._last_pinch_scale = 1.0
         self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
 
     def on_drag_update(self, gesture, dx, dy):
+        if not self.view.camera_drag_enable:
+            return
         self.camera.offset[0] = self.drag_start_offset[0] - dx / self.camera.zoom
         self.camera.offset[1] = self.drag_start_offset[1] - dy / self.camera.zoom
         self.widget.queue_draw()

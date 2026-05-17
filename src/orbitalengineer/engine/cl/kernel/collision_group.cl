@@ -1,22 +1,21 @@
 #include "kernel/stride.clh"
-
+#include "flags.clh"
 
 __kernel void assign_collision_groups(
                const uint    N,
                const float   dt,
+    __global   const uint*   restrict flags,
     __global   const float*  restrict mass,
     __global   const float*  restrict velocity_relative,
     __global   const float*  restrict distance_edge,
     __global         uint*   restrict collision_group
 ) {
-    uint i = get_group_id(0);
-    uint lane = get_local_id(0);
-    uint Lx   = get_local_size(0);
+    GRID_STRIDE_INIT();
+    
     uint max_index = i;
 
     GRID_STRIDE_IJ(
-        if (mass[j] == 0) continue;
-
+        if ((flags[i]&REMOVED)) continue;
         if (distance_edge[IDX] <= EPS_DIST)
             max_index = min(max_index, j);
     );
@@ -30,6 +29,7 @@ __kernel void assign_collision_groups(
 
 __kernel void reduce_collision_groups(
                const uint    N,
+    __global   const uint*   restrict flags,
     __global   const float*  restrict mass,
     __global         uint*   restrict collision_group,
     __global         uint*   restrict has_updates
@@ -37,13 +37,12 @@ __kernel void reduce_collision_groups(
     uint i = get_global_id(0);
 
     // Get own collision_group ID. If it's itself, then we're done!
-    if (i >= N || mass[i] == 0 || i == collision_group[i]) return;
+    if (i >= N || (flags[i]&REMOVED) || i == collision_group[i])
+        return;
 
     uint workgroup_id = get_group_id(0);
     uint lane = get_local_id(0);
-    if (lane == 0) {
-        has_updates[workgroup_id] = false;
-    }
+    if (lane == 0) has_updates[workgroup_id] = false;
 
     // Walk up however many we can
     // We want the largest group ID for the simultaneous collisions
@@ -56,7 +55,5 @@ __kernel void reduce_collision_groups(
     
     collision_group[i] = j;
     bool wg_has_updated = work_group_any(updated);
-    if (lane == 0) {
-        has_updates[workgroup_id] = wg_has_updated;
-    }
+    if (lane == 0) has_updates[workgroup_id] = wg_has_updated;
 }

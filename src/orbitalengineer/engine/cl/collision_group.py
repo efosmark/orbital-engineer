@@ -5,16 +5,16 @@ from orbitalengineer.engine.cl.dimension import CLPipelineStep
 KERNEL_FILE_LOCATION = "kernel/collision_group.cl"
 
 class CollisionGroupPipeline(CLPipelineStep):
+    debug_flag = "collision_group"
     
-    def load_kernels(self):
+    def initialize(self):
         self._assign_collision_groups = self._load_kernel("assign_collision_groups", KERNEL_FILE_LOCATION)
         self._reduce_collision_groups = self._load_kernel("reduce_collision_groups", KERNEL_FILE_LOCATION)
     
-    def init_memory(self, N:int):
-        self.groups = np.zeros(N, dtype=np.uint32)
+        self.groups = np.zeros(self.N, dtype=np.uint32)
         self.groups_cl = self._create_buffer(self.groups)
     
-    def assign_collision_groups(self, dt_step: float, mass: cl.Buffer, velocity_relative: cl.Buffer, distance_edge: cl.Buffer):
+    def assign_collision_groups(self, dt_step: float, status: cl.Buffer, mass: cl.Buffer, velocity_relative: cl.Buffer, distance_edge: cl.Buffer):
         return self.tr.add("assign_collision_groups",
             self._assign_collision_groups(
                 self.queue,
@@ -24,6 +24,7 @@ class CollisionGroupPipeline(CLPipelineStep):
                 # Args
                 np.uint32(self.N),
                 np.float32(dt_step),
+                status,
                 mass,
                 velocity_relative,
                 distance_edge,
@@ -31,7 +32,7 @@ class CollisionGroupPipeline(CLPipelineStep):
             )
         )
     
-    def reduce_collision_groups(self, mass: cl.Buffer):
+    def reduce_collision_groups(self, status: cl.Buffer, mass: cl.Buffer):
         num_workgroups = (self.N // self.Lx) + 1
         result_indices = np.zeros(num_workgroups, dtype=np.uint32)
         result_buffer = self._create_buffer(result_indices)
@@ -48,6 +49,7 @@ class CollisionGroupPipeline(CLPipelineStep):
                     
                     # Args
                     np.uint32(self.N),
+                    status,
                     mass,
                     self.groups_cl,
                     result_buffer,
@@ -60,7 +62,7 @@ class CollisionGroupPipeline(CLPipelineStep):
                 print("TOO MANY ITERATIONS")
                 raise SystemExit
 
-    def __call__(self, dt_step:float, velocity_relative: cl.Buffer, mass: cl.Buffer, distance_edge: cl.Buffer):
-        self.assign_collision_groups(dt_step, mass, velocity_relative, distance_edge)
-        self.reduce_collision_groups(mass)
+    def __call__(self, dt_step:float, status: cl.Buffer, velocity_relative: cl.Buffer, mass: cl.Buffer, distance_edge: cl.Buffer):
+        self.assign_collision_groups(dt_step, status, mass, velocity_relative, distance_edge)
+        self.reduce_collision_groups(status, mass)
         

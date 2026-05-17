@@ -1,7 +1,8 @@
-import time
 from orbitalengineer.engine.particle import ParticleRaw
 from orbitalengineer.ui.mainapp import App
 from orbitalengineer.helpers import angular_position, r_from_mass, random_color, create_primary, create_secondary, random_position, rng
+
+import time
 
 N = 4
 
@@ -39,9 +40,9 @@ def on_activate(app: App):
     app.orbit_ctl.speed = 1.0
     app.orbit_ctl.coef_of_restitution = 0.999
     app.orbit_ctl.init_sim()
-    app.orbit_ctl.tick(time.monotonic())
+    app.orbit_ctl.tick(app.clock.time())
     time.sleep(app.orbit_ctl.dt_base)
-    app.orbit_ctl.tick(time.monotonic())
+    app.orbit_ctl.tick(app.clock.time())
     #app.ticker.start()
     #app.relative_zoom(1.0)
 

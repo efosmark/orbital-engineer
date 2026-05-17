@@ -4,29 +4,29 @@ import math
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Gtk, GLib, Gdk
+from gi.repository import Gtk, GLib # type:ignore
 
 import matplotlib
 matplotlib.use("GTK4Agg")
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_gtk4agg import FigureCanvasGTK4Agg as FigureCanvas
 
-from orbitalengineer.ui import model
-
 class PlotWindow(Gtk.ApplicationWindow):
     def __init__(
         self,
         app,
-        model: model.DataModel,
-        refresh_interval_ms=1000,
+        durations: dict[str, list[tuple[int,float]]],
+        refresh_interval_ms=100,
         min_ticks_between_redraws=8,
         max_line_points=180,
-        auto_refresh=False,
+        auto_refresh=True,
     ):
         super().__init__(application=app, title="Duration plots-dialog")
         self.set_default_size(800, 500)
 
-        self.model = model
+        self.durations = durations
+
+        #self.model = model
         self.auto_refresh = bool(auto_refresh)
         self.refresh_interval_ms = max(16, int(refresh_interval_ms))
         self.min_ticks_between_redraws = max(1, int(min_ticks_between_redraws))
@@ -64,13 +64,12 @@ class PlotWindow(Gtk.ApplicationWindow):
         self.ax_avg_individual = fig.add_subplot(gs[1, 2], sharey=self.ax_avg)
         fig.subplots_adjust(left=0.16, right=0.98, bottom=0.10, top=0.93, hspace=0.58, wspace=0.10)
         self.canvas = FigureCanvas(fig)
+        self.canvas.set_hexpand(True)
+        self.canvas.set_vexpand(True)
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        refresh_btn = Gtk.Button(label="Refresh")
-        refresh_btn.connect("clicked", self.on_refresh_clicked)
-        controls.append(refresh_btn)
-        root.append(controls)
+        root.set_hexpand(True)
+        root.set_vexpand(True)
         root.append(self.canvas)
         self.set_child(root)
 
@@ -84,20 +83,10 @@ class PlotWindow(Gtk.ApplicationWindow):
         self._next_color_idx = 0
 
         self._style_axes()
-
         self.redraw_plot()
-
         self.connect("close-request", self.on_close_request)
-        if self.auto_refresh:
-            self._refresh_source_id = GLib.timeout_add(
-                self.refresh_interval_ms,
-                self._periodic_refresh,
-            )
 
     def redraw_plot(self):
-        if self._closed:
-            return
-
         self.ax_line.clear()
         self.ax_avg.clear()
         self.ax_count.clear()
@@ -112,7 +101,8 @@ class PlotWindow(Gtk.ApplicationWindow):
         avg_values = []
         avg_counts = []
         avg_values_individual = []
-        fields_to_plot = list(self.model.durations.keys())
+        line_y_values = []
+        fields_to_plot = list(self.durations.keys())
         for name in fields_to_plot:
             series = self._get_series(name)
             if series is None:
@@ -129,6 +119,7 @@ class PlotWindow(Gtk.ApplicationWindow):
                     line_x_max = max(line_x_max, x_vals[-1]) # type: ignore
 
             y_list = [y * 1000.0 for y in y_vals]
+            line_y_values.extend(y_list)
             line_artist, = self.ax_line.plot(
                 x_vals,
                 y_list,
@@ -141,7 +132,7 @@ class PlotWindow(Gtk.ApplicationWindow):
                 avg_names.append(name)
                 avg_values.append(sum(y_list) / len(y_list))
                 avg_counts.append(sum(counts) / len(counts))
-                raw_data = self.model.durations.get(name, [])
+                raw_data = self.durations.get(name, [])
                 raw_y_ms = [y * 1000.0 for _, y in raw_data]
                 avg_values_individual.append(sum(raw_y_ms) / len(raw_y_ms))
 
@@ -150,6 +141,7 @@ class PlotWindow(Gtk.ApplicationWindow):
                 self.ax_line.set_xlim(line_x_min - 1, line_x_max + 1)
             else:
                 self.ax_line.set_xlim(line_x_min, line_x_max)
+        self._set_line_axis_ylim(line_y_values)
 
         if avg_names:
             bar_colors = [self.prop_to_color[name] for name in avg_names]
@@ -200,9 +192,8 @@ class PlotWindow(Gtk.ApplicationWindow):
                     fontsize=self.value_font_size,
                     color=self.text_color,
                 )
-
+        
         self.canvas.draw_idle()
-        self._last_redraw_tick = int(self.model.num_ticks)
 
     def _ensure_field_color(self, name):
         color = self.prop_to_color.get(name)
@@ -256,6 +247,34 @@ class PlotWindow(Gtk.ApplicationWindow):
             return
         axis.set_xlim(right=max_value * 1.16)
 
+    def _set_line_axis_ylim(self, values):
+        values = sorted(v for v in values if math.isfinite(v))
+        if not values:
+            return
+
+        max_value = values[-1]
+        if max_value <= 0:
+            self.ax_line.set_ylim(0.0, 1.0)
+            return
+
+        if len(values) < 8:
+            upper = max_value
+        else:
+            median = self._quantile(values, 0.5)
+            p95 = self._quantile(values, 0.95)
+            deviations = sorted(abs(v - median) for v in values)
+            mad = self._quantile(deviations, 0.5)
+            robust_upper = max(p95 * 1.5, median + (8.0 * mad))
+            upper = min(max_value, robust_upper) if robust_upper > 0 else max_value
+
+        self.ax_line.set_ylim(0.0, max(upper * 1.12, 0.001))
+
+    def _quantile(self, sorted_values, q):
+        if len(sorted_values) == 1:
+            return sorted_values[0]
+        idx = math.floor((len(sorted_values) - 1) * q)
+        return sorted_values[idx]
+
     def _redraw_on_main_thread(self):
         self._redraw_queued = False
         if self._closed:
@@ -263,16 +282,13 @@ class PlotWindow(Gtk.ApplicationWindow):
         self.redraw_plot()
         return False
 
-    def _queue_redraw(self):
+    def queue_redraw(self):
         if self._closed:
             return
         if self._redraw_queued:
             return
         self._redraw_queued = True
         GLib.idle_add(self._redraw_on_main_thread)
-
-    def on_refresh_clicked(self, _button):
-        self._queue_redraw()
 
     def on_close_request(self, _window):
         self._closed = True
@@ -281,42 +297,8 @@ class PlotWindow(Gtk.ApplicationWindow):
             self._refresh_source_id = 0
         return False
 
-    def _periodic_refresh(self):
-        if self._closed:
-            return False
-        if not self._can_redraw_now():
-            return True
-        num_ticks = int(self.model.num_ticks)
-        if num_ticks <= self._last_redraw_tick:
-            return True
-        if (num_ticks - self._last_redraw_tick) < self.min_ticks_between_redraws:
-            return True
-        self._queue_redraw()
-        return True
-
-    def _can_redraw_now(self):
-        if not self.get_visible():
-            return False
-        if not self.get_mapped():
-            return False
-        if not self.is_active():
-            return False
-
-        surface = self.get_surface()
-        if surface is not None:
-            try:
-                state = Gdk.Toplevel.get_state(surface)
-                if state & Gdk.ToplevelState.MINIMIZED:
-                    return False
-                if state & Gdk.ToplevelState.SUSPENDED:
-                    return False
-            except Exception:
-                # If state probing fails on a platform/backend, keep plotting behavior safe.
-                pass
-        return True
-
     def _get_series(self, name):
-        data = self.model.durations.get(name)
+        data = self.durations.get(name)
         if not data:
             return None
         summed_by_x = {}

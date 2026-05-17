@@ -1,0 +1,104 @@
+import os
+import socket
+import json
+
+from collections import defaultdict
+from typing import Any
+
+from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject, GLib
+from orbitalengineer.ui_metrics.plot import PlotWindow
+from orbitalengineer.engine.config import METRIC_SOCKET_PATH
+
+APP_ID = "com.qmew.OrbitalEngineer-Metrics-dialog"
+WINDOW_DEFAULT_SIZE = (1200, 800)
+
+class MetricsApp(Gtk.Application):
+    props:Any
+    durations = GObject.Property(type=object)
+    
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.durations = defaultdict(list)
+        self.max_tick_id = 0
+        self.plot_win = None
+        self._refresh_source_id = 0
+        self._max_metrics_per_poll = 250
+
+        try:
+            os.unlink(METRIC_SOCKET_PATH)
+        except FileNotFoundError:
+            pass
+
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        self.sock.bind(METRIC_SOCKET_PATH)
+        self.sock.setblocking(False)
+        print(f"listening on {METRIC_SOCKET_PATH}")
+
+        self._refresh_source_id = GLib.timeout_add(50, self._periodic_refresh)
+
+    def _periodic_refresh(self):
+        received_metric = False
+
+        for _ in range(self._max_metrics_per_poll):
+            try:
+                data, _addr = self.sock.recvfrom(65536)
+            except BlockingIOError:
+                break
+
+            try:
+                metric = json.loads(data)
+            except json.JSONDecodeError:
+                print("bad metric:", data)
+                continue
+
+            tick_id = metric.get("value")
+            if tick_id is None:
+                continue
+
+            received_metric = True
+            for m in metric.get("timeline", []):
+                self.add_duration(m["name"], m["t"], tick_id)
+        
+        if received_metric and self.plot_win is not None:
+            self.plot_win.queue_redraw()
+        
+        return True
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+
+    def do_activate(self):
+        Gtk.Application.do_activate(self)
+        if self.plot_win is not None:
+            self.plot_win.present()
+            return 
+
+        self.plot_win = PlotWindow(self, self.durations)
+        self.plot_win.connect("destroy", self._on_plot_window_destroyed)
+        self.plot_win.present()
+        self.plot_win.queue_redraw()
+
+    def do_shutdown(self):
+        if self._refresh_source_id:
+            GLib.source_remove(self._refresh_source_id)
+            self._refresh_source_id = 0
+        self.sock.close()
+        try:
+            os.unlink(METRIC_SOCKET_PATH)
+        except FileNotFoundError:
+            pass
+        Gtk.Application.do_shutdown(self)
+
+    def _on_plot_window_destroyed(self, _window):
+        self.plot_win = None
+
+    def add_duration(self, name, duration, tick_id):
+        self.durations[name].append((tick_id, duration))
+        self.max_tick_id = max(self.max_tick_id, tick_id)
+        while len(self.durations[name]) > 0 and self.durations[name][0][0]  < self.max_tick_id - 50:
+            self.durations[name].pop(0)
+
+
+if __name__ == "__main__":
+    app = MetricsApp()
+    app.run(None)

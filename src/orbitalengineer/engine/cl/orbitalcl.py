@@ -1,8 +1,15 @@
-from dataclasses import dataclass
 from typing import cast
+from pathlib import Path
+from numpy.typing import NDArray
+import numpy as np
+import pyopencl as cl
 
 from orbitalengineer.engine import logger, config
+from orbitalengineer.engine.cl import flags
+from orbitalengineer.engine.cl.hill_radius import HillRadiusPipeline
 from orbitalengineer.engine.cl.interaction import InteractionGroupPipeline
+from orbitalengineer.engine.cl.nudge import NudgePipeline
+from orbitalengineer.engine.cl.position import PositionPipeline
 from orbitalengineer.engine.cl.relative_velocity import RelativeVelocityPipeline
 from orbitalengineer.engine.cl.velocity import VelocityPipeline
 from orbitalengineer.engine.cl.bounce import BouncePipeline
@@ -11,13 +18,21 @@ from orbitalengineer.engine.cl.dimension import load_kernel
 from orbitalengineer.engine.cl.merge import MergePipeline
 from orbitalengineer.engine.cl.particle_cl import ParticleCL
 from orbitalengineer.engine.cl.tracer import EventTracer
-from orbitalengineer.engine.collision_strategy import CollisionStrategy
+from orbitalengineer.engine.clock import SimClock
+from orbitalengineer.engine.event import BouncingCollisionEvent
+from orbitalengineer.engine.metric import MetricsProducer
 from orbitalengineer.engine.simcontroller import OrbitalSimController
 from orbitalengineer.engine.cl.device import get_device_pci_bdf, map_pci_bdf_to_drm_card
 
+PLATFORM_ID = 0
+DEVICE_ID = 1
 
-PLATFORM_ID = 1
-DEVICE_ID = 0
+# particle_dtype = np.dtype([
+#     ("velocity", np.complex64),
+#     ("position", np.complex64),
+#     ("mass",     np.float32),
+#     ("radius",   np.float32)
+# ])
 
 import warnings
 warnings.filterwarnings(
@@ -26,26 +41,11 @@ warnings.filterwarnings(
     module="pyopencl.cache"
 )
 
-import numpy as np
-import pyopencl as cl
 mf = cl.mem_flags
-
-from pathlib import Path
 kernel_dir = Path(__file__).parent
 
 def round_up(n, l):
     return ((n + l - 1) // l) * l
-
-@dataclass
-class Metric:
-    field:str
-    value:float|int
-
-@dataclass
-class TickStats:
-    num_steps:int
-    tick_id:int
-    metrics:list[Metric]
 
 class SimController_CL(OrbitalSimController):
     collision_strategy = config.DEFAULT_COLLISION_STRATEGY
@@ -57,14 +57,17 @@ class SimController_CL(OrbitalSimController):
     N:int = 1024
     Lx:int = 256
     
-    def __init__(self):
+    def __init__(self, clock:SimClock):
         self._active_events:list[cl.Event] = []
         self._particles:list = []
+        self.clock = clock
         self.accum = 0.0
         self.last_now:float|None = None
         self.enable_profiling = True
         self.is_initialized = False
+
         self.tr = EventTracer(self)
+        self.metrics = MetricsProducer(config.METRIC_SOCKET_PATH)
 
         self.step_count = 0
         self.opencl_device_name = ""
@@ -74,32 +77,32 @@ class SimController_CL(OrbitalSimController):
 
     def _populate_particle_fields(self):
         for i,p in enumerate(self._particles):
+            self.status[i] = np.uint32(p.get_flags())
             self.velocity[i] = np.complex64(p.get_velocity())
-            self.position[i] = np.complex64(p.get_position())
+            self.position[i] = np.complex64(p .get_position())
             self.mass[i] = np.float32(p.get_mass())
             self.radius[i] = np.float32(p.get_radius())
 
     def _allocate_memory(self):
+        # Primary particle fields
+        self.status = np.zeros(self.N, dtype=np.uint32)
         self.velocity = np.zeros(self.N, dtype=np.complex64)
-        self.velocity_relative = np.zeros(self.N * self.N, dtype=np.complex64)
         self.position = np.zeros(self.N, dtype=np.complex64)
         self.radius = np.zeros(self.N, dtype=np.float32)
         self.mass = np.zeros(self.N, dtype=np.float32)
+        
+        self.velocity_relative = np.zeros(self.N * self.N, dtype=np.complex64)
         self.distance_edge = np.zeros(self.N * self.N, dtype=np.float32)
-        self.min_impact_time = np.array([np.inf for i in range(self.N)], dtype=np.float32)
-        self.toi = np.zeros(self.N * self.N, dtype=np.float32)
-
         logger.debug("Memory allocated.")
 
     def _create_buffers(self):
+        self.status_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.status)
         self.vel_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.velocity)
         self.pos_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.position)
         self.mass_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.mass)
         self.radius_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.radius)
-        self.min_impact_time_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.min_impact_time)
         self.velocity_relative_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.velocity_relative)
         self.distance_edge_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.distance_edge)
-        self.toi_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.USE_HOST_PTR, hostbuf=self.toi)
         logger.debug("Buffers were created.")
     
     def _init_device(self):
@@ -119,10 +122,19 @@ class SimController_CL(OrbitalSimController):
         self.copy_q = cl.CommandQueue(self.ctx, properties=properties)
         self.q = cl.CommandQueue(self.ctx, properties=properties)
     
+    def _generate_headers(self):
+        build_dir = Path(".opencl_build")
+        build_dir.mkdir(exist_ok=True)
+        header_path = build_dir / "flags.clh"
+        header_path.write_text(flags.generate_cl_flag_file())
+        
+        return build_dir
+    
     def _init_kernel(self):
         self._init_device()
         self.ctx = cl.Context([self._device])
         self._init_queue()
+        build_dir = self._generate_headers()                
         
         defs = {
             "COEF_OF_RESTITUTION": f'{self.coef_of_restitution}f',
@@ -136,19 +148,22 @@ class SimController_CL(OrbitalSimController):
         build_options = [
             '-cl-std=CL2.0',
             f'-I {kernel_dir}',
+            f'-I {build_dir}',
             *[ f'-D{k}={v}' for k,v in defs.items() ]
         ]
         
         try:
             self._velocity = VelocityPipeline(self.N, self.ctx, self.q, self.tr, build_options)
-            self._relative_velocity = RelativeVelocityPipeline(self.N, self.ctx, self.q, self.tr, build_options)
-            self._collision = CollisionGroupPipeline(self.N, self.ctx, self.q, self.tr, build_options)
-            self._merge = MergePipeline(self.N, self.ctx, self.q, self.tr, build_options)
+            self._position = PositionPipeline(self.N, self.ctx, self.q, self.tr, build_options)
             self._bounce = BouncePipeline(self.N, self.ctx, self.q, self.tr, build_options)
             self._interaction = InteractionGroupPipeline(self.N, self.ctx, self.q, self.tr, build_options)
+            self._nudge = NudgePipeline(self.N, self.ctx, self.q, self.tr, build_options)
+            self._collision = CollisionGroupPipeline(self.N, self.ctx, self.q, self.tr, build_options)
+            self._merge = MergePipeline(self.N, self.ctx, self.q, self.tr, build_options)
+            #self._hill_radius = HillRadiusPipeline(self.N, self.ctx, self.q, self.tr, build_options)
             
-            self.knl_position = load_kernel('compute_position', 'kernel/position.cl', self.ctx, build_options)
-            self.knl_distance_edge = load_kernel('compute_distance_edge', 'kernel/distance_edge.cl', self.ctx, build_options)
+            self._relative_velocity = RelativeVelocityPipeline(self.N, self.ctx, self.q, self.tr, build_options)
+            self.knl_distance_edge = load_kernel('compute_edge_distance', 'kernel/distance_edge.cl', self.ctx, build_options)
             
             logger.info("Kernels have been created.")
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
@@ -178,6 +193,14 @@ class SimController_CL(OrbitalSimController):
         self._particles.append(particle)
         return len(self._particles) - 1
     
+    def set_position(self, body_id, x, y):
+        self.position[body_id] = complex(x, y)
+        cl.enqueue_copy(self.q, self.pos_cl, self.position).wait()
+    
+    def set_velocity(self, body_id, x, y):
+        self.velocity[body_id] = complex(x, y)
+        cl.enqueue_copy(self.q, self.vel_cl, self.velocity).wait()
+
     def find_bodies_at(self, x:float, y:float, margin:float=10):
         indices = np.arange(self.N)
         
@@ -189,13 +212,15 @@ class SimController_CL(OrbitalSimController):
         d = np.complex128(x, y) - p
         
         # Create a mask indicating where there is crossover
-        mask = (np.abs(d) <= radius)
+        mask = (np.abs(d) <= radius) #& ~(self.status & flags.REMOVED)
         
         # Get the indices 
         return indices[mask]
 
-    def get_valid_indices(self):
+    def get_valid_indices(self) -> NDArray:
         return np.arange(self.N)
+        cl.enqueue_copy(self.q, self.status, self.status_cl)
+        return ~(self.status & flags.REMOVED)
 
     def get_particle(self, particle_id:int):
         return ParticleCL(particle_id, self)
@@ -210,19 +235,7 @@ class SimController_CL(OrbitalSimController):
         cl.enqueue_copy(self.q, self.velocity, self.vel_cl)
         cl.enqueue_copy(self.q, self.mass, self.mass_cl)
         cl.enqueue_copy(self.q, self.radius, self.radius_cl)
-        cl.enqueue_copy(self.q, self.toi, self.toi_cl)
-    
-    def compute_position(self, dt_step):
-        return self.knl_position(
-            self.q,
-            (self.N,),   # global work size
-            None,        # local work size
-                        
-            # Args
-            np.float32(dt_step),
-            self.vel_cl,
-            self.pos_cl
-        )
+        cl.enqueue_copy(self.q, self._interaction.toi, self._interaction.toi_cl)
     
     def compute_distance_edge(self):
         return self.knl_distance_edge(
@@ -238,43 +251,40 @@ class SimController_CL(OrbitalSimController):
         )
     
     def kick(self, dt_step):
-        self._velocity(dt_step, self.pos_cl, self.mass_cl, self.vel_cl)
-        self._relative_velocity(self.pos_cl, self.vel_cl, self.radius_cl, self.velocity_relative_cl)
-        if (self.collision_strategy == CollisionStrategy.MERGE):
-            self._collision(dt_step, self.velocity_relative_cl, self.mass_cl, self.distance_edge_cl)
-            self._merge(self._collision.groups_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
-        elif (self.collision_strategy == CollisionStrategy.BOUNCE):
-           self._bounce(self.velocity_relative_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.distance_edge_cl)
-        else:
-            ...
+        self._velocity(dt_step, self.status_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.distance_edge_cl, self.vel_cl)
+
+    def kick2(self, dt_step):
+        self._velocity(dt_step, self.status_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.distance_edge_cl, self.vel_cl)
+        self._relative_velocity(self.pos_cl, self.vel_cl, self.velocity_relative_cl)
+        self._collision(dt_step, self.status_cl, self.velocity_relative_cl, self.mass_cl, self.distance_edge_cl)
+        self._merge(self.status_cl, self._collision.groups_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
+        self._bounce(self.status_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl, self.velocity_relative_cl, self.distance_edge_cl)
+        #self._hill_radius(self.pos_cl, self.mass_cl, self.radius_cl)
 
     def drift(self, dt_step):
-        self.tr.add("position", self.compute_position(dt_step))
-        self.tr.add("distance_edge", self.compute_distance_edge())
+        self._position(dt_step, self.status_cl, self.vel_cl, self.pos_cl)
+        self.tr.add("edge_distance", self.compute_distance_edge())
 
     def sub_step(self, dt_step):
         self.kick(dt_step / 2.0)
         self.drift(dt_step)
-        self.kick(dt_step / 2.0)
-        
-        self._interaction(dt_step, self.pos_cl, self.vel_cl, self.radius_cl, self.toi_cl, self.min_impact_time_cl, self.mass_cl)
-        #self.tr.add("impact_time", self.compute_interaction())
+        self.kick2(dt_step / 2.0)
+        self._interaction(dt_step, self.pos_cl, self.vel_cl, self.radius_cl, self.mass_cl)
     
     def single_step(self, dt_step):
         dt_step_start = dt_step
         count = 0
-        while dt_step > 0 and count < 20:
-            
+        
+        while dt_step > 0 and count < config.MAX_SUB_STEPS:
             cl.enqueue_copy(
                 self.copy_q,
-                self.min_impact_time,
-                self.min_impact_time_cl
+                self._interaction.node_dt,
+                self._interaction.node_dt_cl
             ).wait()
             
             try:
-                min_toi = min([t for t in self.min_impact_time if t > 0])
+                min_toi = min([t for t in self._interaction.node_dt if t > 0])
             except ValueError:
-                logger.warning("No min time-of-impact. Using EPS_TIME (%s)", config.EPS_TIME)
                 min_toi = config.EPS_TIME
             
             dt = max(config.EPS_TIME, min(dt_step, min_toi))
@@ -283,13 +293,29 @@ class SimController_CL(OrbitalSimController):
             self.step_count += 1
             count += 1
                 
-        return dt_step_start - dt_step
+        return count, dt_step_start - dt_step
+
+    def _detect_event(self):
+        cl.enqueue_copy(self.q, self.distance_edge, self.distance_edge_cl)
+        cl.enqueue_copy(self.q, self._bounce.collision_point, self._bounce.collision_point_cl)
+        cl.enqueue_copy(self.q, self.velocity_relative, self.velocity_relative_cl)
+        for i in range(self.N):
+            row_offset = i * self.N
+            for j in range(i + 1, self.N):
+                grid_idx = row_offset + j
+                edge_dist = self.distance_edge[grid_idx]
+                point = self._bounce.collision_point[grid_idx]
+                if point != 0:
+                    evt = BouncingCollisionEvent(self.tick_id, i, j, complex(point), complex(self.velocity_relative[grid_idx]), float(edge_dist))
+                    self.on_collision(evt)
+    
+    def on_collision(self, event:BouncingCollisionEvent):...
 
     def tick(self, now):
         if not self.is_initialized:
            logger.warning("tick() was called before simulation initialization.")
            return 0
-            
+        
         if self.last_now is None:
             self.accum = 0
             self.last_now = now - self.dt_base
@@ -298,27 +324,31 @@ class SimController_CL(OrbitalSimController):
         self.accum += wall_dt * self.speed
 
         dt_step = np.float32(self.dt_base) # <- for now, fixed cap
-        num_steps = int(min(self.accum // dt_step, config.MAX_STEPS_PER_FRAME)) # type:ignore
+        num_steps = int(min(self.accum // dt_step, config.MAX_STEPS_PER_TICK)) # type:ignore
         self.last_now = now
         
         if num_steps > 0:
-            dt_processed = self.single_step(dt_step)
-            self.tick_id += 1
+            
+            count, dt_processed = self.single_step(dt_step)
+            #count, dt_processed = self.single_step_sub(dt_step)
         
-            self.q.finish()
-            timeline = self.tr.timeline()
-            self.tr.clear()
-
             #self.accum -= dt_processed # type: ignore
             self.accum -= dt_step # type: ignore
+
+            #self._bounce.collision_point[:] = np.complex64(0)
+            #cl.enqueue_copy(self.q, self._bounce.collision_point_cl, self._bounce.collision_point)
+            #self._detect_event()
             
-            return TickStats(
-                num_steps,
-                self.tick_id,
-                [
-                    *[ Metric(t["name"], t["duration_ns"]/1000.0/1000.0) for t in timeline],
-                    # Metric("tick", (time.monotonic() - tick_start) * 1000.0)
-                ] if self.enable_profiling else []
-            )
+            if config.EMIT_METRICS and self.enable_profiling:
+                self.q.finish()
+                timeline = self.tr.timeline()
+                self.tr.clear()
+
+                self.metrics.emit_metric("tick", self.tick_id, timeline=[
+                    { "name":t["name"], "duration_ms":round(t["duration_ns"]/1e6, 6)}
+                    for t in timeline
+                ], dt_step=round(float(dt_step), 6))
+            
+            self.tick_id += 1
         
-        return TickStats(0, self.tick_id, [])
+        return num_steps

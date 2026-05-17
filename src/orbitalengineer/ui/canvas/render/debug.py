@@ -174,14 +174,14 @@ class DebugInfoRenderer(renderer.Renderer):
         if self.view.fps:
             frame_clock = cast(Gdk.FrameClock, self.view.fps)
             fps = frame_clock.get_fps()
-            frame_no = self.view.fps.get_frame_counter()
-            frame_interval_ms = (1/(fps or 1)) * 1000.0
+            #frame_no = self.view.fps.get_frame_counter()
+            #frame_interval_ms = (1/(fps or 1)) * 1000.0
             
             display.extend([
                 None,
-                DebugDisplayField('Frame #',  frame_no),
+                #DebugDisplayField('Frame #',  frame_no),
                 DebugDisplayField("Rate",     fps, 1, "/s", FRAME_RATE_THRESHOLD),
-                DebugDisplayField("Interval", frame_interval_ms, 1, 'ms')
+                #DebugDisplayField("Interval", frame_interval_ms, 1, 'ms')
             ])
 
 
@@ -248,9 +248,9 @@ class DebugInfoRenderer(renderer.Renderer):
 
         ])
         
-        max_value_width = 140
+        max_value_width = 110
         # max_value_width = max([
-        #    cr.text_extents(l[1]).x_advance for l in labels
+        #    cr.text_extents(str(l.value)).x_advance for l in labels if l is not None
         # ])
         
         r_width = X_PADDING + max_label_width + X_SPACING + max_value_width

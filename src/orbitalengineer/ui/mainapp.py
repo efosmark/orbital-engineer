@@ -3,35 +3,65 @@ np.set_printoptions(precision=3)
 
 from orbitalengineer.helpers import seed
 from orbitalengineer.names import make_name
+
 from orbitalengineer.ui import model
 from orbitalengineer.ui.canvas import pz
 from orbitalengineer.ui.ticker import TickController
 from orbitalengineer.ui.mainwindow import MainWindow
 from orbitalengineer.ui.fmt import get_scale_value
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib
-from orbitalengineer.ui.plot import PlotWindow
 from orbitalengineer.ui.keyinput import KeyInput
 
+from orbitalengineer.engine import logger
 from orbitalengineer.engine.cl.orbitalcl import SimController_CL
 from orbitalengineer.engine.simcontroller import Particle
-from orbitalengineer.engine import logger
+from orbitalengineer.engine.clock import SimClock
+from orbitalengineer.engine.event import BouncingCollisionEvent
 
 
 APP_ID = "com.qmew.OrbitalEngineer-dialog"
 WINDOW_DEFAULT_SIZE = (1200, 800)
 
 class App(Gtk.Application):
-
+    paused:bool
+    
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
         self.view = model.ViewModel()
         self.data = model.DataModel()
+        self.clock = SimClock()
         
-        self.orbit_ctl = SimController_CL()
-        self.ticker = TickController(self.data, self.orbit_ctl)
-        self.camera = pz.Camera2D()
+        self.orbit_ctl = SimController_CL(self.clock)
+        self.orbit_ctl.on_collision = self.on_collision
 
-    
+        self.camera = pz.Camera2D()
+        self.paused = False
+
+    def start_tick(self):
+        self.orbit_ctl.accum = 0
+        self.orbit_ctl.last_now = None
+        self.tick_ctl = TickController(self.data, self.orbit_ctl, self.clock)
+        self.clock.start()
+        self.tick_ctl.start()
+        
+    def toggle_paused(self):
+        self.view.add_osd_message("Paused" if not self.paused else "Unpaused", self.clock.time(), 1.0)
+        self.paused = not self.paused
+        if self.paused:
+            self.clock.stop()
+            self.tick_ctl.stop()
+        else:
+            self.start_tick()
+
+    def tick_once(self):
+        if not self.paused: return
+        self.orbit_ctl.accum = 0
+        self.orbit_ctl.last_now = None
+        self.clock.increment_by(self.orbit_ctl.dt_base)
+        if self.orbit_ctl.tick(self.clock.time()) > 0:
+            GLib.idle_add(self.orbit_ctl.sync)
+
+
     def insert_particle(self, particle:Particle, color:tuple[float, float, float, float]=(1,1,1,1)) -> int:
         idx = self.orbit_ctl.add_particle(particle)
         self.view.particle_colors[idx] = random_color() if color is None else color
@@ -44,7 +74,6 @@ class App(Gtk.Application):
     def do_activate(self):
         Gtk.Application.do_activate(self)
         win = self.props.active_window
-        
         if not win:
             win = MainWindow(
                 application=self,
@@ -60,14 +89,6 @@ class App(Gtk.Application):
         win.present()
         if self.view.start_maximized:
            win.maximize()
-        
-        self.plot_win = None
-        if self.view.show_plot_at_startup:
-            self.plot_win = PlotWindow(
-                self,
-                self.data
-            )
-            self.plot_win.present()
 
     def shift_focus(self, particle_id):
         b = self.orbit_ctl.get_particle(particle_id)
@@ -83,7 +104,7 @@ class App(Gtk.Application):
             available_size = min(win.get_allocated_height(), win.get_allocated_width()) * 0.25
 
         radius = b.get_radius()
-        diameter = 2 * radius
+        diameter = 3 * radius
         if diameter * self.camera.zoom > available_size:
             self.camera.zoom = available_size / diameter
         elif diameter * self.camera.zoom < 10:
@@ -92,4 +113,17 @@ class App(Gtk.Application):
     def relative_zoom(self, factor):
         self.camera.zoom_at(0, 0, 0, 0, factor)
         z = get_scale_value(self.camera.zoom)
-        self.view.add_osd_message(f"Zoom: {z:.1f}X", 0.75)
+        self.view.add_osd_message(f"Zoom: {z:.1f}X", self.clock.time(), 0.75)
+
+    def on_collision(self, event:BouncingCollisionEvent):
+        r1 = self.orbit_ctl.get_particle(event.i).get_radius()
+        r2 = self.orbit_ctl.get_particle(event.j).get_radius()
+        
+        size = min(r1, r2)/2.0
+        
+        self.view.pinpoint.append(model.Pinpoint(
+            position=event.collision_point,
+            start=self.clock.time(),
+            until=self.clock.time() + 0.1,
+            radius=size * self.camera.zoom
+        ))

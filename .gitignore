@@ -4,3 +4,4 @@ scratch/
 __pycache__/
 flatpak/dist/
 flatpak/python3-deps/wheels/
+.opencl_build/

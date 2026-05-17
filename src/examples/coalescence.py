@@ -29,7 +29,7 @@ def on_activate(app: App):
     app.orbit_ctl.Lx = Lx
     app.orbit_ctl.coef_of_restitution = 0.85
     app.orbit_ctl.init_sim()
-    app.ticker.start()
+    app.tick_ctl.start()
     app.orbit_ctl.speed = 2.0
     
 def run():

@@ -1,10 +1,7 @@
 import pyopencl as cl
+from dataclasses import dataclass
 
 from orbitalengineer.engine.simcontroller import OrbitalSimController
-mf = cl.mem_flags
-
-import pyopencl as cl
-from dataclasses import dataclass
 
 @dataclass
 class TraceEvent:

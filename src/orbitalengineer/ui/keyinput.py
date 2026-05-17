@@ -1,11 +1,5 @@
-import time
+import cmath
 from typing import Any
-
-import numpy as np
-np.set_printoptions(precision=3)
-
-from orbitalengineer.ui.model import Pinpoint
-from orbitalengineer.engine.cl.orbitalcl import SimController_CL
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, GObject
 
 
@@ -42,7 +36,7 @@ class KeyInput(GObject.GObject):
             direction = -1 if keyval == self.TAB_PREV else 1
             self.cycle_particles(direction)
         elif keyval in self.WASD_KEYS:
-            self.on_wasd()
+            self.on_wasd(keyval)
         elif keyval == Gdk.KEY_Left:
             self.app.orbit_ctl.speed -= 0.1
         elif keyval == Gdk.KEY_Right:
@@ -51,13 +45,34 @@ class KeyInput(GObject.GObject):
             self.app.relative_zoom(0.9)
         elif keyval == Gdk.KEY_Up:
             self.app.relative_zoom(1 / 0.9)
-        #elif keyval == Gdk.KEY_p:
-        #    self.app.paused = not self.app.paused
+        elif keyval == Gdk.KEY_space:
+            self.app.toggle_paused()
         elif keyval == Gdk.KEY_f:
             self.toggle_screen_size()
-        #elif keyval == Gdk.KEY_Delete and self.app.data.secondary_body is not None:
-        #    self.app.shm.status[self.app.data.secondary_body] = STATUS_DELETED
+        elif keyval == Gdk.KEY_period:
+            self.app.tick_once()
         return False
+
+    def on_wasd(self, keyval):
+        if self.app.data.secondary_body is None: return
+        b = self.app.orbit_ctl.get_particle(self.app.data.secondary_body)
+        r, angle = cmath.polar(b.get_velocity())
+        
+        if keyval == Gdk.KEY_a:
+            angle -= (2*cmath.pi / 360.0)
+            velocity = cmath.rect(r, angle)
+        elif keyval == Gdk.KEY_d:
+            angle += (2*cmath.pi / 360.0)
+            velocity = cmath.rect(r, angle)
+        elif keyval == Gdk.KEY_w:
+            r, angle = cmath.polar(b.get_velocity())
+            velocity = cmath.rect(r * 1.005, angle)
+        elif keyval == Gdk.KEY_s:
+            r, angle = cmath.polar(b.get_velocity())
+            velocity = cmath.rect(r / 1.005, angle)
+        else:
+            return
+        self.app.orbit_ctl.set_velocity(self.app.data.secondary_body, velocity.real, velocity.imag)
 
     def on_escape(self):
         if self.app.data.secondary_body is not None:
@@ -70,45 +85,7 @@ class KeyInput(GObject.GObject):
         self.props.pressed_keys.discard(keyval)
         self.notify('pressed_keys')
         return False
-    
-    def on_wasd(self):
-        if not self.app.data.secondary_body:
-            return
-        MAX_THRUST = 0.15
-        ax, ay = 0, 0
-        if Gdk.KEY_w in self.pressed_keys:
-            ay -= MAX_THRUST
-        if Gdk.KEY_a in self.pressed_keys:
-            ax -= MAX_THRUST
-        if Gdk.KEY_s in self.pressed_keys:
-            ay += MAX_THRUST
-        if Gdk.KEY_d in self.pressed_keys:
-            ax += MAX_THRUST
-        self.app.orbit_ctl.inout_queue.append((self.app.data.secondary_body, ax, ay))
-        
-        A = self.app.orbit_ctl.get_particle(self.app.data.secondary_body)
-        start = time.monotonic()
-        
-        accel_angle = np.atan2(ay, ax) - np.pi
-        radius = A.get_radius()
-        
-        dist = radius/2
-        size = radius/2
-        for i in range(1, 21):
-            k = 1 - (i / 10.0)
-            
-            size = radius * k
-            dist += size
-            x = dist * np.cos(accel_angle)
-            y = dist * np.sin(accel_angle)
 
-            self.app.view.pinpoint.append(Pinpoint(
-                position=A.get_position() + complex(x, y),
-                start=start,
-                until=start + k/4,
-                radius=size * self.app.camera.zoom
-            ))
-    
     def cycle_particles(self, direction:int):
         valid_indices:list = self.app.orbit_ctl.get_valid_indices().tolist()
         try:
@@ -125,8 +102,7 @@ class KeyInput(GObject.GObject):
 
     def toggle_screen_size(self):
         win = self.app.get_active_window()
-        if win is None:
-            return False
+        if win is None: return False
         if self.mod_held:
             if win.is_maximized():
                 win.unmaximize()

@@ -2,12 +2,12 @@ import atexit
 from threading import BrokenBarrierError
 from threading import Event, Lock
 
-import time
 import multiprocessing as mp
 from multiprocessing import Barrier
 from typing import Sequence
 
 from orbitalengineer.engine import logger
+from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.engine.orbitalnp.memory import INTERACTION_MERGED, STATUS_DELETED, STATUS_NOMINAL #, OrbitalMemory
 from orbitalengineer.engine.orbitalnp import orbitalmemory, worker
 from orbitalengineer.engine.particle import Particle
@@ -35,7 +35,8 @@ class SimController_NP(OrbitalSimController):
     _merge_handlers:list[MergeHandler_T]
     _collision_handlers:list[CollisionHandler_T]
     
-    def __init__(self):
+    def __init__(self, clock:SimClock):
+        self.clock = clock
         self.lock = Lock()
         self.bumper = Event() 
         
@@ -98,7 +99,7 @@ class SimController_NP(OrbitalSimController):
         return self.ix
 
     def _init_worker_processes(self):
-        init_start = time.perf_counter()
+        init_start = self.clock.time()
         N = len(self._particles)
         if N < MAX_NUM_PROCESSES * MIN_BODIES_PER_PROCESS:
             self.num_processes = max(1, len(self._particles) // MIN_BODIES_PER_PROCESS)
@@ -119,7 +120,7 @@ class SimController_NP(OrbitalSimController):
         logger.info("Workers created. Waiting for them to be ready.")
         self.barrier_sync.wait()
         self.workers_ready = True
-        elapsed = time.perf_counter() - init_start
+        elapsed = self.clock.time() - init_start
         logger.info("%s workers ready after %.2f ms", self.num_processes, elapsed*1000.0)
 
     def init_sim(self):

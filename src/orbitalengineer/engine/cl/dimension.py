@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Sequence
 import pyopencl as cl
@@ -20,7 +21,8 @@ def load_kernel(kernel_name:str, kernel_file:str, ctx:cl.Context, build_options:
 
 
 class CLPipelineStep:
-    Lx = 256
+    Lx:int = 256
+    debug_flag:str = '_'
     
     def __init__(self, N:int, ctx:cl.Context, queue:cl.CommandQueue, tr:EventTracer, build_options:Sequence|None=None):
         self.N = N
@@ -29,11 +31,16 @@ class CLPipelineStep:
         self.ctx = ctx
         self.queue = queue
         self.tr = tr
-        self.init_memory(N)
-        self.load_kernels()
+        self._check_debug_flag()
+        self.initialize()
     
-    def _allocate(self, size:int, dtype):
-        ...
+    def _check_debug_flag(self):
+        debug_flags = os.environ.get("DEBUG", "").lower()
+        if debug_flags == "all" or self.debug_flag.lower() in debug_flags:
+            self.default_build_options = [
+                *self.default_build_options,
+                f"-DDEBUG=true"
+            ]
     
     def _create_buffer(self, hostbuf) -> cl.Buffer:
         return cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=hostbuf)
@@ -44,7 +51,5 @@ class CLPipelineStep:
         prg = cl.Program(self.ctx, kernel_src).build(options=[*opts])
         return cl.Kernel(prg, kernel_name)
 
-    def load_kernels(self): ...
-    
-    def init_memory(self, N:int): ...
-    
+    def initialize(self):
+        raise NotImplementedError()

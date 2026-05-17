@@ -3,7 +3,6 @@ import cairo
 
 from orbitalengineer.engine.orbitalnp.integrator.conf import GRAV_DEFAULT
 from orbitalengineer.engine.orbitalnp.integrator.kick import accel
-from orbitalengineer.engine.orbitalnp.integrator.merge import center_of_mass_position
 from orbitalengineer.ui.canvas import renderer
 
 DASHES = [2, 2]

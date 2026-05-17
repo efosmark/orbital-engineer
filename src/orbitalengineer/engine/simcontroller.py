@@ -1,4 +1,6 @@
 from typing import Any, Callable, Generator, Protocol
+from orbitalengineer.engine.clock import SimClock
+from orbitalengineer.engine.event import BouncingCollisionEvent
 from orbitalengineer.engine.particle import Particle
 
 StatusHandler_T = Callable[[int,int,int], bool|None]
@@ -6,14 +8,13 @@ MergeHandler_T = Callable[[int,int], bool|None]
 CollisionHandler_T = Callable[[int,int], bool|None]
 
 class OrbitalSimController(Protocol):
+    clock:SimClock
     N:int
     speed:float
     dt_base:float
     accum:float
-    
     tick_id:int = 0
     step_count:int = 0
-    
     is_initialized:bool = False
  
     def add_particle(self, particle:Particle) -> int:...
@@ -26,9 +27,11 @@ class OrbitalSimController(Protocol):
 
     def init_sim(self):...
 
-    def get_particle(self, particle_id) -> Particle: ...
+    def get_particle(self, particle_id:int) -> Particle: ...
     
-    def handle_interaction(self, body_i: int, body_j: int, prev: int, next: int):...
+    def on_collision(self, event:BouncingCollisionEvent):...
+    
+    #def handle_interaction(self, body_i: int, body_j: int, prev: int, next: int):...
 
     # def add_merge_changed_handler(self, handler:MergeHandler_T):...
 

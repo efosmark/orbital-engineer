@@ -16,6 +16,10 @@ class Particle(Protocol):
     def get_all_impact_times(self) -> Sequence[float]:...
     def get_status(self) -> float:...
 
+    def get_flags(self) -> int:...
+    def has_flag(self, flag:int) -> bool:
+        return (self.get_flags() & flag) == flag
+
     def __str__(self):
         fields:list[tuple[str, Any]] = []
         if self.idx is not None:
@@ -41,11 +45,12 @@ class ParticleRaw(Particle):
     _radius:float
     _status:int
     
-    def __init__(self, *, position, velocity, radius, mass):
+    def __init__(self, *, position, velocity, radius, mass, flags=0):
         self._position = position
         self._velocity = velocity
         self._radius = radius
         self._mass = mass
+        self._flags = flags
     
     def get_position(self) -> complex:
         return self._position
@@ -71,3 +76,6 @@ class ParticleRaw(Particle):
     
     def get_all_impact_times(self) -> Sequence[float]:
         raise NotImplementedError()
+    
+    def get_flags(self) -> int:
+        return self._flags

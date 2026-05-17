@@ -128,3 +128,10 @@ amdgpu.ppfeaturemask=0xffffffff acpi_mask_gpe=0x4 pcie_aspm=off
 
 
 sudo pacman -Syu rocm-opencl-runtime clpeak clinfo rocminfo
+
+
+
+
+## Collision Strategies
+
+
