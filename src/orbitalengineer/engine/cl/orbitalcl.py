@@ -158,9 +158,7 @@ class SimController_CL(OrbitalSimController):
             self._bounce = BouncePipeline(self.N, self.ctx, self.q, self.tr, build_options)
             self._interaction = InteractionGroupPipeline(self.N, self.ctx, self.q, self.tr, build_options)
             self._nudge = NudgePipeline(self.N, self.ctx, self.q, self.tr, build_options)
-            self._collision = CollisionGroupPipeline(self.N, self.ctx, self.q, self.tr, build_options)
             self._merge = MergePipeline(self.N, self.ctx, self.q, self.tr, build_options)
-            #self._hill_radius = HillRadiusPipeline(self.N, self.ctx, self.q, self.tr, build_options)
             
             self._relative_velocity = RelativeVelocityPipeline(self.N, self.ctx, self.q, self.tr, build_options)
             self.knl_distance_edge = load_kernel('compute_edge_distance', 'kernel/distance_edge.cl', self.ctx, build_options)
@@ -202,7 +200,7 @@ class SimController_CL(OrbitalSimController):
         cl.enqueue_copy(self.q, self.vel_cl, self.velocity).wait()
 
     def find_bodies_at(self, x:float, y:float, margin:float=10):
-        indices = np.arange(self.N)
+        indices = self.get_valid_indices()
         
         # Apply a bit of margin to the radius (e.g. if a radius is too small, it cant be clicked)
         radius = self.radius[indices] + margin
@@ -218,9 +216,7 @@ class SimController_CL(OrbitalSimController):
         return indices[mask]
 
     def get_valid_indices(self) -> NDArray:
-        return np.arange(self.N)
-        cl.enqueue_copy(self.q, self.status, self.status_cl)
-        return ~(self.status & flags.REMOVED)
+        return np.where((self.status & flags.REMOVED) != flags.REMOVED)[0]
 
     def get_particle(self, particle_id:int):
         return ParticleCL(particle_id, self)
@@ -231,6 +227,7 @@ class SimController_CL(OrbitalSimController):
 
     def sync(self):
         self.q.finish()
+        cl.enqueue_copy(self.q, self.status, self.status_cl)
         cl.enqueue_copy(self.q, self.position, self.pos_cl)
         cl.enqueue_copy(self.q, self.velocity, self.vel_cl)
         cl.enqueue_copy(self.q, self.mass, self.mass_cl)
@@ -256,10 +253,8 @@ class SimController_CL(OrbitalSimController):
     def kick2(self, dt_step):
         self._velocity(dt_step, self.status_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.distance_edge_cl, self.vel_cl)
         self._relative_velocity(self.pos_cl, self.vel_cl, self.velocity_relative_cl)
-        self._collision(dt_step, self.status_cl, self.velocity_relative_cl, self.mass_cl, self.distance_edge_cl)
-        self._merge(self.status_cl, self._collision.groups_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
+        self._merge(dt_step, self.status_cl, self.velocity_relative_cl, self.distance_edge_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
         self._bounce(self.status_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl, self.velocity_relative_cl, self.distance_edge_cl)
-        #self._hill_radius(self.pos_cl, self.mass_cl, self.radius_cl)
 
     def drift(self, dt_step):
         self._position(dt_step, self.status_cl, self.vel_cl, self.pos_cl)

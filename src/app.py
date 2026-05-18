@@ -21,16 +21,16 @@ N = (Lx  * 4)
 mass_min, mass_max = 5e4, 1e6
 vel_min, vel_max = 0, 0
 radius_min, radius_max = 20, 100
-dist_min, dist_max = 1000, 7000
+dist_min, dist_max = 2000, 20000
 
 po = 7000
 d = abs(po)
 
 def on_activate(app: App):
     global dist_min, dist_max
-    sol = create_primary(mass=3e8, flags=flags.PRIMARY_BODY)
+    sol = create_primary(mass=3e9, flags=flags.PRIMARY_BODY)
     app.insert_particle(sol, color=SOL_COLOR)
-    sol._radius = 400 # type: ignore
+    #sol._radius = 400 # type: ignore
 
     dist_norm = colors.Normalize(sol.get_radius() + dist_min, dist_max)
 
@@ -41,16 +41,15 @@ def on_activate(app: App):
         app.insert_particle(create_secondary(
             sol,
             mass=mass,
-            #radius=30,
             position=pos,
-            ecc=0.9,
+            ecc=0.65,
             flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY
         ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))
 
     app.orbit_ctl.Lx = Lx
     app.orbit_ctl.speed = 1.0
     app.orbit_ctl.collision_strategy = CollisionStrategy.MERGE
-    app.orbit_ctl.coef_of_restitution = 0.88
+    app.orbit_ctl.coef_of_restitution = 0.89
     app.view.show_focused_history = True
     #app.view.show_debug_info = False
     #app.view.show_focus_info = True
