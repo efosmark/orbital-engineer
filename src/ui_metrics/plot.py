@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from collections import deque
 import math
 
 import gi
@@ -15,7 +16,7 @@ class PlotWindow(Gtk.ApplicationWindow):
     def __init__(
         self,
         app,
-        durations: dict[str, list[tuple[int,float]]],
+        durations: dict[str, deque[tuple[int,float]]],
         refresh_interval_ms=100,
         min_ticks_between_redraws=8,
         max_line_points=180,
@@ -23,7 +24,6 @@ class PlotWindow(Gtk.ApplicationWindow):
     ):
         super().__init__(application=app, title="Duration plots-dialog")
         self.set_default_size(800, 500)
-
         self.durations = durations
 
         #self.model = model
@@ -118,7 +118,7 @@ class PlotWindow(Gtk.ApplicationWindow):
                     line_x_min = min(line_x_min, x_vals[0])
                     line_x_max = max(line_x_max, x_vals[-1]) # type: ignore
 
-            y_list = [y * 1000.0 for y in y_vals]
+            y_list = [y for y in y_vals]
             line_y_values.extend(y_list)
             line_artist, = self.ax_line.plot(
                 x_vals,
@@ -133,7 +133,7 @@ class PlotWindow(Gtk.ApplicationWindow):
                 avg_values.append(sum(y_list) / len(y_list))
                 avg_counts.append(sum(counts) / len(counts))
                 raw_data = self.durations.get(name, [])
-                raw_y_ms = [y * 1000.0 for _, y in raw_data]
+                raw_y_ms = [y for _, y in raw_data]
                 avg_values_individual.append(sum(raw_y_ms) / len(raw_y_ms))
 
         if line_x_min is not None and line_x_max is not None:

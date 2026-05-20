@@ -55,6 +55,8 @@ class DataModel(GObject.GObject):
 class ViewModel(GObject.GObject):
     props:Any
     
+    paused = GObject.Property(type=bool, default=False)
+    
     fps = GObject.Property(type=object)
     
     start_maximized = GObject.Property(type=bool, default=False)
@@ -90,6 +92,10 @@ class ViewModel(GObject.GObject):
     font_size = GObject.Property(type=int, default=10)
     
     osd_message = GObject.Property(type=object)    
+    
+    selected_particles = GObject.Property(type=object)
+    drag_start = GObject.Property(type=object)
+    drag_end = GObject.Property(type=object)
     
     def __init__(self):
         super().__init__()

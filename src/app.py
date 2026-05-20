@@ -42,18 +42,18 @@ def on_activate(app: App):
             sol,
             mass=mass,
             position=pos,
-            ecc=0.65,
+            ecc=0.9,
             flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY
         ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))
 
     app.orbit_ctl.Lx = Lx
     app.orbit_ctl.speed = 1.0
-    app.orbit_ctl.collision_strategy = CollisionStrategy.MERGE
-    app.orbit_ctl.coef_of_restitution = 0.89
+    #app.orbit_ctl.collision_strategy = CollisionStrategy.MERGE
+    app.orbit_ctl.coef_of_restitution = 0.85
     app.view.show_focused_history = True
     #app.view.show_debug_info = False
     #app.view.show_focus_info = True
-    app.data.secondary_body = 0
+    #app.data.secondary_body = 0
     #app.view.show_plot_at_startup = False
     app.orbit_ctl.init_sim()
     app.start_tick()

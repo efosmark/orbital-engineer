@@ -2,11 +2,11 @@ import os
 import socket
 import json
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Any
 
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject, GLib
-from orbitalengineer.ui_metrics.plot import PlotWindow
+from ui_metrics.plot import PlotWindow
 from orbitalengineer.engine.config import METRIC_SOCKET_PATH
 
 APP_ID = "com.qmew.OrbitalEngineer-Metrics-dialog"
@@ -18,8 +18,7 @@ class MetricsApp(Gtk.Application):
     
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        self.durations = defaultdict(list)
-        self.max_tick_id = 0
+        self.durations = defaultdict(lambda:deque(maxlen=200))
         self.plot_win = None
         self._refresh_source_id = 0
         self._max_metrics_per_poll = 250
@@ -57,7 +56,7 @@ class MetricsApp(Gtk.Application):
 
             received_metric = True
             for m in metric.get("timeline", []):
-                self.add_duration(m["name"], m["t"], tick_id)
+                self.add_duration(m["name"], m["duration_ms"], tick_id)
         
         if received_metric and self.plot_win is not None:
             self.plot_win.queue_redraw()
@@ -93,11 +92,9 @@ class MetricsApp(Gtk.Application):
         self.plot_win = None
 
     def add_duration(self, name, duration, tick_id):
-        self.durations[name].append((tick_id, duration))
-        self.max_tick_id = max(self.max_tick_id, tick_id)
-        while len(self.durations[name]) > 0 and self.durations[name][0][0]  < self.max_tick_id - 50:
-            self.durations[name].pop(0)
-
+        if tick_id == 0:
+            self.durations.clear()
+        self.durations[name].append((tick_id, duration))    
 
 if __name__ == "__main__":
     app = MetricsApp()

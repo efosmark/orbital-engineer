@@ -6,14 +6,12 @@ import pyopencl as cl
 
 from orbitalengineer.engine import logger, config
 from orbitalengineer.engine.cl import flags
-from orbitalengineer.engine.cl.hill_radius import HillRadiusPipeline
 from orbitalengineer.engine.cl.interaction import InteractionGroupPipeline
 from orbitalengineer.engine.cl.nudge import NudgePipeline
 from orbitalengineer.engine.cl.position import PositionPipeline
 from orbitalengineer.engine.cl.relative_velocity import RelativeVelocityPipeline
 from orbitalengineer.engine.cl.velocity import VelocityPipeline
 from orbitalengineer.engine.cl.bounce import BouncePipeline
-from orbitalengineer.engine.cl.collision_group import CollisionGroupPipeline
 from orbitalengineer.engine.cl.dimension import load_kernel
 from orbitalengineer.engine.cl.merge import MergePipeline
 from orbitalengineer.engine.cl.particle_cl import ParticleCL
@@ -77,7 +75,7 @@ class SimController_CL(OrbitalSimController):
 
     def _populate_particle_fields(self):
         for i,p in enumerate(self._particles):
-            self.status[i] = np.uint32(p.get_flags())
+            self.flags[i] = np.uint32(p.get_flags())
             self.velocity[i] = np.complex64(p.get_velocity())
             self.position[i] = np.complex64(p .get_position())
             self.mass[i] = np.float32(p.get_mass())
@@ -85,7 +83,7 @@ class SimController_CL(OrbitalSimController):
 
     def _allocate_memory(self):
         # Primary particle fields
-        self.status = np.zeros(self.N, dtype=np.uint32)
+        self.flags = np.zeros(self.N, dtype=np.uint32)
         self.velocity = np.zeros(self.N, dtype=np.complex64)
         self.position = np.zeros(self.N, dtype=np.complex64)
         self.radius = np.zeros(self.N, dtype=np.float32)
@@ -96,7 +94,7 @@ class SimController_CL(OrbitalSimController):
         logger.debug("Memory allocated.")
 
     def _create_buffers(self):
-        self.status_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.status)
+        self.flags_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.flags)
         self.vel_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.velocity)
         self.pos_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.position)
         self.mass_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.mass)
@@ -127,7 +125,6 @@ class SimController_CL(OrbitalSimController):
         build_dir.mkdir(exist_ok=True)
         header_path = build_dir / "flags.clh"
         header_path.write_text(flags.generate_cl_flag_file())
-        
         return build_dir
     
     def _init_kernel(self):
@@ -210,29 +207,31 @@ class SimController_CL(OrbitalSimController):
         d = np.complex128(x, y) - p
         
         # Create a mask indicating where there is crossover
-        mask = (np.abs(d) <= radius) #& ~(self.status & flags.REMOVED)
+        mask = (np.abs(d) <= radius)
         
         # Get the indices 
         return indices[mask]
 
     def get_valid_indices(self) -> NDArray:
-        return np.where((self.status & flags.REMOVED) != flags.REMOVED)[0]
+        """Get the list of nodes that are still considered valid (e.g. not removed)."""
+        return np.where((self.flags & flags.REMOVED) != flags.REMOVED)[0]
 
     def get_particle(self, particle_id:int):
         return ParticleCL(particle_id, self)
 
     def __iter__(self):
-        for i in range(self.N):
+        for i in self.get_valid_indices():
             yield self.get_particle(int(i))
 
     def sync(self):
         self.q.finish()
-        cl.enqueue_copy(self.q, self.status, self.status_cl)
+        cl.enqueue_copy(self.q, self.flags, self.flags_cl)
         cl.enqueue_copy(self.q, self.position, self.pos_cl)
         cl.enqueue_copy(self.q, self.velocity, self.vel_cl)
         cl.enqueue_copy(self.q, self.mass, self.mass_cl)
         cl.enqueue_copy(self.q, self.radius, self.radius_cl)
         cl.enqueue_copy(self.q, self._interaction.toi, self._interaction.toi_cl)
+        self.q.finish()
     
     def compute_distance_edge(self):
         return self.knl_distance_edge(
@@ -248,41 +247,37 @@ class SimController_CL(OrbitalSimController):
         )
     
     def kick(self, dt_step):
-        self._velocity(dt_step, self.status_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.distance_edge_cl, self.vel_cl)
+        self._velocity(dt_step, self.flags_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.distance_edge_cl, self.vel_cl)
 
     def kick2(self, dt_step):
-        self._velocity(dt_step, self.status_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.distance_edge_cl, self.vel_cl)
+        self._velocity(dt_step, self.flags_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.distance_edge_cl, self.vel_cl)
         self._relative_velocity(self.pos_cl, self.vel_cl, self.velocity_relative_cl)
-        self._merge(dt_step, self.status_cl, self.velocity_relative_cl, self.distance_edge_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
-        self._bounce(self.status_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl, self.velocity_relative_cl, self.distance_edge_cl)
+        self._merge(dt_step, self.flags_cl, self.velocity_relative_cl, self.distance_edge_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
+        self._bounce(self.flags_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl, self.velocity_relative_cl, self.distance_edge_cl)
 
     def drift(self, dt_step):
-        self._position(dt_step, self.status_cl, self.vel_cl, self.pos_cl)
+        self._position(dt_step, self.flags_cl, self.vel_cl, self.pos_cl)
         self.tr.add("edge_distance", self.compute_distance_edge())
 
     def sub_step(self, dt_step):
         self.kick(dt_step / 2.0)
         self.drift(dt_step)
         self.kick2(dt_step / 2.0)
-        self._interaction(dt_step, self.pos_cl, self.vel_cl, self.radius_cl, self.mass_cl)
+        self._interaction(dt_step, self.flags_cl, self.pos_cl, self.vel_cl, self.radius_cl, self.mass_cl)
     
     def single_step(self, dt_step):
         dt_step_start = dt_step
         count = 0
         
         while dt_step > 0 and count < config.MAX_SUB_STEPS:
-            cl.enqueue_copy(
-                self.copy_q,
-                self._interaction.node_dt,
-                self._interaction.node_dt_cl
-            ).wait()
+            cl.enqueue_copy(self.copy_q, self._interaction.node_dt, self._interaction.node_dt_cl).wait()
             
             try:
                 min_toi = min([t for t in self._interaction.node_dt if t > 0])
             except ValueError:
-                min_toi = config.EPS_TIME
+                min_toi = dt_step_start / config.MAX_SUB_STEPS
             
-            dt = max(config.EPS_TIME, min(dt_step, min_toi))
+            dt = max(dt_step_start / config.MAX_SUB_STEPS, min(dt_step, min_toi))
             self.sub_step(dt)
             dt_step -= dt
             self.step_count += 1
@@ -294,6 +289,7 @@ class SimController_CL(OrbitalSimController):
         cl.enqueue_copy(self.q, self.distance_edge, self.distance_edge_cl)
         cl.enqueue_copy(self.q, self._bounce.collision_point, self._bounce.collision_point_cl)
         cl.enqueue_copy(self.q, self.velocity_relative, self.velocity_relative_cl)
+        
         for i in range(self.N):
             row_offset = i * self.N
             for j in range(i + 1, self.N):
@@ -323,16 +319,10 @@ class SimController_CL(OrbitalSimController):
         self.last_now = now
         
         if num_steps > 0:
-            
             count, dt_processed = self.single_step(dt_step)
-            #count, dt_processed = self.single_step_sub(dt_step)
         
             #self.accum -= dt_processed # type: ignore
             self.accum -= dt_step # type: ignore
-
-            #self._bounce.collision_point[:] = np.complex64(0)
-            #cl.enqueue_copy(self.q, self._bounce.collision_point_cl, self._bounce.collision_point)
-            #self._detect_event()
             
             if config.EMIT_METRICS and self.enable_profiling:
                 self.q.finish()

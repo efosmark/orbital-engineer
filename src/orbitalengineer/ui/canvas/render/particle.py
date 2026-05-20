@@ -8,8 +8,6 @@ DEFAULT_PARTICLE_COLOR = (1, 1, 1)
 class ParticleRenderer(renderer.Renderer):
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        #cr.set_antialias(cairo.ANTIALIAS_SUBPIXEL)
-        cr.set_line_width(0.5)
         
         for b in self.orbital:
             try:

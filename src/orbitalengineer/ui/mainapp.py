@@ -23,7 +23,6 @@ APP_ID = "com.qmew.OrbitalEngineer-dialog"
 WINDOW_DEFAULT_SIZE = (1200, 800)
 
 class App(Gtk.Application):
-    paused:bool
     
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
@@ -35,7 +34,6 @@ class App(Gtk.Application):
         self.orbit_ctl.on_collision = self.on_collision
 
         self.camera = pz.Camera2D()
-        self.paused = False
 
     def start_tick(self):
         self.orbit_ctl.accum = 0
@@ -45,16 +43,16 @@ class App(Gtk.Application):
         self.tick_ctl.start()
         
     def toggle_paused(self):
-        self.view.add_osd_message("Paused" if not self.paused else "Unpaused", self.clock.time(), 1.0)
-        self.paused = not self.paused
-        if self.paused:
+        self.view.add_osd_message("Paused" if not self.view.props.paused else "Unpaused", self.clock.time(), 1.0)
+        self.view.props.paused = not self.view.props.paused
+        if self.view.props.paused:
             self.clock.stop()
             self.tick_ctl.stop()
         else:
             self.start_tick()
 
     def tick_once(self):
-        if not self.paused: return
+        if not self.view.props.paused: return
         self.orbit_ctl.accum = 0
         self.orbit_ctl.last_now = None
         self.clock.increment_by(self.orbit_ctl.dt_base)

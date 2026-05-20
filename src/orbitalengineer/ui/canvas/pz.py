@@ -1,5 +1,5 @@
 import cairo
-from orbitalengineer.ui.gtk4 import Gtk, Gsk, Graphene
+from orbitalengineer.ui.gtk4 import Gtk, Gdk
 
 MIN_ZOOM = 0.0005
 MAX_ZOOM = 600.0
@@ -63,10 +63,18 @@ class Camera2DController:
         motion.connect("motion", self.on_motion)
         widget.add_controller(motion)
 
-        drag = Gtk.GestureDrag.new()
-        drag.connect("drag-begin", self.on_drag_begin)
-        drag.connect("drag-update", self.on_drag_update)
-        widget.add_controller(drag)
+        drag_middle_click = Gtk.GestureDrag.new()
+        drag_middle_click.connect("drag-begin", self.on_drag_middle_click_begin)
+        drag_middle_click.connect("drag-update", self.on_drag_middle_click_update)
+        drag_middle_click.connect("drag-end", self.on_drag_middle_click_end)
+        drag_middle_click.set_button(Gdk.BUTTON_MIDDLE)
+        widget.add_controller(drag_middle_click)
+
+        drag_touch = Gtk.GestureDrag.new()
+        drag_touch.connect("drag-begin", self.on_drag_touch_begin)
+        drag_touch.connect("drag-update", self.on_drag_touch_update)
+        drag_touch.connect("drag-end", self.on_drag_touch_end)
+        widget.add_controller(drag_touch)
 
         scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
         scroll.connect("scroll", self.on_scroll)
@@ -82,17 +90,54 @@ class Camera2DController:
         self.pointer_y = y
         self.widget.queue_draw()
 
-    def on_drag_begin(self, gesture, start_x, start_y):
+    def on_drag_middle_click_begin(self, gesture, start_x, start_y):
         if not self.view.camera_drag_enable:
-            return
+            return        
         self._last_pinch_scale = 1.0
         self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
 
-    def on_drag_update(self, gesture, dx, dy):
-        if not self.view.camera_drag_enable:
+    def on_drag_middle_click_update(self, gesture, dx, dy):
+        if not self.view.camera_drag_enable: return
+        self.camera.offset[0] = self.drag_start_offset[0] - (dx / self.camera.zoom)
+        self.camera.offset[1] = self.drag_start_offset[1] - (dy / self.camera.zoom)
+        self.widget.queue_draw()
+
+    def on_drag_middle_click_end(self, gesture, dx, dy):
+        if not self.view.camera_drag_enable: return
+        self.camera.offset[0] = self.drag_start_offset[0] - (dx / self.camera.zoom)
+        self.camera.offset[1] = self.drag_start_offset[1] - (dy / self.camera.zoom)
+        self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
+        self.widget.queue_draw()
+
+    def on_drag_touch_begin(self, gesture, start_x, start_y):
+        if not self.view.camera_drag_enable:return
+
+        sequence = gesture.get_last_updated_sequence()
+        event = gesture.get_last_event(sequence)
+        if event is None: return None
+
+        device = event.get_device()
+        if device and device.get_source() != Gdk.InputSource.TOUCHSCREEN:
+            if sequence:
+                gesture.set_sequence_state(sequence, Gtk.EventSequenceState.DENIED)
+            else:
+                gesture.set_state(Gtk.EventSequenceState.DENIED)
             return
-        self.camera.offset[0] = self.drag_start_offset[0] - dx / self.camera.zoom
-        self.camera.offset[1] = self.drag_start_offset[1] - dy / self.camera.zoom
+        
+        self._last_pinch_scale = 1.0
+        self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
+
+    def on_drag_touch_update(self, gesture, dx, dy):
+        if not self.view.camera_drag_enable:return
+        self.camera.offset[0] = self.drag_start_offset[0] - (dx / self.camera.zoom)
+        self.camera.offset[1] = self.drag_start_offset[1] - (dy / self.camera.zoom)
+        self.widget.queue_draw()
+
+    def on_drag_touch_end(self, gesture, dx, dy):
+        if not self.view.camera_drag_enable:return
+        self.camera.offset[0] = self.drag_start_offset[0] - (dx / self.camera.zoom)
+        self.camera.offset[1] = self.drag_start_offset[1] - (dy / self.camera.zoom)
+        self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
         self.widget.queue_draw()
 
     def on_scroll(self, controller, dx, dy):

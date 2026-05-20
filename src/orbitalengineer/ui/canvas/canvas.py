@@ -2,6 +2,7 @@ from orbitalengineer.engine.simcontroller import OrbitalSimController
 from orbitalengineer.ui import model
 from orbitalengineer.ui.canvas.render.hill_radius import HillRadiusRenderer
 from orbitalengineer.ui.canvas.render.hud_clock import HudClockRenderer
+from orbitalengineer.ui.canvas.render.selection import SelectionRenderer
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, Gsk
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.canvas.pz import Camera2D, Camera2DController
@@ -17,6 +18,8 @@ from orbitalengineer.ui.canvas.render.particle import ParticleRenderer
 from orbitalengineer.ui.canvas.render.pinpoint import PinpointRenderer
 from orbitalengineer.ui.canvas.render.reticle import ReticleRenderer
 
+import numpy as np
+import pyopencl as cl
 
 HOVER_MARGIN = 15
 
@@ -27,14 +30,32 @@ class MoveParticleController:
         self.camera = camera
         self.orbital = orbital
         self.view = view_model
+        
+        self._orig_particle_positions = None
 
         drag = Gtk.GestureDrag.new()
-        drag.set_button(Gdk.BUTTON_PRIMARY)  # optional; usually already primary
-        drag.set_exclusive(True)             # ignore normal touch sequences
+        drag.set_button(Gdk.BUTTON_PRIMARY)
+        drag.set_exclusive(True) # ignore normal touch sequences
         drag.connect("drag-begin", self.on_drag_begin)
         drag.connect("drag-update", self.on_drag_update)
         drag.connect("drag-end", self.on_drag_end)
         canvas.add_controller(drag)
+
+    def _get_selection_box(self):
+        x_start = min(self.view.drag_start[0], self.view.drag_end[0])
+        x_end = max(self.view.drag_start[0], self.view.drag_end[0])
+        y_start = min(self.view.drag_start[1], self.view.drag_end[1])
+        y_end = max(self.view.drag_start[1], self.view.drag_end[1])
+        return (x_start, x_end, y_start, y_end)
+
+    def _update_selection(self):
+        x_start, x_end, y_start, y_end = self._get_selection_box()
+        self.view.selected_particles = np.where(
+             (self.orbital.position.real <= x_end)
+            &(self.orbital.position.real >  x_start)
+            &(self.orbital.position.imag <= y_end)
+            &(self.orbital.position.imag >  y_start)
+        )[0]
 
     def on_drag_begin(self, gesture, start_x, start_y):
         event = gesture.get_last_event(None)
@@ -46,29 +67,39 @@ class MoveParticleController:
             return
 
         x, y = self.camera.screen_to_world(start_x, start_y, self.canvas.get_width(), self.canvas.get_height())
-        bodies = self.orbital.find_bodies_at(x, y, margin=15/self.camera.zoom)
-        if len(bodies) == 0:
-            return
+        self.view.drag_start = (x, y)
+
+        bodies = self.orbital.find_bodies_at(x, y, margin=5/self.camera.zoom)
+        if len(bodies) == 0: return
         
-        self.view.props.camera_drag_enable = False
         self.view.props.dragging_particle = bodies[0]
-        px, py = self.orbital.get_particle(self.view.props.dragging_particle).get_xy()
-        self.view.props.dragging_particle_offset = (px, py)
 
     def on_drag_update(self, gesture, dx, dy):
-        if self.view.props.dragging_particle:
-            offset_x, offset_y = self.view.props.dragging_particle_offset
-
-            offset_x += dx / self.camera.zoom
-            offset_y += dy / self.camera.zoom
-
-            self.orbital.set_position(self.view.props.dragging_particle, offset_x, offset_y)
+        if not self.view.drag_start:
             return
 
+        offset_x = dx / self.camera.zoom
+        offset_y = dy / self.camera.zoom
+        
+        self.view.drag_end = (self.view.drag_start[0]+offset_x, self.view.drag_start[1]+offset_y)
+        
+        if self.view.props.dragging_particle is None:
+            self._update_selection()
+        else:
+            if self._orig_particle_positions is None:
+                self._orig_particle_positions = self.orbital.position[self.view.selected_particles]
+            offset = np.complex64(offset_x, offset_y)
+            self.orbital.position[self.view.selected_particles] = self._orig_particle_positions + offset              
+            cl.enqueue_copy(self.orbital.q, self.orbital.pos_cl, self.orbital.position)  
+        
     def on_drag_end(self, gesture, start_x, start_y):
-        self.view.props.camera_drag_enable = True
+        #if self.view.props.dragging_particle:
+        #    cl.enqueue_copy(self.orbital.q, self.orbital.pos_cl, self.orbital.position)  
         self.view.props.dragging_particle = None
         self.view.props.dragging_particle_offset = (0, 0)
+        self._orig_particle_positions = None
+        self.view.drag_start = None
+        self.view.drag_end = None
 
 class MouseController:
     
@@ -113,16 +144,15 @@ class OrbitalCanvas(Gtk.DrawingArea):
         
         self.hud_renderers = [
             BackgroundRenderer(self.view, self.data, self.camera, self.orbital),
-            #GravFieldRenderer(self.view, self.data, self.camera, self.orbital),
             GridRenderer(self.view, self.data, self.camera, self.orbital),
         ]
         
         self.scene_renderers = [
-            #HistoryRenderer(self.view, self.data, self.camera, self.orbital),
+            HistoryRenderer(self.view, self.data, self.camera, self.orbital),
             ForceVectorRenderer(self.view, self.data, self.camera, self.orbital),
             EllipseRenderer(self.view, self.data, self.camera, self.orbital),
-            #HillRadiusRenderer(self.view, self.data, self.camera, self.orbital),
             ParticleRenderer(self.view, self.data, self.camera, self.orbital),
+            SelectionRenderer(self.view, self.data, self.camera, self.orbital),
             ReticleRenderer(self.view, self.data, self.camera, self.orbital),
             PinpointRenderer(self.view, self.data, self.camera, self.orbital),
         ]
@@ -130,7 +160,6 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.hud_fg_renderers = [
             DebugInfoRenderer(self.view, self.data, self.camera, self.orbital),
             FocusInfoRenderer(self.view, self.data, self.camera, self.orbital),
-            OSDRenderer(self.view, self.data, self.camera, self.orbital),
             HudClockRenderer(self.view, self.data, self.camera, self.orbital),
         ]
         

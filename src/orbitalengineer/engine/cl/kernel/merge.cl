@@ -151,29 +151,3 @@ __kernel void compute_merging_collision(
         }
     }
 }
-
-/**
- * Update all of the node vectors from their intermediate values.
- * The radius is dynamically computed from `cbrt(mass / pi)`.
- *
- * Flags used:
- *  - FIXED_RADIUS       -- Prevent the radius from changing.
- */
-__kernel void apply_merge(
-    __global const uint*   restrict flags,
-    __global const float*  restrict mass_in,
-    __global const float2* restrict velocity_in,
-    __global const float2* restrict position_in,
-    __global       uint*   restrict flags_out,
-    __global       float*  restrict mass_out,
-    __global       float2* restrict velocity_out,
-    __global       float2* restrict position_out,
-    __global       float*  restrict radius_out
-) {
-    uint i = get_global_id(0);
-    flags_out[i] = flags[i];
-    mass_out[i] = mass_in[i];
-    velocity_out[i] = velocity_in[i];
-    position_out[i] = position_in[i];
-    radius_out[i] = (flags[i]&FIXED_RADIUS) ? radius_out[i] : cbrt(mass_out[i] / 3.14159f);
-}

@@ -30,6 +30,7 @@ class MergePipeline(CLPipelineStep):
         self._groups = np.zeros(self.N, dtype=np.uint32)
         self._groups_cl = self._create_buffer(self._groups)
     
+    
     def collide_merge_group_assign(self, dt_step: float, status: cl.Buffer, mass: cl.Buffer, velocity_relative: cl.Buffer, distance_edge: cl.Buffer):
         return self.tr.add("collide_merge_group_assign",
             self._assign_merge_groups(
@@ -47,6 +48,7 @@ class MergePipeline(CLPipelineStep):
                 self._groups_cl
             )
         )
+    
     
     def collide_merge_group_reduce(self, status: cl.Buffer, mass: cl.Buffer):
         num_workgroups = (self.N // self.Lx) + 1
@@ -75,8 +77,8 @@ class MergePipeline(CLPipelineStep):
             if n_iterations > 5:
                 print("TOO MANY ITERATIONS")
                 raise SystemExit
-        
-            
+    
+    
     def compute_merging_collision(self, status: cl.Buffer, merge_group: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
         return self.tr.add("collide_merge",
             self._compute_merging_collision(
@@ -99,6 +101,7 @@ class MergePipeline(CLPipelineStep):
                 self._radius_intermediate_cl
             ))        
 
+    
     def __call__(self, dt_step, flags: cl.Buffer, velocity_relative:cl.Buffer, edge_distance: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
         self.collide_merge_group_assign(dt_step, flags, mass, velocity_relative, edge_distance)
         self.collide_merge_group_reduce(flags, mass)
