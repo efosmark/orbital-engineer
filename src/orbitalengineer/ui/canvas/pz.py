@@ -4,18 +4,6 @@ from orbitalengineer.ui.gtk4 import Gtk, Gdk
 MIN_ZOOM = 0.0005
 MAX_ZOOM = 600.0
 
-def source_touchscreen(gesture):
-    sequence = gesture.get_last_updated_sequence()
-    event = gesture.get_last_event(sequence)
-    if event is None: return True
-    device = event.get_device()
-    if device and device.get_source() != Gdk.InputSource.TOUCHSCREEN:
-        if sequence:
-            gesture.set_sequence_state(sequence, Gtk.EventSequenceState.DENIED)
-        else:
-            gesture.set_state(Gtk.EventSequenceState.DENIED)
-        return False
-    return True
 
 class Camera2D:
     offset:list[float]
@@ -66,7 +54,6 @@ class Camera2DController:
         self.widget = widget
         self.camera = camera
         self.view = view
-        self.drag_enabled = True
         self.pointer_x = 0
         self.pointer_y = 0
         self.drag_start_offset = (0, 0)
@@ -83,20 +70,11 @@ class Camera2DController:
         drag_middle_click.set_button(Gdk.BUTTON_MIDDLE)
         widget.add_controller(drag_middle_click)
 
-        drag_touch = Gtk.GestureDrag.new()
-        drag_touch.connect("drag-begin", self.on_drag_touch_begin)
-        drag_touch.connect("drag-update", self.on_drag_touch_update)
-        drag_touch.connect("drag-end", self.on_drag_touch_end)
-        widget.add_controller(drag_touch)
+        self.touch_ctl = PanZoomTouchController(widget, camera, view)
 
         scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
         scroll.connect("scroll", self.on_scroll)
         widget.add_controller(scroll)
-
-        zoom = Gtk.GestureZoom.new()
-        zoom.connect("scale-changed", self.on_pinch_zoom)
-        widget.add_controller(zoom)
-        self.zoom_gesture = zoom
 
     def on_motion(self, controller, x, y):
         self.pointer_x = x
@@ -122,28 +100,6 @@ class Camera2DController:
         self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
         self.widget.queue_draw()
 
-    def on_drag_touch_begin(self, gesture, start_x, start_y):
-        if not self.view.camera_drag_enable:return
-        if not source_touchscreen(gesture):return
-        
-        self._last_pinch_scale = 1.0
-        self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
-
-    def on_drag_touch_update(self, gesture, dx, dy):
-        if not self.view.camera_drag_enable:return
-        if not source_touchscreen(gesture):return
-        self.camera.offset[0] = self.drag_start_offset[0] - (dx / self.camera.zoom)
-        self.camera.offset[1] = self.drag_start_offset[1] - (dy / self.camera.zoom)
-        self.widget.queue_draw()
-
-    def on_drag_touch_end(self, gesture, dx, dy):
-        if not self.view.camera_drag_enable:return
-        if not source_touchscreen(gesture):return
-        self.camera.offset[0] = self.drag_start_offset[0] - (dx / self.camera.zoom)
-        self.camera.offset[1] = self.drag_start_offset[1] - (dy / self.camera.zoom)
-        self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
-        self.widget.queue_draw()
-
     def on_scroll(self, controller, dx, dy):
         if dy == 0: return
         direction = -1 if dy > 0 else 1
@@ -152,8 +108,63 @@ class Camera2DController:
         h = self.widget.get_allocated_height()
         self.camera.zoom_at(self.pointer_x, self.pointer_y, w, h, factor)
         self.widget.queue_draw()
-    
-    
+
+
+
+class PanZoomTouchController:
+        
+    def __init__(self, widget, camera, view):
+        self.widget = widget
+        self.camera = camera
+        self.view = view
+        
+        drag_touch = Gtk.GestureDrag.new()
+        drag_touch.connect("drag-begin", self.on_drag_touch_begin)
+        drag_touch.connect("drag-update", self.on_drag_touch_update)
+        drag_touch.connect("drag-end", self.on_drag_touch_end)
+        widget.add_controller(drag_touch)
+
+        zoom = Gtk.GestureZoom.new()
+        zoom.connect("scale-changed", self.on_pinch_zoom)
+        widget.add_controller(zoom)
+        self.zoom_gesture = zoom
+
+
+    def _source_touchscreen(self, gesture):
+        sequence = gesture.get_last_updated_sequence()
+        event = gesture.get_last_event(sequence)
+        if event is None: return True
+        device = event.get_device()
+        if device and device.get_source() != Gdk.InputSource.TOUCHSCREEN:
+            if sequence:
+                gesture.set_sequence_state(sequence, Gtk.EventSequenceState.DENIED)
+            else:
+                gesture.set_state(Gtk.EventSequenceState.DENIED)
+            return False
+        return True
+
+    def on_drag_touch_begin(self, gesture, start_x, start_y):
+        if not self.view.camera_drag_enable:return
+        if not self._source_touchscreen(gesture):return
+        
+        self._last_pinch_scale = 1.0
+        self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
+
+    def on_drag_touch_update(self, gesture, dx, dy):
+        if not self.view.camera_drag_enable:return
+        if not self._source_touchscreen(gesture):return
+        self.camera.offset[0] = self.drag_start_offset[0] - (dx / self.camera.zoom)
+        self.camera.offset[1] = self.drag_start_offset[1] - (dy / self.camera.zoom)
+        self.widget.queue_draw()
+
+    def on_drag_touch_end(self, gesture, dx, dy):
+        if not self.view.camera_drag_enable:return
+        if not self._source_touchscreen(gesture):return
+        self.camera.offset[0] = self.drag_start_offset[0] - (dx / self.camera.zoom)
+        self.camera.offset[1] = self.drag_start_offset[1] - (dy / self.camera.zoom)
+        self.drag_start_offset = (self.camera.offset[0], self.camera.offset[1])
+        self.widget.queue_draw()
+
     def on_pinch_zoom(self, gesture, scale):
         if scale == 0:
             return  # Sanity check
