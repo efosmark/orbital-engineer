@@ -36,17 +36,9 @@ __kernel void compute_velocity(
 
     GRID_STRIDE_IJ(
         if ((flags[j]&REMOVED)) continue;
-
         float2 force = compute_gravitation(position[i], position[j], mass[i], mass[j]);
-        //float edge_dist = distance_edge[IDX];
-        //float overlap = (fabs(edge_dist) / fmin(radius[i], radius[j])) + 1.0f;
-        
-        // 
-        //float2 repel_rate = (edge_dist <= 0)
-        //                  ? (repel_on_overlap(flags[i]) ? -overlap : 0.0f)
-        //                  : 1.0f;
-
-        A += force * inv_mass_i * ((distance_edge[IDX] < 0) ? -1 : 1.0f);
+        float repel = (flags[i]&REPEL_ON_OVERLAP) ? -1.0f : 0;
+        A += force * inv_mass_i * ((distance_edge[IDX] < 0) ? repel : 1.0f);
     );
   
     float2 wg_A = FLOAT2_WG_REDUCE_ADD(A);

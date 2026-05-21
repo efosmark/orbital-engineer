@@ -1,6 +1,6 @@
+from orbitalengineer.engine.cl import flags
 from orbitalengineer.engine.simcontroller import OrbitalSimController
 from orbitalengineer.ui import model
-from orbitalengineer.ui.canvas.render.hill_radius import HillRadiusRenderer
 from orbitalengineer.ui.canvas.render.hud_clock import HudClockRenderer
 from orbitalengineer.ui.canvas.render.selection import SelectionRenderer
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, Gsk
@@ -8,7 +8,6 @@ from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.canvas.pz import Camera2D, Camera2DController
 from orbitalengineer.ui.canvas.render.focus_info import FocusInfoRenderer
 from orbitalengineer.ui.canvas.render.force import ForceVectorRenderer
-from orbitalengineer.ui.canvas.render.osd import OSDRenderer
 from orbitalengineer.ui.canvas.render.debug import DebugInfoRenderer
 from orbitalengineer.ui.canvas.render.grid import GridRenderer
 from orbitalengineer.ui.canvas.render.background import BackgroundRenderer
@@ -55,6 +54,7 @@ class MoveParticleController:
             &(self.orbital.position.real >  x_start)
             &(self.orbital.position.imag <= y_end)
             &(self.orbital.position.imag >  y_start)
+            &((self.orbital.flags & flags.REMOVED) != flags.REMOVED)
         )[0]
 
     def on_drag_begin(self, gesture, start_x, start_y):
@@ -70,19 +70,24 @@ class MoveParticleController:
         self.view.drag_start = (x, y)
 
         bodies = self.orbital.find_bodies_at(x, y, margin=5/self.camera.zoom)
-        if len(bodies) == 0: return
+        if len(bodies) == 0:
+            self.view.selected_particles = None
+            return
         
         self.view.props.dragging_particle = bodies[0]
 
     def on_drag_update(self, gesture, dx, dy):
-        if not self.view.drag_start:
-            return
+        if not self.view.drag_start: return
 
         offset_x = dx / self.camera.zoom
         offset_y = dy / self.camera.zoom
         
+        if offset_x > 15 or offset_y > 15:
+            self.view.props.paused = True
+        
         self.view.drag_end = (self.view.drag_start[0]+offset_x, self.view.drag_start[1]+offset_y)
         
+        self.view.props.paused = True
         if self.view.props.dragging_particle is None:
             self._update_selection()
         else:
@@ -93,13 +98,11 @@ class MoveParticleController:
             cl.enqueue_copy(self.orbital.q, self.orbital.pos_cl, self.orbital.position)  
         
     def on_drag_end(self, gesture, start_x, start_y):
-        #if self.view.props.dragging_particle:
-        #    cl.enqueue_copy(self.orbital.q, self.orbital.pos_cl, self.orbital.position)  
         self.view.props.dragging_particle = None
         self.view.props.dragging_particle_offset = (0, 0)
+        self.view.props.drag_start = None
+        self.view.props.drag_end = None
         self._orig_particle_positions = None
-        self.view.drag_start = None
-        self.view.drag_end = None
 
 class MouseController:
     

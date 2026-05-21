@@ -46,7 +46,7 @@ class KeyInput(GObject.GObject):
         elif keyval == Gdk.KEY_Up:
             self.app.relative_zoom(1 / 0.9)
         elif keyval == Gdk.KEY_space:
-            self.app.toggle_paused()
+            self.app.view.props.paused = not self.app.view.props.paused
         elif keyval == Gdk.KEY_f:
             self.toggle_screen_size()
         elif keyval == Gdk.KEY_period:

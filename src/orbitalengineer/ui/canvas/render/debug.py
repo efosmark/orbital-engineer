@@ -152,16 +152,14 @@ class DebugInfoRenderer(renderer.Renderer):
             num_bodies = 0
         
         speed = self.orbital.speed
-        if speed < 1:
-            speed = -1/speed
+        if speed < 1: speed = -1/speed
         
         zoom = self.camera.zoom
-        if zoom < 1:
-            zoom = -1/zoom
+        if zoom < 1: zoom = -1/zoom
         
         display:list[DebugDisplayField|None] = []
         display.extend([
-            DebugDisplayField("Bodies", int(num_bodies)),
+            DebugDisplayField("Bodies", f"{self.orbital.get_valid_indices().size} / {int(num_bodies)}"),
             DebugDisplayField("Speed",  speed, 1),
             DebugDisplayField("Zoom",   zoom, 1),
         ])
@@ -187,7 +185,7 @@ class DebugInfoRenderer(renderer.Renderer):
 
         display.extend([
             None,
-            DebugDisplayField('Tick #',   self.data.num_ticks)
+            DebugDisplayField('Tick #',   self.orbital.tick_id)
         ])
         
         tick_durations = self.data.durations['tick'][-10:]

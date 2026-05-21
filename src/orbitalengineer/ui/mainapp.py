@@ -34,6 +34,11 @@ class App(Gtk.Application):
         self.orbit_ctl.on_collision = self.on_collision
 
         self.camera = pz.Camera2D()
+        
+        self.view.connect("notify::paused", self.on_paused_changed)
+
+    def on_paused_changed(self, model, param):
+        self._toggle_paused()
 
     def start_tick(self):
         self.orbit_ctl.accum = 0
@@ -42,9 +47,8 @@ class App(Gtk.Application):
         self.clock.start()
         self.tick_ctl.start()
         
-    def toggle_paused(self):
+    def _toggle_paused(self):
         self.view.add_osd_message("Paused" if not self.view.props.paused else "Unpaused", self.clock.time(), 1.0)
-        self.view.props.paused = not self.view.props.paused
         if self.view.props.paused:
             self.clock.stop()
             self.tick_ctl.stop()

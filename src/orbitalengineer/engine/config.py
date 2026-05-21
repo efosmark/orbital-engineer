@@ -23,7 +23,7 @@ DEFAULT_G = 1.0
 # Tick-rate Settings
 #############################################
 
-DEFAULT_DT_BASE =  1/15.0
+DEFAULT_DT_BASE =  1/20.0
 DEFAULT_SPEED = 1.0
 MAX_STEPS_PER_TICK = int(1.0/np.sqrt(DEFAULT_DT_BASE))
 MAX_SUB_STEPS = 5
@@ -32,5 +32,5 @@ MAX_SUB_STEPS = 5
 # IPC Settings
 #############################################
 
-EMIT_METRICS = True
+EMIT_METRICS = False
 METRIC_SOCKET_PATH = "/tmp/kernel-metrics.sock"

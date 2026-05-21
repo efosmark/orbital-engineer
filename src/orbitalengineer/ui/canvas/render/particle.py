@@ -2,7 +2,7 @@ import math
 import cairo
 from orbitalengineer.ui.canvas import renderer
 
-MIN_RADIUS = 0.5
+MIN_DISPLAY_RADIUS = 1.5
 DEFAULT_PARTICLE_COLOR = (1, 1, 1)
 
 class ParticleRenderer(renderer.Renderer):
@@ -19,7 +19,7 @@ class ParticleRenderer(renderer.Renderer):
             
             x,y = b.get_xy()
             
-            radius = max(radius, 0.5/self.camera.zoom)
+            radius = max(radius, MIN_DISPLAY_RADIUS/self.camera.zoom)
             
             cr.set_source_rgba(*self.view.particle_colors.get(b.idx, DEFAULT_PARTICLE_COLOR))
             cr.arc(x, y, radius, 0, 2*math.pi)
