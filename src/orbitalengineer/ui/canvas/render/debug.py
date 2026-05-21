@@ -9,14 +9,14 @@ from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.gtk4 import Gdk
 
 X_PADDING = 10
-X_SPACING = 30
-X_MARGIN = 50
+X_SPACING = 20
+X_MARGIN = 10
 
 Y_PADDING = 10
 Y_SPACING = 0
 Y_MARGIN = 10
 
-FONT_SIZE = 10
+FONT_SIZE = 9
 BG_COLOR = (0.05, 0, 0.05, 0.7)
 TEXT_COLOR = (0.7, 0.7, 0.7)
 CRITICAL_TEXT_COLOR = (0.8, 0.2, 0.2)

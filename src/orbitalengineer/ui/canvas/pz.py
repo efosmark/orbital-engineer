@@ -129,7 +129,6 @@ class PanZoomTouchController:
         widget.add_controller(zoom)
         self.zoom_gesture = zoom
 
-
     def _source_touchscreen(self, gesture):
         sequence = gesture.get_last_updated_sequence()
         event = gesture.get_last_event(sequence)

@@ -48,7 +48,6 @@ def round_up(n, l):
 class SimController_CL(OrbitalSimController):
     collision_strategy = config.DEFAULT_COLLISION_STRATEGY
     coef_of_restitution = config.COEF_OF_RESTITUTION
-    speed = config.DEFAULT_SPEED
     dt_base = config.DEFAULT_DT_BASE
     G = config.DEFAULT_G
 
@@ -312,7 +311,7 @@ class SimController_CL(OrbitalSimController):
             self.last_now = now - self.dt_base
  
         wall_dt = now - self.last_now
-        self.accum += wall_dt * self.speed
+        self.accum += wall_dt
 
         dt_step = np.float32(self.dt_base) # <- for now, fixed cap
         num_steps = int(min(self.accum // dt_step, config.MAX_STEPS_PER_TICK)) # type:ignore

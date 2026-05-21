@@ -31,7 +31,7 @@ def on_activate(app: App):
             velocity=velocity,
             radius=radius,
             mass=mass,
-            flags=flags.DISABLE_MERGE#|flags.DISABLE_BOUNCE|flags.REPEL_ON_OVERLAP
+            flags=flags.MERGE#|flags.DISABLE_BOUNCE|flags.REPEL_ON_OVERLAP
          ), color=cmap(mass_norm(mass)))
 
     # for i in range(128):
@@ -51,7 +51,7 @@ def on_activate(app: App):
     app.orbit_ctl.Lx = Lx
     app.orbit_ctl.speed = 1.0
     
-    app.orbit_ctl.collision_strategy = CollisionStrategy.BOUNCE
+    #app.orbit_ctl.collision_strategy = CollisionStrategy.BOUNCE
     app.orbit_ctl.coef_of_restitution = 0.92
     app.view.show_focused_history = True
     #app.view.show_debug_info = False
