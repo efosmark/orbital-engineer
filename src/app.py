@@ -47,7 +47,6 @@ def on_activate(app: App):
         ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))
 
     app.orbit_ctl.Lx = Lx
-    app.orbit_ctl.speed = 1.0
     app.orbit_ctl.coef_of_restitution = 0.93
     app.view.show_focused_history = True
     #app.view.show_debug_info = False

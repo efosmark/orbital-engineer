@@ -10,7 +10,6 @@ CollisionHandler_T = Callable[[int,int], bool|None]
 class OrbitalSimController(Protocol):
     clock:SimClock
     N:int
-    speed:float
     dt_base:float
     accum:float
     tick_id:int = 0

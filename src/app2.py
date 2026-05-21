@@ -49,7 +49,6 @@ def on_activate(app: App):
     #     ), color=(0.5,1,0.5,1))
 
     app.orbit_ctl.Lx = Lx
-    app.orbit_ctl.speed = 1.0
     
     #app.orbit_ctl.collision_strategy = CollisionStrategy.BOUNCE
     app.orbit_ctl.coef_of_restitution = 0.92

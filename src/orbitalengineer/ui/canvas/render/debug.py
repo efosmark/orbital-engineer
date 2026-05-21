@@ -151,8 +151,7 @@ class DebugInfoRenderer(renderer.Renderer):
         except AttributeError:
             num_bodies = 0
         
-        speed = self.orbital.speed
-        if speed < 1: speed = -1/speed
+        speed = self.orbital.clock.get_speed()
         
         zoom = self.camera.zoom
         if zoom < 1: zoom = -1/zoom

@@ -38,9 +38,9 @@ class KeyInput(GObject.GObject):
         elif keyval in self.WASD_KEYS:
             self.on_wasd(keyval)
         elif keyval == Gdk.KEY_Left:
-            self.app.orbit_ctl.speed -= 0.1
+            self.app.view.props.speed -= 0.1
         elif keyval == Gdk.KEY_Right:
-            self.app.orbit_ctl.speed += 0.1
+            self.app.view.props.speed += 0.1
         elif keyval == Gdk.KEY_Down:
             self.app.relative_zoom(0.9)
         elif keyval == Gdk.KEY_Up:

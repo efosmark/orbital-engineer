@@ -2,6 +2,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
+from orbitalengineer.engine import config
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, GObject, GLib
 import numpy as np
 
@@ -56,6 +57,7 @@ class ViewModel(GObject.GObject):
     props:Any
     
     paused = GObject.Property(type=bool, default=False)
+    speed = GObject.Property(type=float, default=config.DEFAULT_SPEED)
     
     fps = GObject.Property(type=object)
     

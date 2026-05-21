@@ -36,9 +36,14 @@ class App(Gtk.Application):
         self.camera = pz.Camera2D()
         
         self.view.connect("notify::paused", self.on_paused_changed)
+        self.view.connect("notify::speed", self.on_speed_changed)
 
     def on_paused_changed(self, model, param):
         self._toggle_paused()
+    
+    def on_speed_changed(self, model, param):
+        self.orbit_ctl.clock.set_speed(self.view.props.speed)
+
 
     def start_tick(self):
         self.orbit_ctl.accum = 0
