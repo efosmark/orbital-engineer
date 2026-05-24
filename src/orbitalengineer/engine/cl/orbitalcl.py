@@ -1,36 +1,27 @@
+import time
 from typing import cast
 from pathlib import Path
 from numpy.typing import NDArray
 import numpy as np
 import pyopencl as cl
 
-from orbitalengineer.engine import logger, config
+from orbitalengineer.engine import log_timing, logger, config
 from orbitalengineer.engine.cl import flags
-from orbitalengineer.engine.cl.interaction import InteractionGroupPipeline
-from orbitalengineer.engine.cl.nudge import NudgePipeline
-from orbitalengineer.engine.cl.position import PositionPipeline
-from orbitalengineer.engine.cl.relative_velocity import RelativeVelocityPipeline
-from orbitalengineer.engine.cl.velocity import VelocityPipeline
-from orbitalengineer.engine.cl.bounce import BouncePipeline
+from orbitalengineer.engine.cl.interaction.interaction import InteractionGroupPipeline
+from orbitalengineer.engine.cl.nudge.nudge import NudgePipeline
+from orbitalengineer.engine.cl.position.position import PositionPipeline
+from orbitalengineer.engine.cl.relative_velocity.relative_velocity import RelativeVelocityPipeline
+from orbitalengineer.engine.cl.velocity.velocity import VelocityPipeline
+from orbitalengineer.engine.cl.bounce.bounce import BouncePipeline
 from orbitalengineer.engine.cl.dimension import load_kernel
-from orbitalengineer.engine.cl.merge import MergePipeline
+from orbitalengineer.engine.cl.merge.merge import MergePipeline
 from orbitalengineer.engine.cl.particle_cl import ParticleCL
 from orbitalengineer.engine.cl.tracer import EventTracer
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.engine.event import BouncingCollisionEvent
 from orbitalengineer.engine.metric import MetricsProducer
 from orbitalengineer.engine.simcontroller import OrbitalSimController
-from orbitalengineer.engine.cl.device import get_device_pci_bdf, map_pci_bdf_to_drm_card
-
-PLATFORM_ID = 0
-DEVICE_ID = 1
-
-# particle_dtype = np.dtype([
-#     ("velocity", np.complex64),
-#     ("position", np.complex64),
-#     ("mass",     np.float32),
-#     ("radius",   np.float32)
-# ])
+from orbitalengineer.engine.cl.device import CLDeviceManager
 
 import warnings
 warnings.filterwarnings(
@@ -67,11 +58,12 @@ class SimController_CL(OrbitalSimController):
         self.metrics = MetricsProducer(config.METRIC_SOCKET_PATH)
 
         self.step_count = 0
-        self.opencl_device_name = ""
-        self.opencl_platform_name = ""
-        self.opencl_pci_bdf:str|None = None
-        self.drm_card_index:int|None = None
+        self.device = None
+        
+        self.N = 1
+        self._allocate_memory()
 
+    @log_timing
     def _populate_particle_fields(self):
         for i,p in enumerate(self._particles):
             self.flags[i] = np.uint32(p.get_flags())
@@ -80,7 +72,9 @@ class SimController_CL(OrbitalSimController):
             self.mass[i] = np.float32(p.get_mass())
             self.radius[i] = np.float32(p.get_radius())
 
+    @log_timing
     def _allocate_memory(self):
+        
         # Primary particle fields
         self.flags = np.zeros(self.N, dtype=np.uint32)
         self.velocity = np.zeros(self.N, dtype=np.complex64)
@@ -90,8 +84,8 @@ class SimController_CL(OrbitalSimController):
         
         self.velocity_relative = np.zeros(self.N * self.N, dtype=np.complex64)
         self.distance_edge = np.zeros(self.N * self.N, dtype=np.float32)
-        logger.debug("Memory allocated.")
 
+    @log_timing
     def _create_buffers(self):
         self.flags_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.flags)
         self.vel_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.velocity)
@@ -100,25 +94,16 @@ class SimController_CL(OrbitalSimController):
         self.radius_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.radius)
         self.velocity_relative_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.velocity_relative)
         self.distance_edge_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.distance_edge)
-        logger.debug("Buffers were created.")
-    
-    def _init_device(self):
-        platform = cl.get_platforms()[PLATFORM_ID]
-        devices = platform.get_devices()
-        self._device = devices[-1]
-        self.opencl_platform_name = platform.name
-        self.opencl_device_name = self._device.name
-        self.opencl_pci_bdf = get_device_pci_bdf(self._device)
-        self.drm_card_index = map_pci_bdf_to_drm_card(self.opencl_pci_bdf)
 
+    @log_timing
     def _init_queue(self):
         properties = cast(cl.command_queue_properties, 0)
         if self.enable_profiling:
             logger.info("OpenCL profiling enabled.")
             properties = cl.command_queue_properties.PROFILING_ENABLE
-        self.copy_q = cl.CommandQueue(self.ctx, properties=properties)
         self.q = cl.CommandQueue(self.ctx, properties=properties)
     
+    @log_timing
     def _generate_headers(self):
         build_dir = Path(".opencl_build")
         build_dir.mkdir(exist_ok=True)
@@ -126,9 +111,11 @@ class SimController_CL(OrbitalSimController):
         header_path.write_text(flags.generate_cl_flag_file())
         return build_dir
     
+    @log_timing
     def _init_kernel(self):
-        self._init_device()
-        self.ctx = cl.Context([self._device])
+        if self.device is None:
+            raise Exception("Cannot initialize kernels until CL device is selected.")
+        self.ctx = cl.Context([self.device._device])
         self._init_queue()
         build_dir = self._generate_headers()                
         
@@ -165,6 +152,13 @@ class SimController_CL(OrbitalSimController):
             print(e, file=sys.stderr)
             raise SystemExit
     
+    def set_cl_device(self, platform_id:int, device_id:int):
+        if self.is_initialized:
+            logger.error("Cannot set CL device after initialization.")
+            return
+        self.device = CLDeviceManager(platform_id, device_id)
+    
+    @log_timing
     def init_sim(self):
         if self.is_initialized:
             logger.warning("Attempted to init_sim after simulation was already started.")
@@ -176,9 +170,7 @@ class SimController_CL(OrbitalSimController):
         self._populate_particle_fields()
         self._create_buffers()
         self.compute_distance_edge()
-        
         self.is_initialized = True
-        logger.info("Sim was initialized.")
 
     def add_particle(self, particle) -> int:
         if self.is_initialized:
@@ -269,7 +261,7 @@ class SimController_CL(OrbitalSimController):
         count = 0
         
         while dt_step > 0 and count < config.MAX_SUB_STEPS:
-            cl.enqueue_copy(self.copy_q, self._interaction.node_dt, self._interaction.node_dt_cl).wait()
+            cl.enqueue_copy(self.q, self._interaction.node_dt, self._interaction.node_dt_cl).wait()
             
             try:
                 min_toi = min([t for t in self._interaction.node_dt if t > 0])
@@ -284,20 +276,6 @@ class SimController_CL(OrbitalSimController):
                 
         return count, dt_step_start - dt_step
 
-    def _detect_event(self):
-        cl.enqueue_copy(self.q, self.distance_edge, self.distance_edge_cl)
-        cl.enqueue_copy(self.q, self._bounce.collision_point, self._bounce.collision_point_cl)
-        cl.enqueue_copy(self.q, self.velocity_relative, self.velocity_relative_cl)
-        
-        for i in range(self.N):
-            row_offset = i * self.N
-            for j in range(i + 1, self.N):
-                grid_idx = row_offset + j
-                edge_dist = self.distance_edge[grid_idx]
-                point = self._bounce.collision_point[grid_idx]
-                if point != 0:
-                    evt = BouncingCollisionEvent(self.tick_id, i, j, complex(point), complex(self.velocity_relative[grid_idx]), float(edge_dist))
-                    self.on_collision(evt)
     
     def on_collision(self, event:BouncingCollisionEvent):...
 

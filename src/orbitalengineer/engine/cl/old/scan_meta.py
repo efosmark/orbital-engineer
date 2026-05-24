@@ -16,7 +16,7 @@ def classify_vgpr(v: Optional[int]) -> str:
 
 
 def classify_sgpr(s: Optional[int]) -> str:
-    if s is None:
+    if s  is None:
         return "UNKNOWN"
     if s <= 64:
         return "OK"

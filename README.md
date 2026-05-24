@@ -133,5 +133,3 @@ sudo pacman -Syu rocm-opencl-runtime clpeak clinfo rocminfo
 
 
 ## Collision Strategies
-
-

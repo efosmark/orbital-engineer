@@ -2,7 +2,7 @@ import numpy as np
 import pyopencl as cl
 from orbitalengineer.engine.cl.dimension import CLPipelineStep
 
-KERNEL_FILE_LOCATION = "kernel/nudge.cl"
+KERNEL_FILE_LOCATION = "nudge/nudge.cl"
 
 class NudgePipeline(CLPipelineStep):
     

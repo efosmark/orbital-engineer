@@ -2,7 +2,7 @@ import numpy as np
 import pyopencl as cl
 from orbitalengineer.engine.cl.dimension import CLPipelineStep
 
-KERNEL_FILE_LOCATION = "kernel/bounce.cl"
+KERNEL_FILE_LOCATION = "bounce/bounce.cl"
 
 class BouncePipeline(CLPipelineStep):
     debug_flag = "bounce"

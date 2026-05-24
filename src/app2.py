@@ -57,8 +57,6 @@ def on_activate(app: App):
     #app.view.show_focus_info = True
     #app.data.secondary_body = 41
     #app.view.show_plot_at_startup = False
-    app.orbit_ctl.init_sim()
-    app.start_tick()
     app.relative_zoom(1.0)
  
 def run():

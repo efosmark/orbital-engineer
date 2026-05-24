@@ -1,5 +1,7 @@
+from functools import wraps
 import logging
 import os
+import time
 
 logging.basicConfig(level=logging.WARN)
 logger = logging.getLogger("orbit.engine")
@@ -29,3 +31,15 @@ if log_level_env:
 
 else:
     logger.setLevel(logging.WARN)
+
+def log_timing(function):
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        try:
+            return function(*args, **kwargs)
+        finally:
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            logger.info("%s executed in %.3f ms", function.__name__, elapsed_ms)
+
+    return wrapper

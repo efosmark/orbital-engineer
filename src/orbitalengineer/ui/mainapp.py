@@ -1,4 +1,7 @@
+from typing import cast
 import numpy as np
+
+from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 np.set_printoptions(precision=3)
 
 from orbitalengineer.helpers import seed
@@ -8,7 +11,6 @@ from orbitalengineer.ui import model
 from orbitalengineer.ui.canvas import pz
 from orbitalengineer.ui.ticker import TickController
 from orbitalengineer.ui.mainwindow import MainWindow
-from orbitalengineer.ui.fmt import get_scale_value
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib
 from orbitalengineer.ui.keyinput import KeyInput
 
@@ -37,6 +39,7 @@ class App(Gtk.Application):
         
         self.view.connect("notify::paused", self.on_paused_changed)
         self.view.connect("notify::speed", self.on_speed_changed)
+        self.view.props.paused = True
 
     def on_paused_changed(self, model, param):
         self._toggle_paused()
@@ -44,19 +47,18 @@ class App(Gtk.Application):
     def on_speed_changed(self, model, param):
         self.orbit_ctl.clock.set_speed(self.view.props.speed)
 
-
     def start_tick(self):
         self.orbit_ctl.accum = 0
         self.orbit_ctl.last_now = None
-        self.tick_ctl = TickController(self.data, self.orbit_ctl, self.clock)
         self.clock.start()
+        self.tick_ctl = TickController(self.data, self.orbit_ctl, self.clock)
         self.tick_ctl.start()
         
     def _toggle_paused(self):
-        self.view.add_osd_message("Paused" if not self.view.props.paused else "Unpaused", self.clock.time(), 1.0)
         if self.view.props.paused:
             self.clock.stop()
-            self.tick_ctl.stop()
+            if hasattr(self, 'tick_ctl'):
+                self.tick_ctl.stop()
         else:
             self.start_tick()
 
@@ -68,7 +70,6 @@ class App(Gtk.Application):
         if self.orbit_ctl.tick(self.clock.time()) > 0:
             GLib.idle_add(self.orbit_ctl.sync)
 
-
     def insert_particle(self, particle:Particle, color:tuple[float, float, float, float]=(1,1,1,1)) -> int:
         idx = self.orbit_ctl.add_particle(particle)
         self.view.particle_colors[idx] = random_color() if color is None else color
@@ -78,9 +79,19 @@ class App(Gtk.Application):
     def do_startup(self):
         Gtk.Application.do_startup(self)
 
+    def _on_close_request(self, dialog: SelectDeviceWindow):
+        selection = dialog.get_selection()
+        if selection is None:
+            self.quit()
+            return
+        self.orbit_ctl.set_cl_device(*selection)
+        self.orbit_ctl.init_sim()
+        self.view.props.paused = False
+
     def do_activate(self):
         Gtk.Application.do_activate(self)
-        win = self.props.active_window
+        
+        win = cast(MainWindow, self.props.active_window)
         if not win:
             win = MainWindow(
                 application=self,
@@ -90,12 +101,17 @@ class App(Gtk.Application):
                 data=self.data,
                 ctl=self.orbit_ctl,
             )
-            self.key_input = KeyInput(self, win)
             logger.info("Main window configured and ready to present.")
-        
+        self.key_input = KeyInput(self, win)
+         
         win.present()
         if self.view.start_maximized:
-           win.maximize()
+            win.maximize()
+        
+        dialog = SelectDeviceWindow(parent=win)
+        dialog.set_application(self)
+        dialog.connect("close-request", self._on_close_request)
+        dialog.present()
 
     def shift_focus(self, particle_id):
         b = self.orbit_ctl.get_particle(particle_id)
@@ -119,15 +135,12 @@ class App(Gtk.Application):
 
     def relative_zoom(self, factor):
         self.camera.zoom_at(0, 0, 0, 0, factor)
-        z = get_scale_value(self.camera.zoom)
-        self.view.add_osd_message(f"Zoom: {z:.1f}X", self.clock.time(), 0.75)
 
     def on_collision(self, event:BouncingCollisionEvent):
         r1 = self.orbit_ctl.get_particle(event.i).get_radius()
         r2 = self.orbit_ctl.get_particle(event.j).get_radius()
         
         size = min(r1, r2)/2.0
-        
         self.view.pinpoint.append(model.Pinpoint(
             position=event.collision_point,
             start=self.clock.time(),

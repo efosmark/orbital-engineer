@@ -2,7 +2,7 @@ import numpy as np
 import pyopencl as cl
 from orbitalengineer.engine.cl.dimension import CLPipelineStep
 
-KERNEL_FILE_LOCATION = "kernel/merge.cl"
+KERNEL_FILE_LOCATION = "merge/merge.cl"
 
 class MergePipeline(CLPipelineStep):
     debug_flag = "merge"

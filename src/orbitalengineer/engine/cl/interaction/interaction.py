@@ -3,7 +3,7 @@ import pyopencl as cl
 from orbitalengineer.engine.cl.dimension import CLPipelineStep
 from orbitalengineer.engine.collision_strategy import CollisionStrategy
 
-KERNEL_FILE_LOCATION = "kernel/interaction.cl"
+KERNEL_FILE_LOCATION = "interaction/interaction.cl"
 
 class InteractionGroupPipeline(CLPipelineStep):
     debug_flag = 'interaction'
@@ -141,7 +141,6 @@ if __name__ == "__main__":
     ctl.add_particle(ParticleRaw(position=-1700-1000j, velocity=11+5j, radius=10, mass=10))
 
     ctl.Lx = int((N * 2.0) + 3)
-    ctl.speed = 1.0
     
     ctl.collision_strategy = CollisionStrategy.BOUNCE
     ctl.coef_of_restitution = 0.8

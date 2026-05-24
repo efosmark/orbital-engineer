@@ -14,26 +14,6 @@ class Pinpoint:
     radius:float
     color:tuple[float,float,float] = (1.0, 1.0, 1.0)
 
-class OSDMessage:
-    message:str
-    start:float
-    until:float|None
-    def __init__(self, message:str, start:float, duration:float|None):
-        self.message = message
-        self.start = start
-        self.until = self.start + duration if duration is not None else None
-    
-    def __repr__(self):
-        return f"{self.__class__.__name__}(message={repr(self.message)}, start={repr(self.start)}, until={repr(self.until)})"
-    
-class _ViewModelProps(Protocol):
-    pinpoint: Any
-    particle_colors: Any
-    particle_names: Any
-    hover_position: Any
-    hovered_over_particle: Any
-    osd_message: Any
-
 class DataModel(GObject.GObject):
     secondary_body = GObject.Property(type=object, default=None)
 
@@ -56,7 +36,7 @@ class DataModel(GObject.GObject):
 class ViewModel(GObject.GObject):
     props:Any
     
-    paused = GObject.Property(type=bool, default=False)
+    paused = GObject.Property(type=bool, default=True)
     speed = GObject.Property(type=float, default=config.DEFAULT_SPEED)
     
     fps = GObject.Property(type=object)
@@ -101,17 +81,10 @@ class ViewModel(GObject.GObject):
     
     def __init__(self):
         super().__init__()
-        props = cast(_ViewModelProps, self.props)
-        props.pinpoint = []
-        props.particle_colors = {}
-        props.particle_names = {}
-        props.hover_position = (0, 0)
-        props.hovered_over_particle = None
-        props.osd_message = []
+        self.props.pinpoint = []
+        self.props.particle_colors = {}
+        self.props.particle_names = {}
+        self.props.hover_position = (0, 0)
+        self.props.hovered_over_particle = None
+        self.props.osd_message = []
     
-    def add_osd_message(self, message, start, duration:float|None=None) -> OSDMessage:
-        m = OSDMessage(message, start, duration)
-        props = cast(_ViewModelProps, self.props)
-        props.osd_message.append(m)
-        return m
-        

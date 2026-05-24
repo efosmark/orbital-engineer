@@ -57,12 +57,11 @@ class KeyInput(GObject.GObject):
         if self.app.data.secondary_body is None: return
         b = self.app.orbit_ctl.get_particle(self.app.data.secondary_body)
         r, angle = cmath.polar(b.get_velocity())
-        
         if keyval == Gdk.KEY_a:
-            angle -= (2*cmath.pi / 360.0)
+            angle -= ((2*cmath.pi) / 360.0)
             velocity = cmath.rect(r, angle)
         elif keyval == Gdk.KEY_d:
-            angle += (2*cmath.pi / 360.0)
+            angle += ((2*cmath.pi) / 360.0)
             velocity = cmath.rect(r, angle)
         elif keyval == Gdk.KEY_w:
             r, angle = cmath.polar(b.get_velocity())

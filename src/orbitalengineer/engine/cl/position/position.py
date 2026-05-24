@@ -2,7 +2,7 @@ import pyopencl as cl
 import numpy as np
 from orbitalengineer.engine.cl.dimension import CLPipelineStep
 
-KERNEL_FILE = "kernel/position.cl"
+KERNEL_FILE = "position/position.cl"
 
 class PositionPipeline(CLPipelineStep):
     debug_flag = "position"

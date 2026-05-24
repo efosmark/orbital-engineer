@@ -29,7 +29,7 @@ class TickController:
                 GLib.idle_add(self.orbit_ctl.sync)
 
             now = self.clock.time()
-            next_tick_at += (self.orbit_ctl.dt_base / self.orbit_ctl.clock.get_speed()) * 0.8
+            next_tick_at += (self.orbit_ctl.dt_base / self.orbit_ctl.clock.get_speed()) * 0.4
             if next_tick_at < now:
                 next_tick_at = now
     

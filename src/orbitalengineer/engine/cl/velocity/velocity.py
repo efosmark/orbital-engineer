@@ -3,7 +3,7 @@ import numpy as np
 
 from orbitalengineer.engine.cl.dimension import CLPipelineStep
 
-KERNEL_FILE = "kernel/velocity.cl"
+KERNEL_FILE = "velocity/velocity.cl"
 
 class VelocityPipeline(CLPipelineStep):
     debug_flag = "velocity"
