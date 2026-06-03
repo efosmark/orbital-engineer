@@ -42,7 +42,6 @@ def create_background(width:int, height:int) -> cairo.RecordingSurface:
     ctx.stroke()
     return rec
 
-
 def create_title(title:str):
     rec = cairo.RecordingSurface(cairo.Content.COLOR_ALPHA, None)
     ctx = cairo.Context(rec)
@@ -51,7 +50,6 @@ def create_title(title:str):
     ctx.set_source_rgb(*BG_COLOR)
     ctx.show_text(title.upper())
     return rec
-
 
 def create_contents(lines:list[str]):
     rec = cairo.RecordingSurface(cairo.Content.COLOR_ALPHA, None)
@@ -121,8 +119,8 @@ class FocusInfoRenderer(renderer.Renderer):
         
         if self.view.hovered_over_particle is not None:
             b = self.view.hovered_over_particle
-        elif self.data.secondary_body is not None:
-            b = self.orbital.get_particle(self.data.secondary_body)
+        elif self.view.secondary_body is not None:
+            b = self.orbital.get_particle(self.view.secondary_body)
         else:
             return
         
@@ -135,21 +133,21 @@ class FocusInfoRenderer(renderer.Renderer):
         mag, angle = polar(velocity)
         angle_degrees = np.degrees(positive_angle(angle))
         
-        min_dt = b.get_min_toi()
-        if np.isinf(min_dt):
-            min_dt = '--.------'
-        else:
-            min_dt = f"{min_dt:.6f}"
+        # min_dt = b.get_min_toi()
+        # if np.isinf(min_dt):
+        #     min_dt = '--.------'
+        # else:
+        #     min_dt = f"{min_dt:.6f}"
         
         disp.extend([
-            ("velocity",   f"{mag_format(mag)} m/s"),
-            ("angle",      f"{angle_degrees:.1f}°"),
-            ("dt",         min_dt)
+            ("vel mag",   f"{mag_format(mag)} m/s"),
+            ("vel angle",      f"{angle_degrees:.1f}°"),
+            #("dt",         min_dt)
         ])
         
         cr.translate(20, 20)
         
-        name = self.view.particle_names[b.idx]
+        name = self.view.particle_names.get(b.idx, f"{b.idx}")
         create_panel(cr, f"{name}-{b.idx}", [
             f"{label:<8} {value:>18}"
             for label, value in disp

@@ -21,6 +21,6 @@ class ParticleRenderer(renderer.Renderer):
             
             radius = max(radius, MIN_DISPLAY_RADIUS/self.camera.zoom)
             
-            cr.set_source_rgba(*self.view.particle_colors.get(b.idx, DEFAULT_PARTICLE_COLOR))
+            cr.set_source_rgba(*self.view.props.particle_colors[b.idx])
             cr.arc(x, y, radius, 0, 2*math.pi)
             cr.fill()

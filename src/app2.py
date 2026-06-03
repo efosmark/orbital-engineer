@@ -1,5 +1,4 @@
 from orbitalengineer.engine.cl import flags
-from orbitalengineer.engine.collision_strategy import CollisionStrategy
 from orbitalengineer.engine.particle import ParticleRaw
 from orbitalengineer.ui.mainapp import App
 from orbitalengineer.helpers import random_position, rng
@@ -36,7 +35,7 @@ def on_activate(app: App):
 
     # for i in range(128):
     #     pos = random_position(dist_min, dist_max)
-    #     #velocity = random_position(0, 20)
+    #     #velocity = random_posit ion(0, 20)
     #     mass = -mass_min
     #     velocity = 0+0j
     #     #radius = np.cbrt(abs(mass) / np.pi) / 5.0
@@ -48,10 +47,10 @@ def on_activate(app: App):
     #         mass=mass
     #     ), color=(0.5,1,0.5,1))
 
-    app.orbit_ctl.Lx = Lx
+    app.orbital.Lx = Lx
     
-    #app.orbit_ctl.collision_strategy = CollisionStrategy.BOUNCE
-    app.orbit_ctl.coef_of_restitution = 0.92
+    #app.orbital.collision_strategy = CollisionStrategy.BOUNCE
+    app.orbital.coef_of_restitution = 0.92
     app.view.show_focused_history = True
     #app.view.show_debug_info = False
     #app.view.show_focus_info = True

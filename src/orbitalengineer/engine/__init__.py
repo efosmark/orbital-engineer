@@ -32,6 +32,7 @@ if log_level_env:
 else:
     logger.setLevel(logging.WARN)
 
+
 def log_timing(function):
     @wraps(function)
     def wrapper(*args, **kwargs):

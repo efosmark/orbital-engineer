@@ -1,0 +1,11 @@
+APP_ID = "com.qmew.orbitalengineer.metrics"
+
+WINDOW_TITLE = "OE Metrics Monitor"
+
+WINDOW_DEFAULT_SIZE = (1000, 600)
+
+MAX_METRICS_PER_POLL = 500
+
+REFRESH_INTERVAL_MS = 50
+
+MAX_DATA_POINTS = 500

@@ -1,7 +1,7 @@
 import pyopencl as cl
 from dataclasses import dataclass
 
-from orbitalengineer.engine.simcontroller import OrbitalSimController
+from orbitalengineer.engine import logger
 
 @dataclass
 class TraceEvent:
@@ -9,7 +9,7 @@ class TraceEvent:
     event: cl.Event
 
 class EventTracer:
-    def __init__(self, ctl: OrbitalSimController):
+    def __init__(self, ctl):
         self.ctl = ctl
         self.clear()
     

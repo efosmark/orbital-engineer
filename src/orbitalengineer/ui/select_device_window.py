@@ -96,6 +96,7 @@ class SelectDeviceWindow(Gtk.Window):
         cancel_button = Gtk.Button(label="Cancel")
         self.select_button = Gtk.Button(label="Select")
         self.select_button.add_css_class("suggested-action")
+        self.select_button.set_receives_default(True)
         buttons.append(cancel_button)
         buttons.append(self.select_button)
 
@@ -137,6 +138,8 @@ class SelectDeviceWindow(Gtk.Window):
         self.device_dropdown.set_sensitive(has_devices)
         self.select_button.set_sensitive(has_devices)
         if has_devices:
+            self.set_default_widget(self.select_button)
+            self.select_button.grab_focus()
             if device_id is None:
                 device_id = self._default_device_id(devices)
             device_id = min(max(device_id, 0), len(devices) - 1)

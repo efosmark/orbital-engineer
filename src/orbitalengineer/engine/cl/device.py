@@ -13,19 +13,6 @@ import re
 from typing import Any
 import pyopencl as cl
 
-
-def print_platforms():
-    for plat in cl.get_platforms():
-        print("PLATFORM  : ")
-        print("  name    : ", plat.name)
-        print("  vendor  : ", plat.vendor)
-        print("  version :", plat.version)
-        for dev in plat.get_devices():
-            print("   DEVICE  :", dev.name)
-            print("     type  :", cl.device_type.to_string(dev.type))
-        print()
-
-
 class CLDeviceManager:
     
     def __init__(self, platform_id, device_id):

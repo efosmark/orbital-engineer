@@ -8,28 +8,24 @@ gi.require_version("Gdk", "4.0")
 from gi.repository import Gtk, GLib # type:ignore
 
 import matplotlib
-matplotlib.use("GTK4Agg")
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_gtk4agg import FigureCanvasGTK4Agg as FigureCanvas
+matplotlib.use("GTK4Agg")
+
+from ui_metrics import ui_metrics_config
 
 class PlotWindow(Gtk.ApplicationWindow):
     def __init__(
         self,
         app,
         durations: dict[str, deque[tuple[int,float]]],
-        refresh_interval_ms=100,
-        min_ticks_between_redraws=8,
         max_line_points=180,
-        auto_refresh=True,
     ):
-        super().__init__(application=app, title="Duration plots-dialog")
-        self.set_default_size(800, 500)
+        super().__init__(application=app, title=ui_metrics_config.WINDOW_TITLE)
+        self.set_default_size(*ui_metrics_config.WINDOW_DEFAULT_SIZE)
         self.durations = durations
 
         #self.model = model
-        self.auto_refresh = bool(auto_refresh)
-        self.refresh_interval_ms = max(16, int(refresh_interval_ms))
-        self.min_ticks_between_redraws = max(1, int(min_ticks_between_redraws))
         self.max_line_points = max(20, int(max_line_points))
         self.title_font_size = 10
         self.label_font_size = 9

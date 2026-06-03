@@ -151,7 +151,7 @@ class DebugInfoRenderer(renderer.Renderer):
         except AttributeError:
             num_bodies = 0
         
-        speed = self.orbital.clock.get_speed()
+        speed = self.view.speed
         
         zoom = self.camera.zoom
         if zoom < 1: zoom = -1/zoom
@@ -163,31 +163,33 @@ class DebugInfoRenderer(renderer.Renderer):
             DebugDisplayField("Zoom",   zoom, 1),
         ])
 
-        render_durations = self.data.durations['render'][-10:]
+        render_durations = self.view.durations['render'][-10:]
         if len(render_durations) > 0:
             t_render_ms = statistics.mean([d[1] for d in render_durations]) * 1000.0
             display.append(DebugDisplayField("Render", t_render_ms, 2, 'ms', RENDER_MS_THRESHOLD))
         
-        if self.view.fps:
-            frame_clock = cast(Gdk.FrameClock, self.view.fps)
-            fps = frame_clock.get_fps()
-            #frame_no = self.view.fps.get_frame_counter()
-            #frame_interval_ms = (1/(fps or 1)) * 1000.0
-            
-            display.extend([
-                None,
-                #DebugDisplayField('Frame #',  frame_no),
-                DebugDisplayField("Rate",     fps, 1, "/s", FRAME_RATE_THRESHOLD),
-                #DebugDisplayField("Interval", frame_interval_ms, 1, 'ms')
-            ])
-
-
+        frame_clock = cast(Gdk.FrameClock, self.view.fps)
+        fps = frame_clock.get_fps()
+        frame_no = self.view.fps.get_frame_counter()
+        frame_interval_ms = (1/(fps or 1)) * 1000.0
+        
         display.extend([
             None,
-            DebugDisplayField('Tick #',   self.orbital.tick_id)
+            DebugDisplayField('Frame #',  frame_no),
+            DebugDisplayField("Rate",     fps, 1, "/s", FRAME_RATE_THRESHOLD),
+            DebugDisplayField("Interval", frame_interval_ms, 1, 'ms')
         ])
+
+
+        try:
+            display.extend([
+                None,
+                DebugDisplayField('Tick #',   self.orbital.tick_id)
+            ])
+        except AttributeError:
+            pass
         
-        tick_durations = self.data.durations['tick'][-10:]
+        tick_durations = self.view.durations['tick'][-10:]
         if len(tick_durations) > 0:
             t_tick = statistics.mean([d[1] for d in tick_durations])
             t_tick_ms = t_tick * 1000.0

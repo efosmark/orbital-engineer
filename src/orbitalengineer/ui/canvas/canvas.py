@@ -1,5 +1,6 @@
 from orbitalengineer.engine.cl import flags
-from orbitalengineer.engine.simcontroller import OrbitalSimController
+from orbitalengineer.engine.cl.orbitalcl import SimController_CL
+from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui import model
 from orbitalengineer.ui.canvas.render.hud_clock import HudClockRenderer
 from orbitalengineer.ui.canvas.render.selection import SelectionRenderer
@@ -132,38 +133,38 @@ class MouseController:
 class OrbitalCanvas(Gtk.DrawingArea):
     hud_renderers:list[renderer.Renderer]
 
-    def __init__(self, camera:Camera2D, view: model.ViewModel, data: model.DataModel, orbital:OrbitalSimController):
+    def __init__(self, camera:Camera2D, view: model.ViewModel, orbital:SimController_CL, clock:SimClock):
         super().__init__()
         
         self.camera = camera
         
         self.view = view
-        self.data = data
-
+        self.clock = clock
+        
         self.orbital = orbital
         self.camera_ctl = Camera2DController(self, self.camera, self.view)
         self.mouse_controller = MouseController(self, self.camera, self.orbital, self.view)
         self.move_particle_ctl = MoveParticleController(self, self.camera, self.orbital, self.view)
         
         self.hud_renderers = [
-            BackgroundRenderer(self.view, self.data, self.camera, self.orbital),
-            GridRenderer(self.view, self.data, self.camera, self.orbital),
+            BackgroundRenderer(self.view, self.camera, self.orbital, self.clock),
+            GridRenderer(self.view, self.camera, self.orbital, self.clock),
         ]
         
         self.scene_renderers = [
-            HistoryRenderer(self.view, self.data, self.camera, self.orbital),
-            ForceVectorRenderer(self.view, self.data, self.camera, self.orbital),
-            EllipseRenderer(self.view, self.data, self.camera, self.orbital),
-            ParticleRenderer(self.view, self.data, self.camera, self.orbital),
-            SelectionRenderer(self.view, self.data, self.camera, self.orbital),
-            ReticleRenderer(self.view, self.data, self.camera, self.orbital),
-            PinpointRenderer(self.view, self.data, self.camera, self.orbital),
+            HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
+            ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
+            EllipseRenderer(self.view, self.camera, self.orbital, self.clock),
+            ParticleRenderer(self.view, self.camera, self.orbital, self.clock),
+            SelectionRenderer(self.view, self.camera, self.orbital, self.clock),
+            ReticleRenderer(self.view, self.camera, self.orbital, self.clock),
+            PinpointRenderer(self.view, self.camera, self.orbital, self.clock),
         ]
         
         self.hud_fg_renderers = [
-            DebugInfoRenderer(self.view, self.data, self.camera, self.orbital),
-            FocusInfoRenderer(self.view, self.data, self.camera, self.orbital),
-            HudClockRenderer(self.view, self.data, self.camera, self.orbital),
+            DebugInfoRenderer(self.view, self.camera, self.orbital, self.clock),
+            FocusInfoRenderer(self.view, self.camera, self.orbital, self.clock),
+            HudClockRenderer(self.view, self.camera, self.orbital, self.clock),
         ]
         
         click_controller = Gtk.GestureClick.new()
@@ -192,7 +193,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
         
         x, y = self.camera.screen_to_world(x, y, self.get_width(), self.get_height())
         bodies = self.orbital.find_bodies_at(x, y, margin=HOVER_MARGIN/self.camera.zoom)
-        self.data.props.secondary_body = bodies[0] if len(bodies) > 0 else None
+        self.view.props.secondary_body = bodies[0] if len(bodies) > 0 else None
     
     def zoom_in(self):
         self.camera.zoom_at(0, 0, 0, 0, 0.9)
@@ -201,19 +202,19 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.camera.zoom_at(0, 0, 0, 0, 1/0.9)
 
     def do_snapshot(self, snapshot: Gtk.Snapshot):
-        now = self.orbital.clock.time()
+        now = self.clock.time()
         self.last_draw_time = now
 
         fps = self.get_frame_clock()
         if fps:
-            self.view.props.fps = fps
+            self.view.fps = fps
         
         width = self.get_allocated_width()
         height = self.get_allocated_height()
         
         try:
-            if self.data.secondary_body is not None and self.view.follow_tracked_body:
-                f = self.orbital.get_particle(self.data.secondary_body)
+            if self.view.secondary_body is not None and self.view.follow_tracked_body:
+                f = self.orbital.get_particle(self.view.secondary_body)
                 fpos = f.get_position()
                 self.camera.offset = [fpos.real, fpos.imag]
 
@@ -239,5 +240,6 @@ class OrbitalCanvas(Gtk.DrawingArea):
                 r.draw(cr, width, height)
                 cr.restore()
         except Exception as e:
-            print("EXCEPTION", e)
-            raise SystemExit
+            #print("EXCEPTION", e.wit)
+            #raise SystemExit
+            raise e

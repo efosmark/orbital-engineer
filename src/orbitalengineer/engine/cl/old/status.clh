@@ -1,9 +1,0 @@
-#ifndef STATUS_CLH_
-#define STATUS_CLH_
-
-typedef enum {
-    STATUS_NOMINAL  = 0,
-    STATUS_DELETED = 1
-} Status;
-
-#endif // STATUS_CLH_

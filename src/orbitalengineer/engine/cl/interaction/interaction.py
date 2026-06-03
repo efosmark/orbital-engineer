@@ -1,7 +1,6 @@
 import numpy as np
 import pyopencl as cl
 from orbitalengineer.engine.cl.dimension import CLPipelineStep
-from orbitalengineer.engine.collision_strategy import CollisionStrategy
 
 KERNEL_FILE_LOCATION = "interaction/interaction.cl"
 
@@ -117,7 +116,6 @@ if __name__ == "__main__":
     from cmath import pi, rect
     import numpy as np
     
-    from orbitalengineer.engine.collision_strategy import CollisionStrategy
     from orbitalengineer.engine.cl.orbitalcl import SimController_CL
     from orbitalengineer.engine.clock import SimClock
     from orbitalengineer.engine.particle import ParticleRaw
@@ -142,7 +140,6 @@ if __name__ == "__main__":
 
     ctl.Lx = int((N * 2.0) + 3)
     
-    ctl.collision_strategy = CollisionStrategy.BOUNCE
     ctl.coef_of_restitution = 0.8
     ctl.init_sim()
     

@@ -45,5 +45,5 @@ class HistoryRenderer(renderer.Renderer):
         if self.view.show_all_history:
             for b in self.orbital:
                 self.draw_history(cr, b.idx)
-        elif self.view.show_focused_history and self.data.secondary_body is not None:
-            self.draw_history(cr, self.data.secondary_body)
+        elif self.view.show_focused_history and self.view.secondary_body is not None:
+            self.draw_history(cr, self.view.secondary_body)

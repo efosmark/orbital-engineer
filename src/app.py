@@ -1,12 +1,11 @@
 from orbitalengineer.engine.cl import flags
-from orbitalengineer.engine.collision_strategy import CollisionStrategy
 from orbitalengineer.ui.mainapp import App
 from orbitalengineer.helpers import create_primary, create_secondary, random_position, rng
 
 import matplotlib.pyplot as plt
 from matplotlib import colors
 
-SOL_COLOR = (1.0, 0.98, 0.45, 1.0)
+SOL_COLOR = (0.95, 0.8, 0.45, 1.0)
 
 def brighten(color:tuple[float,float,float,float], amount=0.1) -> tuple[float,float,float,float]:
     r = [*color]
@@ -16,12 +15,12 @@ def brighten(color:tuple[float,float,float,float], amount=0.1) -> tuple[float,fl
 
 cmap = plt.colormaps['gist_rainbow']
 
-Lx = 256
-N = (Lx  * 4)
-mass_min, mass_max = 1e6, 1e6
+Lx = 8
+N = (Lx  * 1)
+mass_min, mass_max = 1e3, 1e3
 vel_min, vel_max = 0, 0
 radius_min, radius_max = 20, 100
-dist_min, dist_max = 15000, 25000
+dist_min, dist_max = 5000, 10000
 
 po = 7000
 d = abs(po)
@@ -35,18 +34,20 @@ def on_activate(app: App):
 
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)
-
         pos = random_position(sol.get_radius() + dist_min, dist_max)
         app.insert_particle(create_secondary(
             sol,
             mass=mass,
             position=pos,
-            ecc=0.98,
-            flags=flags.MERGE_AS_SECONDARY|flags.BOUNCE,
+            ecc=(0.5 + (0.5 * rng.random())),
+            #radius=50,
+            prograde=(i <= N/2.0),
+            flags=flags.MERGE_AS_SECONDARY|flags.MERGE,
         ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))
 
-    app.orbit_ctl.Lx = Lx
-    app.orbit_ctl.coef_of_restitution = 0.98
+    app.orbital.Lx = Lx
+    app.orbital.coef_of_restitution = 0.9
+    #app.view.show_all_history = True
     app.view.show_focused_history = True
     app.view.show_debug_info = False
     app.view.show_focus_info = True

@@ -1,5 +1,6 @@
 import cairo
-from orbitalengineer.engine.simcontroller import OrbitalSimController
+from orbitalengineer.engine.cl.orbitalcl import SimController_CL
+from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui import model
 from orbitalengineer.ui.canvas import pz
 from orbitalengineer.ui.gtk4 import GObject, Graphene
@@ -8,16 +9,15 @@ from orbitalengineer.ui.gtk4 import GObject, Graphene
 class Renderer(GObject.GObject):
     
     view = GObject.Property(type=object)
-    data = GObject.Property(type=object)
     camera = GObject.Property(type=object)
     orbital:OrbitalSimController = GObject.Property(type=object) # type:ignore
     
-    def __init__(self, view:model.ViewModel, data:model.DataModel, camera:pz.Camera2D, orbital:OrbitalSimController):
+    def __init__(self, view:model.ViewModel, camera:pz.Camera2D, orbital:SimController_CL, clock:SimClock):
         super().__init__()
         self.view = view
-        self.data = data
         self.camera = camera
         self.orbital = orbital
+        self.clock = clock
         
     def get_cairo(self, snapshot, width, height):
         return snapshot.append_cairo(Graphene.Rect().init(0, 0, width, height))

@@ -48,6 +48,12 @@ class Camera2D:
         wx2, wy2 = self.screen_to_world(screen_x, screen_y, width, height)
         self.offset[0] += wx - wx2
         self.offset[1] += wy - wy2
+    
+    def to_dict(self) -> dict:
+        return {
+            "offset": tuple(self.offset),
+            "zoom": self.zoom
+        }
 
 class Camera2DController:
     def __init__(self, widget, camera, view):

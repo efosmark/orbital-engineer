@@ -171,8 +171,8 @@ class GridRenderer(renderer.Renderer):
         x_lines(cr, height, x1, x2, spacing, scale)
         y_lines(cr, width, y1, y2, spacing, scale)
         
-        if self.data.secondary_body:
-            b = self.orbital.get_particle(self.data.secondary_body)
+        if self.view.secondary_body:
+            b = self.orbital.get_particle(self.view.secondary_body)
             pos = b.get_position()
         
             draw_x_label(cr, x1, pos.real-x1, height, scale, True)

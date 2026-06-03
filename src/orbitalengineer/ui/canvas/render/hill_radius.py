@@ -32,7 +32,7 @@ class HillRadiusRenderer(renderer.Renderer):
             # cr.set_line_width(max_travel_dist)
             # cr.stroke()
             
-            # if self.data.secondary_body == b.idx:
+            # if self.view.secondary_body == b.idx:
                 # cr.set_source_rgba(1, 1, 1, 0.4)
                 # cr.set_line_width(2)
                 

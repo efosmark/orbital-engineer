@@ -26,11 +26,9 @@ def on_activate(app: App):
             radius=4,
         ), color=cmap(1-dist_norm(abs(position))))
     
-    app.orbit_ctl.Lx = Lx
-    app.orbit_ctl.coef_of_restitution = 0.85
-    app.orbit_ctl.init_sim()
-    app.tick_ctl.start()
-    app.orbit_ctl.speed = 2.0
+    app.orbital.Lx = Lx
+    app.orbital.coef_of_restitution = 0.85
+    #app.orbit_ctl.speed = 2.0
     
 def run():
     app = App()

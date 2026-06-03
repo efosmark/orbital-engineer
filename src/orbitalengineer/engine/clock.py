@@ -1,5 +1,4 @@
 import time
-
 from orbitalengineer.engine import config
 
 class SimClock:
@@ -36,15 +35,21 @@ class SimClock:
         self._duration += dt
         return self._duration
 
-    def set_speed(self, value):
-        if value < 0:
-            value = 1/float(value)
-        self._speed = value
-    
-    def get_speed(self) -> float:
+    @property
+    def speed(self) -> float:
         if 0 <= self._speed < 1:
             return 1/self._speed
         return self._speed
+
+    @speed.setter
+    def speed(self, value):
+        if value < 0:
+            value = 1/float(value)
+        self._speed = value
+
+    def to_dict(self) -> dict:
+        FIELDS = ["_duration", "_speed", "running"]
+        return dict([(k, round(getattr(self, k), 6)) for k in FIELDS])
 
 if __name__ == "__main__":
     import time
@@ -52,6 +57,8 @@ if __name__ == "__main__":
     c = SimClock()
     print(c.time())
     
-    time.sleep(1.01)
+    time.sleep(0.01)
     print(c.time())
     
+    import json
+    print(json.dumps(c.to_dict()))

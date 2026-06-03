@@ -1,5 +1,4 @@
 import numpy as np
-from orbitalengineer.engine.collision_strategy import CollisionStrategy
 
 #############################################
 # Simulation Bounds
@@ -15,7 +14,6 @@ DV_MAX = 1e10
 # Simulation Settings
 #############################################
 
-DEFAULT_COLLISION_STRATEGY = CollisionStrategy.BOUNCE
 COEF_OF_RESTITUTION = 0.90
 DEFAULT_G = 1.0
 
@@ -32,5 +30,11 @@ MAX_SUB_STEPS = 5
 # IPC Settings
 #############################################
 
-EMIT_METRICS = False
+EMIT_METRICS = True
 METRIC_SOCKET_PATH = "/tmp/kernel-metrics.sock"
+
+#############################################
+# SerDe Settings
+#############################################
+
+SERIALIZED_VALUE_PRECISION = 6

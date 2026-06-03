@@ -36,13 +36,13 @@ def on_activate(app: App):
     ), color=(*random_color(), 1.0))
     
 
-    app.orbit_ctl.Lx = N
-    app.orbit_ctl.speed = 1.0
-    app.orbit_ctl.coef_of_restitution = 0.999
-    app.orbit_ctl.init_sim()
-    app.orbit_ctl.tick(app.clock.time())
-    time.sleep(app.orbit_ctl.dt_base)
-    app.orbit_ctl.tick(app.clock.time())
+    app.orbital.Lx = N
+    app.orbital.speed = 1.0
+    app.orbital.coef_of_restitution = 0.999
+    app.orbital.init_sim()
+    app.orbital.tick(app.clock.time())
+    time.sleep(app.orbital.dt_base)
+    app.orbital.tick(app.clock.time())
     #app.ticker.start()
     #app.relative_zoom(1.0)
 

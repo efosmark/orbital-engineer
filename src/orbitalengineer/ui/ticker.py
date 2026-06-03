@@ -2,16 +2,14 @@ import atexit
 import threading
 import time
 
-from orbitalengineer.engine.simcontroller import OrbitalSimController
+from orbitalengineer.engine.cl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui.gtk4 import GLib
-from orbitalengineer.ui.model import DataModel
 
 class TickController:
         
-    def __init__(self, data:DataModel, orbit_ctl:OrbitalSimController, clock:SimClock):
-        self.data = data
-        self.orbit_ctl = orbit_ctl
+    def __init__(self, orbital:SimController_CL, clock:SimClock):
+        self.orbital = orbital
         self.clock = clock
         self.logic_thread = threading.Thread(target=self._logic_loop, daemon=True)
         self.logic_running = False
@@ -25,11 +23,11 @@ class TickController:
                 time.sleep(next_tick_at - now)
                 continue
 
-            if self.orbit_ctl.tick(now) > 0:
-                GLib.idle_add(self.orbit_ctl.sync)
+            if self.orbital.tick(now) > 0:
+                GLib.idle_add(self.orbital.sync)
 
             now = self.clock.time()
-            next_tick_at += (self.orbit_ctl.dt_base / self.orbit_ctl.clock.get_speed()) * 0.4
+            next_tick_at += (self.orbital.dt_base / self.clock.speed) * 0.4
             if next_tick_at < now:
                 next_tick_at = now
     

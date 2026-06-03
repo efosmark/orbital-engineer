@@ -100,7 +100,6 @@ class MergePipeline(CLPipelineStep):
                 self._mass_intermediate_cl,
                 self._radius_intermediate_cl
             ))        
-
     
     def __call__(self, dt_step, flags: cl.Buffer, velocity_relative:cl.Buffer, edge_distance: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
         self.collide_merge_group_assign(dt_step, flags, mass, velocity_relative, edge_distance)

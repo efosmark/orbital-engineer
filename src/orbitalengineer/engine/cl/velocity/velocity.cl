@@ -26,6 +26,7 @@ __kernel void compute_velocity(
     __global const float*  restrict mass,
     __global const float*  restrict radius,
     __global const float*  restrict distance_edge,
+    __global       float2* restrict acceleration,
     __global       float2* restrict velocity
 ) {
     GRID_STRIDE_INIT();
@@ -38,7 +39,10 @@ __kernel void compute_velocity(
         if ((flags[j]&REMOVED)) continue;
         float2 force = compute_gravitation(position[i], position[j], mass[i], mass[j]);
         float repel = (flags[i]&REPEL_ON_OVERLAP) ? -1.0f : 0;
-        A += force * inv_mass_i * ((distance_edge[IDX] < 0) ? repel : 1.0f);
+
+        float2 accel = force * inv_mass_i * ((distance_edge[IDX] < 0) ? repel : 1.0f);
+        acceleration[IDX] = accel;
+        A += accel;
     );
   
     float2 wg_A = FLOAT2_WG_REDUCE_ADD(A);

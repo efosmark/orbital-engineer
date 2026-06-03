@@ -27,7 +27,7 @@ class HudClockRenderer(renderer.Renderer):
         cr.select_font_face("Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(FONT_SIZE)
 
-        txt = f"T+ {self.orbital.clock.time():5.2f}"
+        txt = f"T+ {self.clock.time():5.2f}"
 
         te = cr.text_extents(txt)
         r_height = te.height + (Y_PADDING * 2)

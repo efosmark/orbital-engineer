@@ -1,31 +1,30 @@
 from typing import Any, cast
 
-from orbitalengineer.engine.simcontroller import OrbitalSimController
-from orbitalengineer.ui import canvas
+from orbitalengineer.engine.cl.orbitalcl import SimController_CL
+from orbitalengineer.engine.clock import SimClock
+from orbitalengineer.ui import canvas, ui_config
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib, GObject
-from orbitalengineer.ui.model import Pinpoint, ViewModel #, Adw
+from orbitalengineer.ui.model import ViewModel
 
-APP_ID = "test-app"
-WINDOW_DEFAULT_SIZE = (1200, 800)
 
 class MainWindow(Gtk.ApplicationWindow):
 
-    def __init__(self, application, title, camera, view: ViewModel, data, ctl:OrbitalSimController):
+    def __init__(self, application, title, camera, view: ViewModel, ctl:SimController_CL, clock:SimClock):
         Gtk.ApplicationWindow.__init__(self, application=application, title=title)
         self.ctl = ctl
+        self.clock = clock
         self._tick_sound = None
         self._tick_audio_ready = False
         
-        self.data = data
         self.view = view
         
-        self.canvas = canvas.OrbitalCanvas(camera, view, data, self.ctl)
+        self.canvas = canvas.OrbitalCanvas(camera, view, self.ctl, self.clock)
         self.canvas.set_hexpand(True)
         self.canvas.set_vexpand(True)
         self.canvas.set_halign(Gtk.Align.FILL)
         self.canvas.set_valign(Gtk.Align.FILL)
         
-        self.set_default_size(*WINDOW_DEFAULT_SIZE)
+        self.set_default_size(*ui_config.WINDOW_DEFAULT_SIZE)
         self.set_child(self.canvas)
 
         header = Gtk.HeaderBar()

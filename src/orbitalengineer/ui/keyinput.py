@@ -32,9 +32,11 @@ class KeyInput(GObject.GObject):
 
         if keyval == Gdk.KEY_Escape:
             self.on_escape()
-        elif keyval in [self.TAB_PREV, self.TAB_NEXT] and self.app.data.secondary_body is not None:    
+        elif keyval in [self.TAB_PREV, self.TAB_NEXT] and self.app.view.secondary_body is not None:    
             direction = -1 if keyval == self.TAB_PREV else 1
             self.cycle_particles(direction)
+        elif keyval == Gdk.KEY_s and self.props.ctrl_held:
+            self.app.save_scenario()
         elif keyval in self.WASD_KEYS:
             self.on_wasd(keyval)
         elif keyval == Gdk.KEY_Left:
@@ -54,8 +56,8 @@ class KeyInput(GObject.GObject):
         return False
 
     def on_wasd(self, keyval):
-        if self.app.data.secondary_body is None: return
-        b = self.app.orbit_ctl.get_particle(self.app.data.secondary_body)
+        if self.app.view.secondary_body is None: return
+        b = self.app.orbital.get_particle(self.app.view.secondary_body)
         r, angle = cmath.polar(b.get_velocity())
         if keyval == Gdk.KEY_a:
             angle -= ((2*cmath.pi) / 360.0)
@@ -71,11 +73,11 @@ class KeyInput(GObject.GObject):
             velocity = cmath.rect(r / 1.005, angle)
         else:
             return
-        self.app.orbit_ctl.set_velocity(self.app.data.secondary_body, velocity.real, velocity.imag)
+        self.app.orbital.set_velocity(self.app.view.secondary_body, velocity.real, velocity.imag)
 
     def on_escape(self):
-        if self.app.data.secondary_body is not None:
-            self.app.data.secondary_body = None
+        if self.app.view.secondary_body is not None:
+            self.app.view.secondary_body = None
             return True
         self.app.quit()
         return True
@@ -86,9 +88,9 @@ class KeyInput(GObject.GObject):
         return False
 
     def cycle_particles(self, direction:int):
-        valid_indices:list = self.app.orbit_ctl.get_valid_indices().tolist()
+        valid_indices:list = self.app.orbital.get_valid_indices().tolist()
         try:
-            idx_current = valid_indices.index(self.app.data.secondary_body)
+            idx_current = valid_indices.index(self.app.view.secondary_body)
             idx_new = idx_current + direction
             if idx_new >= len(valid_indices):
                 self.app.shift_focus(valid_indices[0])
