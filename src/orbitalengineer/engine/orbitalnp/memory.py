@@ -1,3 +1,6 @@
+###############################################
+# DEPRECATED. REPLACED BY `orbitalmemory.py`
+###############################################
 import atexit
 import math
 from collections import OrderedDict

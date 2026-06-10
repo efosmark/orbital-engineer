@@ -9,7 +9,6 @@ from orbitalengineer.engine.orbitalnp import integrator, orbitalmemory
 from orbitalengineer.engine.orbitalnp.history import compute_history
 from orbitalengineer.engine.orbitalnp.integrator.collision import find_collisions
 from orbitalengineer.engine.orbitalnp.integrator.conf import MERGE_STRATEGY_COMBINE
-from orbitalengineer.engine.orbitalnp.memory import OrbitalMemory
  
 from numba import njit, void, float64, complex128, int64
 from numpy.typing import NDArray
