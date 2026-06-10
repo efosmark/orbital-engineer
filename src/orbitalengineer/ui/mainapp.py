@@ -2,7 +2,6 @@ import json
 import os
 from typing import cast
 
-from orbitalengineer import serde
 from orbitalengineer.engine.particle import Particle
 from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 

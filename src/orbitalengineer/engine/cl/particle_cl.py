@@ -1,54 +1,8 @@
-from dataclasses import dataclass
-import math
 from typing import Any, ClassVar, Sequence
 import numpy as np
 
 from orbitalengineer.engine import twobody
 from orbitalengineer.engine.particle import Particle
-from orbitalengineer.ui import vec
-from orbitalengineer.ui.fmt import mag_format
-
-@dataclass
-class OrbitInfo:
-    
-    secondary_idx:int
-    focus_idx:int
-    
-    # Orbital elements
-    orbital_energy: float
-    standard_grav_param: float
-    argument_of_periapsis: float
-    eccentricity_vec: vec.Vec2
-    eccentricity: float
-    orbital_period: float
-    true_anomaly: float
-    mean_anomaly: float
-    
-    # Ellipse 
-    ellipse_center: vec.Vec2
-    axis_a: float
-    axis_b: float
-    
-    r_rel: vec.Vec2
-    v_rel: vec.Vec2
-    eccentric_anomaly: float
-    v_esc: float
-    direction: str
-    time_periapsis: float
-
-    def __str__(self):
-        fields = [
-            ('ε', f"{self.orbital_energy:.1e}"),
-            #('μ', f"{self.standard_grav_param:.3e}"),
-            ('θ', f"{self.true_anomaly:.2f}"),
-            ('e', f"{self.eccentricity:.2f}"),
-            ('ω', f"{self.argument_of_periapsis:.2f}"),
-            ('M', f"{self.mean_anomaly:.1f}"),
-            ('T', f"{self.orbital_period:.1f}"),
-            ('τ', f"+{self.time_periapsis:.1f}"),
-            ('d', f"{self.direction}"),
-        ]
-        return ';'.join([ f"{a}={b}" for a,b in fields ])
 
 
 class ParticleCL(Particle):
@@ -112,21 +66,19 @@ class ParticleCL(Particle):
     def get_flags(self) -> int:
         return self.ctl.flags[self.idx]
     
-    def _get_focus_idx(self) -> int|None:
+    def get_focus(self) -> int|None:
         idx_start = self.idx * self.ctl.N
         idx_stop = idx_start + self.ctl.N
         A = np.abs(self.ctl._velocity._acceleration)[idx_start:idx_stop]
-        
         focus_idx = np.argmax(A)
         if focus_idx is None or focus_idx == self.idx:return
-        
         return int(focus_idx)
 
-    def get_orbit_info(self, circular_eps:float=1e-12) -> Any:
+    def get_orbit_info(self, circular_eps:float=1e-12) -> twobody.TwoBody|None:
         secondary_idx = self.idx
         if secondary_idx is None: return
         
-        focus_idx = self._get_focus_idx()
+        focus_idx = self.get_focus()
         if focus_idx is None:return
         
         if self.ctl.mass[secondary_idx] > self.ctl.mass[focus_idx]:
@@ -140,70 +92,7 @@ class ParticleCL(Particle):
         m1 = self.ctl.mass[focus_idx]
         m2 = self.ctl.mass[secondary_idx]
         
-        r_rel, v_rel = twobody.relative_state(r1, v1, r2, v2)
-        standard_grav_param = twobody.standard_grav_param(m1, m2, 1.0)
-        eccentricity_vec = twobody.ecc_vector(r_rel, v_rel, standard_grav_param)
-        eccentricity = twobody.ecc_scalar(eccentricity_vec)
-        a, b = twobody.ellipse_axes(r_rel, v_rel, standard_grav_param, eccentricity)
-
-        if eccentricity < circular_eps:
-            b = a
-            return
-
-        cx, cy = twobody.ellipse_center(r1, eccentricity_vec, eccentricity, a)
-
-        e_unit = vec.unit(eccentricity_vec)
-        if e_unit is None: raise ValueError(f"{e_unit=}")
-            
-        argument_of_periapsis = twobody.argument_of_periapsis(e_unit)
-
-        e_unit = vec.unit(eccentricity_vec)
-        if e_unit is None: return
-        
-        true_anomaly = (math.atan2(r_rel[1], r_rel[0]) - argument_of_periapsis)
-        if true_anomaly < 0:
-            true_anomaly += math.pi * 2.0
-        true_anomaly = true_anomaly % (math.pi * 2.0)
-
-
-        #true_anomaly = twobody.true_anomaly(eccentricity_vec, r_rel)
-        #if true_anomaly is None: return
-
-        orbital_energy = twobody.orbital_energy(standard_grav_param, vec.norm(r_rel), vec.norm(v_rel))
-        eccentric_anomaly = twobody.eccentric_anomaly(true_anomaly, eccentricity_vec)
-        mean_anomaly = twobody.mean_anomaly(eccentricity_vec, eccentric_anomaly)
-        orbital_period = twobody.orbital_period(a, standard_grav_param)
-        v_esc = np.sqrt((2 * standard_grav_param) / vec.norm(r_rel))
-
-        direction = "prograde"
-        time_periapsis = (orbital_period * (mean_anomaly / (np.pi*2.0)))
-        if twobody.is_retrograde(r_rel, v_rel):
-            direction = "retrograde"
-            time_periapsis = orbital_period - time_periapsis
-        
-        return OrbitInfo(
-            secondary_idx=int(secondary_idx),
-            focus_idx=int(focus_idx),
-            
-            # Orbital elements
-            orbital_energy=orbital_energy,
-            standard_grav_param=standard_grav_param,
-            argument_of_periapsis=argument_of_periapsis,
-            eccentricity_vec=eccentricity_vec,
-            eccentricity=eccentricity,
-            orbital_period=orbital_period,
-            true_anomaly=true_anomaly,
-            mean_anomaly=mean_anomaly,
-            
-            # Ellipse 
-            ellipse_center=(cx,cy),
-            axis_a=a,
-            axis_b=b,
-            
-            r_rel=r_rel,
-            v_rel=v_rel,
-            eccentric_anomaly=eccentric_anomaly,
-            v_esc=v_esc,
-            direction=direction,
-            time_periapsis=time_periapsis
-        )
+        o = twobody.TwoBody(r1, r2, v1, v2, m1, m2)
+        if not o.is_bound:return
+        return o
+    

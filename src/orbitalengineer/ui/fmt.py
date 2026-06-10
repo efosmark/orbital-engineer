@@ -28,8 +28,8 @@ def get_exp(x, sig, places=3):
     mant = round(x / (10 ** exp), sig)
     return exp, mant
 
-def mag_format(x, sig=1):
-    if abs(x) < 1e-6:
+def mag_format(x, sig=1, eps=1e-12):
+    if abs(x) < eps:
         return f"0"
     elif abs(x) <= 1:
         return f"{x:.2f}"

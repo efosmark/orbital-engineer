@@ -102,6 +102,7 @@ class KeyInput(GObject.GObject):
             self.app.shift_focus(valid_indices[0])
 
     def toggle_screen_size(self):
+        # TODO: Notify the app and have it handle this rather than performing it here
         win = self.app.get_active_window()
         if win is None: return False
         if self.mod_held:

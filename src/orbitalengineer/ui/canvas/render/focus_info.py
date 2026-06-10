@@ -1,7 +1,9 @@
 from cmath import polar
+from typing import cast
 import numpy as np
 import cairo
 
+from orbitalengineer.engine import twobody
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.gtk4 import Gtk, Graphene
 from orbitalengineer.ui.fmt import mag_format, positive_angle
@@ -109,6 +111,8 @@ def create_panel(cr, title:str|None, lines:list[str], fixed_width:None|int=None)
     
     cr.set_source_surface(rec_content, X_PAD, full_title_height)
     cr.paint()
+    
+    return width, height
 
  
 class FocusInfoRenderer(renderer.Renderer):
@@ -125,30 +129,64 @@ class FocusInfoRenderer(renderer.Renderer):
             return
         
         disp = [
-            ("mass",     f"{mag_format(b.get_mass())} kg"),
-            ("radius",   f"{mag_format(b.get_radius())} m"),
+            ("Mass",     f"{mag_format(b.get_mass())} kg"),
+            ("Radius",   f"{mag_format(b.get_radius())} m"),
          ]
         
         velocity = b.get_velocity()
         mag, angle = polar(velocity)
         angle_degrees = np.degrees(positive_angle(angle))
         
-        # min_dt = b.get_min_toi()
-        # if np.isinf(min_dt):
-        #     min_dt = '--.------'
-        # else:
-        #     min_dt = f"{min_dt:.6f}"
+        min_dt = b.get_min_toi()
+        if np.isinf(min_dt):
+            min_dt = '--.--- s'
+        else:
+            min_dt = f"{min_dt:.3f} s"
         
         disp.extend([
-            ("vel mag",   f"{mag_format(mag)} m/s"),
-            ("vel angle",      f"{angle_degrees:.1f}°"),
-            #("dt",         min_dt)
+            ("Velocity",  f"{mag_format(mag)} m/s"),
+            ("Heading",   f"{angle_degrees:.1f}°"),
+            ("Impact",    min_dt)
         ])
         
         cr.translate(20, 20)
         
         name = self.view.particle_names.get(b.idx, f"{b.idx}")
-        create_panel(cr, f"{name}-{b.idx}", [
-            f"{label:<8} {value:>18}"
+        w, h = create_panel(cr, f"{name}-{b.idx}", [
+            f"{label:<14} {value:>14}"
             for label, value in disp
+        ])
+        
+        orbit = b.get_orbit_info()
+        if orbit is None:
+            return
+        
+        orbit = cast(twobody.TwoBody, orbit)
+        
+        cr.translate(0, 20 + h)
+        
+        fields = [
+            ('Orbital Energy',   f"{mag_format(orbit.orbital_energy)}"),
+            ('Eccentricity',     f"{orbit.eccentricity:.1f}"),
+            ('Grav. Param.',     f"{mag_format(orbit.standard_grav_param)}"),
+            ('True Anomaly',     f"{np.degrees(orbit.true_anomaly):.1f}°"),
+            ('Arg. of Peri.',    f"{np.degrees(orbit.argument_of_periapsis):.1f}°"),
+            ('Semi-Major Axis',  f"{mag_format(orbit.semi_major_axis)} m"),
+            ('Escape Velocity',  f"{mag_format(orbit.v_esc)} m/s"),
+            ('Orbital Time',     f"{orbit.time_periapsis:.1f} s"),
+            ('Orbital Period',   f"{orbit.orbital_period:.1f} s"),
+            ('Mean Anomaly',     f"{np.degrees(orbit.mean_anomaly):.1f}°"),
+            ('Direction',        f"{orbit.direction}"),
+            ('Distance',         f"{mag_format(orbit.distance)} m"),
+        ]
+        
+        a_max, b_max = 0,0
+        for a,b in fields:
+            if len(a) > a_max: a_max = len(a)
+            if len(b) > b_max: b_max = len(b)
+        
+        
+        create_panel(cr, f"Orbit Info", [
+            f"{label:>{a_max+1}}  {value:<{b_max+3}}"
+            for label, value in fields
         ])

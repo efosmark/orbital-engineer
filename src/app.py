@@ -15,12 +15,12 @@ def brighten(color:tuple[float,float,float,float], amount=0.1) -> tuple[float,fl
 
 cmap = plt.colormaps['gist_rainbow']
 
-Lx = 8
-N = (Lx  * 1)
+Lx = 64
+N = 256
 mass_min, mass_max = 1e3, 1e3
 vel_min, vel_max = 0, 0
 radius_min, radius_max = 20, 100
-dist_min, dist_max = 5000, 10000
+dist_min, dist_max = 1000, 20000
 
 po = 7000
 d = abs(po)
@@ -39,9 +39,9 @@ def on_activate(app: App):
             sol,
             mass=mass,
             position=pos,
-            ecc=(0.5 + (0.5 * rng.random())),
+            ecc=(0.75 + (0.5 * rng.random())),
             #radius=50,
-            prograde=(i <= N/2.0),
+            #prograde=(i <= N/2.0),
             flags=flags.MERGE_AS_SECONDARY|flags.MERGE,
         ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))
 
