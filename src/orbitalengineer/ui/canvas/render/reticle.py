@@ -104,13 +104,26 @@ class ReticleRenderer(renderer.Renderer):
         #if radius * self.camera.zoom < 5:
         #    return
         
-        if radius * self.camera.zoom < 20:
-            reticle_count = 3
+        if radius * self.camera.zoom < 30:
+
+            cr.set_line_width(2/self.camera.zoom)
+            cr.set_source_rgba(1,1,1,0.6)
+            reticle_count = 4
             total_angle = 0
+
             for i in range(reticle_count):
                 angle = (2.0*np.pi) / reticle_count
-                angle_deg = round(np.degrees(total_angle), 2)
-                self.draw_tick_mark(cr, angle_deg, radius, show_label=False)
+                
+                reticle_start = radius + 10/self.camera.zoom
+                reticle_end = reticle_start + 10/self.camera.zoom
+                
+                cr.save()
+                cr.move_to(reticle_start, 0)
+                cr.line_to(reticle_end, 0)
+                cr.stroke()
                 total_angle += angle
+                cr.restore()
+                cr.rotate(angle)
+            
         else:
             self.show_detailed_reticle(cr, radius, body)

@@ -113,8 +113,7 @@ class EllipseRenderer(renderer.Renderer):
             o.semi_minor_axis,
             self.camera.zoom,
             o,
-            #apsis_radius=3/self.camera.zoom if not faded else None,
-            show_semimajor_axis=not faded
+            show_semimajor_axis=False
         )
         cr.restore()
 
