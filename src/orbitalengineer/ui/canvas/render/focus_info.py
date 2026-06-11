@@ -164,6 +164,7 @@ class FocusInfoRenderer(renderer.Renderer):
         cr.translate(0, 20 + h)
         
         fields = [
+            ('Accuracy',         f"{orbit.accuracy*100:.2f}%"),
             ('Orbital Energy',   f"{mag_format(orbit.orbital_energy)}"),
             ('Eccentricity',     f"{orbit.eccentricity:.1f}"),
             ('Grav. Param.',     f"{mag_format(orbit.standard_grav_param)}"),

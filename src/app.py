@@ -17,7 +17,7 @@ cmap = plt.colormaps['gist_rainbow']
 
 Lx = 64
 N = 1024
-mass_min, mass_max = 1e3, 1e3
+mass_min, mass_max = 1e3, 1e5
 vel_min, vel_max = 0, 0
 radius_min, radius_max = 20, 100
 dist_min, dist_max = 1000, 20000
@@ -42,11 +42,11 @@ def on_activate(app: App):
             ecc=(0.75 + (0.5 * rng.random())),
             #radius=50,
             #prograde=(i <= N/2.0),
-            flags=flags.MERGE_AS_SECONDARY|flags.MERGE,
+            flags=flags.MERGE_AS_SECONDARY|flags.BOUNCE,
         ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))
 
     app.orbital.Lx = Lx
-    app.orbital.coef_of_restitution = 0.9
+    app.orbital.coef_of_restitution = 0.999
     #app.view.show_all_history = True
     app.view.show_focused_history = True
     app.view.show_debug_info = False

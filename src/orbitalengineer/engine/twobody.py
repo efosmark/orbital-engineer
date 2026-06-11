@@ -436,6 +436,8 @@ class TwoBody:
     
     """
     
+    accuracy:float = 0.0
+    
     # Body properties
     r1: Point
     r2: Point

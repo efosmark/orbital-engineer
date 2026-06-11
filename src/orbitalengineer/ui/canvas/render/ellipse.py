@@ -21,7 +21,7 @@ DEBUG_MEAN_ANOMALY_COLOR = hex_to_rgba("#FFD6336A")
 DEBUG_ECCENTRIC_ANOMALY_COLOR = hex_to_rgba("#FF060633")
 
 
-def draw_ellipse(cr: cairo.Context, cx, cy, a, b, scale, o: twobody.TwoBody, *, apsis_radius:float|None=None, show_semimajor_axis=True):
+def draw_ellipse(cr: cairo.Context, cx, cy, a, b, scale, o: twobody.TwoBody, *, accuracy=1.0, apsis_radius:float|None=None, show_semimajor_axis=True):
     cr.save()
     cr.translate(cx, cy)
  
@@ -53,14 +53,17 @@ def draw_ellipse(cr: cairo.Context, cx, cy, a, b, scale, o: twobody.TwoBody, *, 
             cr.restore()
             cr.set_source_rgba(*color)
             cr.stroke()
-                
+    
+    color = DEFAULT_ELLIPSE_COLOR_RGBA
+    color = (*DEFAULT_ELLIPSE_COLOR_RGBA[0:3], DEFAULT_ELLIPSE_COLOR_RGBA[3] * accuracy)
+
     cr.save()
     cr.new_path()
     cr.scale(a, b)
     cr.arc(0, 0, 1, 0, math.pi*2.0)
     cr.restore()
-    cr.set_source_rgba(*DEFAULT_ELLIPSE_COLOR_RGBA)
-    cr.set_line_width(2.0/scale)
+    cr.set_source_rgba(*color)
+    cr.set_line_width(1.0/scale)
     cr.stroke()
 
     if DEBUG_AUX_CIRCLES:
@@ -113,7 +116,8 @@ class EllipseRenderer(renderer.Renderer):
             o.semi_minor_axis,
             self.camera.zoom,
             o,
-            show_semimajor_axis=False
+            show_semimajor_axis=False,
+            accuracy=o.accuracy,
         )
         cr.restore()
 
