@@ -118,9 +118,7 @@ def create_panel(cr, title:str|None, lines:list[str], fixed_width:None|int=None)
 class FocusInfoRenderer(renderer.Renderer):
     
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if not self.view.show_focus_info:
-            return
-        
+        if not self.view.show_focus_info: return
         if self.view.hovered_over_particle is not None:
             b = self.view.hovered_over_particle
         elif self.view.secondary_body is not None:
@@ -146,7 +144,7 @@ class FocusInfoRenderer(renderer.Renderer):
         disp.extend([
             ("Velocity",  f"{mag_format(mag)} m/s"),
             ("Heading",   f"{angle_degrees:.1f}°"),
-            ("Impact",    min_dt)
+            #("Impact",    min_dt)
         ])
         
         cr.translate(20, 20)

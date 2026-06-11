@@ -2,8 +2,11 @@ import math
 import cairo
 from orbitalengineer.engine import twobody
 from orbitalengineer.ui.canvas import renderer
+from orbitalengineer.ui.color import hex_to_rgba
 
-DEBUG_ELLIPSE = True
+DEBUG_AUX_CIRCLES = False
+DEBUG_ANOMALY_VALUES = False
+
 DEBUG_ELLIPSE_COLOR_RGBA = (0.3, 0.3, 0.5, 0.3)
 DEBUG_ELLIPSE_COLOR_RGBA_2 = (0.5, 0.3, 0.3, 0.3)
 DEFAULT_ELLIPSE_COLOR_RGBA = (0.2, 1.0, 0.6, 0.3)
@@ -11,87 +14,56 @@ DEFAULT_ELLIPSE_COLOR_FADED_RGBA = (0.2, 0.6, 0.6, 0.18)
 SEMI_MAJOR_AXIS_RGBA = (0.5, 0.5, 0.5, 0.3)
 APSIS_RGBA = (0.6, 0.6, 0.6, 0.2)
 
-# def ellipse_center_focus_primary(
-#     r1: vec.Vec2, v1: vec.Vec2, r2: vec.Vec2, v2: vec.Vec2, M1: float, M2: float, G: float = 1.0,
-#     circular_eps: float = 1e-12
-# ) -> Ellipse:
-#     """
-#     Center of the secondary's ellipse when drawn with the PRIMARY at the focus.
+# hex_to_rgba("#06FFDE44") 
 
-#     Geometry:
-#       focus = r1
-#       center = focus - (a e) ê
-#       where a from vis-viva, e and ê from the eccentricity vector.
+DEBUG_TRUE_ANOMALY_COLOR = hex_to_rgba("#418AFF33")
+DEBUG_MEAN_ANOMALY_COLOR = hex_to_rgba("#FFD6336A")
+DEBUG_ECCENTRIC_ANOMALY_COLOR = hex_to_rgba("#FF060633")
 
-#     Returns dict with:
-#       cx, cy   : ellipse center
-#       a, b     : semi-major/minor
-#       e        : eccentricity
-#       theta    : rotation angle (radians), major axis pointing to periapsis
-#       mu       : standard gravitational parameter
-#     """
-#     r_rel, v_rel = twobody.relative_state(r1, v1, r2, v2)
-#     mu = twobody.standard_grav_param(M1, M2, G)
-#     e_vec = twobody.ecc_vector(r_rel, v_rel, mu)
-#     e = twobody.ecc_scalar(e_vec)
-#     a, b = twobody.ellipse_axes(r_rel, v_rel, mu, e)
-    
-#     # circular orbit case: center == focus, orientation arbitrary
-#     if e < circular_eps:
-#         b = a
-#         print("CIRCULAR")
-#         return Ellipse(cx=r1[0], cy=r1[1], a=a, b=b, e=0.0, theta=0.0, e_vec=e_vec, mu=mu, r_rel=r_rel)
 
-#     cx, cy = twobody.ellipse_center(r1, e_vec, e, a)
-
-#     e_unit = vec.unit(e_vec)
-#     if e_unit is None:raise ValueError(f"{e_unit=}")
-        
-#     theta = twobody.argument_of_periapsis(e_unit)
-#     return Ellipse(cx=cx, cy=cy, a=a, b=b, e=e, theta=theta, e_vec=e_vec, mu=mu, r_rel=r_rel)
-
-def draw_ellipse(cr: cairo.Context, cx, cy, a, b, scale, o: twobody.TwoBody, *, angle=0, apsis_radius:float|None=None, show_semimajor_axis=True, show_debug=False):
+def draw_ellipse(cr: cairo.Context, cx, cy, a, b, scale, o: twobody.TwoBody, *, apsis_radius:float|None=None, show_semimajor_axis=True):
     cr.save()
     cr.translate(cx, cy)
  
     if apsis_radius is not None:
         cr.save()
-        #cr.set_source_rgba(*APSIS_RGBA)
+        cr.set_source_rgba(*APSIS_RGBA)
         for x in [cx+a, cx-a]:
             cr.move_to(x, cy)
             cr.arc(x, cy, apsis_radius, 0, 2 * math.pi)
             cr.fill()
         cr.restore()
 
+    if DEBUG_ANOMALY_VALUES:
 
-    if DEBUG_ELLIPSE:
-        anomaly_colors = [
-            (0.5, 0.1, 0.1, 0.6),
-            (0.1, 0.1, 0.5, 0.6),
-            (0.5, 0.5, 0.1, 0.6)
+        anomalys = [
+            (o.true_anomaly, DEBUG_TRUE_ANOMALY_COLOR),
+            (o.mean_anomaly, DEBUG_MEAN_ANOMALY_COLOR),
+            (o.eccentric_anomaly, DEBUG_ECCENTRIC_ANOMALY_COLOR)
         ]
+        
         anomaly_width = 5
-        for i, an in enumerate([o.eccentric_anomaly, o.true_anomaly, o.mean_anomaly]):
-            scale_offset = (i+1) * anomaly_width/scale
+        cr.set_line_width(anomaly_width/scale)
+        for i, (anomaly, color) in enumerate(anomalys):
+            offset = (anomaly_width * (i+1)) / scale
             cr.save()
             cr.new_path()
-            cr.scale(a - scale_offset, b - scale_offset)
-            cr.arc(0, 0, 1, 0, an)
+            cr.scale(a + offset, b + offset)
+            cr.arc(0, 0, 1, 0, anomaly)
             cr.restore()
-            cr.set_source_rgba(*anomaly_colors[i])
-            cr.set_line_width(anomaly_width/scale)
+            cr.set_source_rgba(*color)
             cr.stroke()
-    
+                
     cr.save()
     cr.new_path()
     cr.scale(a, b)
     cr.arc(0, 0, 1, 0, math.pi*2.0)
     cr.restore()
     cr.set_source_rgba(*DEFAULT_ELLIPSE_COLOR_RGBA)
-    cr.set_line_width(1/scale)
+    cr.set_line_width(2.0/scale)
     cr.stroke()
 
-    if show_debug:
+    if DEBUG_AUX_CIRCLES:
         cr.set_dash([2.0/scale, 4.0/scale])
 
         cr.set_source_rgba(*DEBUG_ELLIPSE_COLOR_RGBA)
@@ -123,7 +95,7 @@ def draw_ellipse(cr: cairo.Context, cx, cy, a, b, scale, o: twobody.TwoBody, *, 
 
 class EllipseRenderer(renderer.Renderer):
 
-    def draw_ellipse_for_body(self, cr:cairo.Context, body_id:int, faded:bool=False, show_debug:bool=False):
+    def draw_ellipse_for_body(self, cr:cairo.Context, body_id:int, faded:bool=False):
         secondary = self.orbital.get_particle(body_id)
                 
         if faded: cr.set_source_rgba(*DEFAULT_ELLIPSE_COLOR_FADED_RGBA)
@@ -142,15 +114,14 @@ class EllipseRenderer(renderer.Renderer):
             self.camera.zoom,
             o,
             #apsis_radius=3/self.camera.zoom if not faded else None,
-            show_semimajor_axis=show_debug,
-            show_debug=show_debug
+            show_semimajor_axis=not faded
         )
         cr.restore()
 
     def draw(self, cr:cairo.Context, width:int, height:int):
         if not self.view.show_orbital_ellipse: return
         if self.view.secondary_body is not None:
-            self.draw_ellipse_for_body(cr, self.view.secondary_body, show_debug=DEBUG_ELLIPSE)
+            self.draw_ellipse_for_body(cr, self.view.secondary_body)
         
         b = self.view.hovered_over_particle
         if b is not None and b.idx != self.view.secondary_body:

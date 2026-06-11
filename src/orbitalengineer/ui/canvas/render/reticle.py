@@ -55,6 +55,29 @@ class ReticleRenderer(renderer.Renderer):
             
             cr.restore() 
 
+    def show_detailed_reticle(self,  cr:cairo.Context, radius, body):
+        cr.set_source_rgba(*DEFAULT_RETICLE_COLOR)
+        
+        reticle_count = 64
+        total_angle = 0
+        for i in range(reticle_count):
+            angle = (2.0*np.pi) / reticle_count
+            angle_deg = round(np.degrees(total_angle), 2)
+            self.draw_tick_mark(cr, angle_deg, radius, angle_deg % 45 == 0)
+                
+            cr.rotate(angle)
+            total_angle += angle
+
+        velocity = body.get_velocity()
+        angle = positive_angle(np.atan2(velocity.imag, velocity.real))
+
+        cr.save()
+        cr.rotate(angle)
+        cr.set_line_width(3/self.camera.zoom)
+        cr.set_source_rgba(1, 1, 1)
+        self.draw_tick_mark(cr, np.degrees(angle), radius, True, True)
+        cr.restore()
+
     def draw(self, cr:cairo.Context, width:int, height:int):
         if not self.view.secondary_body:
             return
@@ -78,30 +101,16 @@ class ReticleRenderer(renderer.Renderer):
             cr.restore()
             return
                 
-        if radius * self.camera.zoom < 5:
-            return
+        #if radius * self.camera.zoom < 5:
+        #    return
         
-        elif radius * self.camera.zoom < 20:
-            return
-        
-        cr.set_source_rgba(*DEFAULT_RETICLE_COLOR)
-        
-        reticle_count = 64
-        total_angle = 0
-        for i in range(reticle_count):
-            angle = (2.0*np.pi) / reticle_count
-            angle_deg = round(np.degrees(total_angle), 2)
-            self.draw_tick_mark(cr, angle_deg, radius, angle_deg % 45 == 0)
-                
-            cr.rotate(angle)
-            total_angle += angle
-
-        velocity = body.get_velocity()
-        angle = positive_angle(np.atan2(velocity.imag, velocity.real))
-
-        cr.save()
-        cr.rotate(angle)
-        cr.set_line_width(3/self.camera.zoom)
-        cr.set_source_rgba(1, 1, 1)
-        self.draw_tick_mark(cr, np.degrees(angle), radius, True, True)
-        cr.restore()
+        if radius * self.camera.zoom < 20:
+            reticle_count = 3
+            total_angle = 0
+            for i in range(reticle_count):
+                angle = (2.0*np.pi) / reticle_count
+                angle_deg = round(np.degrees(total_angle), 2)
+                self.draw_tick_mark(cr, angle_deg, radius, show_label=False)
+                total_angle += angle
+        else:
+            self.show_detailed_reticle(cr, radius, body)

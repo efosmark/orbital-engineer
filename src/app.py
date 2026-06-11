@@ -16,7 +16,7 @@ def brighten(color:tuple[float,float,float,float], amount=0.1) -> tuple[float,fl
 cmap = plt.colormaps['gist_rainbow']
 
 Lx = 64
-N = 256
+N = 1024
 mass_min, mass_max = 1e3, 1e3
 vel_min, vel_max = 0, 0
 radius_min, radius_max = 20, 100
