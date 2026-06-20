@@ -16,7 +16,7 @@ class SelectionRenderer(renderer.Renderer):
             return
         
         if self.view.drag_start and self.view.drag_end:
-            cr.set_source_rgba(1,1,1,1)
+            cr.set_source_rgba(1, 1, 1, 1)
             
             x1,y1 = self.view.drag_start
             x2,y2 = self.view.drag_end
