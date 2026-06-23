@@ -4,7 +4,7 @@ from typing import Sequence
 import pyopencl as cl
 from numpy.typing import NDArray
 
-from orbitalengineer.engine.cl.tracer import EventTracer
+from orbitalengineer.engine.orbitalcl.tracer import EventTracer
 
 mf = cl.mem_flags
 

@@ -1,5 +1,5 @@
-from orbitalengineer.engine.cl import flags
-from orbitalengineer.engine.cl.orbitalcl import SimController_CL
+from orbitalengineer.engine.orbitalcl import flags
+from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui import model
 from orbitalengineer.ui.canvas.render.hud_clock import HudClockRenderer
@@ -117,6 +117,7 @@ class MouseController:
         motion.connect("motion", self.on_motion)
         canvas.add_controller(motion)
 
+ 
     def on_motion(self, _ctrl, x, y):
         self.view.hover_position = (x, y)
         x, y = self.camera.screen_to_world(x, y, self.view.width, self.view.height)
@@ -152,7 +153,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
         ]
         
         self.scene_renderers = [
-            #HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
+            HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
             ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
             EllipseRenderer(self.view, self.camera, self.orbital, self.clock),
             ParticleRenderer(self.view, self.camera, self.orbital, self.clock),

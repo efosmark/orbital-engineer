@@ -1,6 +1,6 @@
 import numpy as np
 import pyopencl as cl
-from orbitalengineer.engine.cl.dimension import CLPipelineStep
+from orbitalengineer.engine.orbitalcl.dimension import CLPipelineStep
 
 KERNEL_FILE_LOCATION = "interaction/interaction.cl"
 
@@ -116,13 +116,13 @@ if __name__ == "__main__":
     from cmath import pi, rect
     import numpy as np
     
-    from orbitalengineer.engine.cl.orbitalcl import SimController_CL
+    from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
     from orbitalengineer.engine.clock import SimClock
     from orbitalengineer.engine.particle import ParticleRaw
     
     N = 4
     clock = SimClock()
-    ctl = SimController_CL(clock)
+    ctl = SimController_CL()
 
     for p_offset in [10000, -10000]:
         for i in range(N):

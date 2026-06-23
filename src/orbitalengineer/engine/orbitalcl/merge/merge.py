@@ -1,6 +1,6 @@
 import numpy as np
 import pyopencl as cl
-from orbitalengineer.engine.cl.dimension import CLPipelineStep
+from orbitalengineer.engine.orbitalcl.dimension import CLPipelineStep
 
 KERNEL_FILE_LOCATION = "merge/merge.cl"
 

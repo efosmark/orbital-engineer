@@ -31,7 +31,6 @@ def find_collisions(
         radius (NDArray[np.float64]): Radius for each particle
         interaction (NDArray[np.int64]): Interaction matrix for each particle pair (i,j)
     
-    
     It performs in-place changes to the interaction table.
     """
     if radius[i] == 0:

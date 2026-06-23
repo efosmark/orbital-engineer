@@ -1,5 +1,4 @@
 import json
-import os
 from typing import cast
 
 from orbitalengineer.engine.particle import Particle
@@ -16,7 +15,7 @@ from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib, GObject
 from orbitalengineer.ui.keyinput import KeyInput
 
 from orbitalengineer.engine import config, log_timing, logger
-from orbitalengineer.engine.cl.orbitalcl import SimController_CL
+from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
 
 
@@ -130,10 +129,12 @@ class App(Gtk.Application):
 
         radius = b.get_radius()
         diameter = 3 * radius
-        if diameter * self.camera.zoom > available_size:
-            self.camera.zoom = available_size / diameter
-        elif diameter * self.camera.zoom < 10:
-            self.camera.zoom = 10 / diameter
+        
+        #if self.view.follow_tracked_body:
+        #    if diameter * self.camera.zoom > available_size:
+        #        self.camera.zoom = available_size / diameter
+        #    elif diameter * self.camera.zoom < 10:
+        #        self.camera.zoom = 10 / diameter
 
     def relative_zoom(self, factor):
         self.camera.zoom_at(0, 0, 0, 0, factor)

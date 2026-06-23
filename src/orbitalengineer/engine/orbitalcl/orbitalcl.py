@@ -7,20 +7,20 @@ import pyopencl as cl
 from orbitalengineer.engine import log_timing, logger, config
 from orbitalengineer.engine.event import BouncingCollisionEvent
 from orbitalengineer.engine.metric import MetricsProducer
-from orbitalengineer.engine.cl import flags
-from orbitalengineer.engine.cl.device import CLDeviceManager
-from orbitalengineer.engine.cl.dimension import load_kernel
-from orbitalengineer.engine.cl.particle_cl import ParticleCL
-from orbitalengineer.engine.cl.tracer import EventTracer
+from orbitalengineer.engine.orbitalcl import flags
+from orbitalengineer.engine.orbitalcl.device import CLDeviceManager
+from orbitalengineer.engine.orbitalcl.dimension import load_kernel
+from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
+from orbitalengineer.engine.orbitalcl.tracer import EventTracer
 
 # Integrator kernels
-from orbitalengineer.engine.cl.merge.merge import MergePipeline
-from orbitalengineer.engine.cl.interaction.interaction import InteractionGroupPipeline
-from orbitalengineer.engine.cl.nudge.nudge import NudgePipeline
-from orbitalengineer.engine.cl.position.position import PositionPipeline
-from orbitalengineer.engine.cl.relative_velocity.relative_velocity import RelativeVelocityPipeline
-from orbitalengineer.engine.cl.velocity.velocity import VelocityPipeline
-from orbitalengineer.engine.cl.bounce.bounce import BouncePipeline
+from orbitalengineer.engine.orbitalcl.merge.merge import MergePipeline
+from orbitalengineer.engine.orbitalcl.interaction.interaction import InteractionGroupPipeline
+from orbitalengineer.engine.orbitalcl.nudge.nudge import NudgePipeline
+from orbitalengineer.engine.orbitalcl.position.position import PositionPipeline
+from orbitalengineer.engine.orbitalcl.relative_velocity.relative_velocity import RelativeVelocityPipeline
+from orbitalengineer.engine.orbitalcl.velocity.velocity import VelocityPipeline
+from orbitalengineer.engine.orbitalcl.bounce.bounce import BouncePipeline
 
 import warnings
 warnings.filterwarnings(

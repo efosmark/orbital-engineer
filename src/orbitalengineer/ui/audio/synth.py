@@ -6,7 +6,7 @@ from orbitalengineer.ui import ui_config
 
 import gi
 gi.require_version("Gst", "1.0")
-from gi.repository import Gst, GLib # type:ignore
+from gi.repository import Gst, GLib #  type:ignore
 
 Gst.init(None)
 

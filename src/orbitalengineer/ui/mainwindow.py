@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from orbitalengineer.engine.cl.orbitalcl import SimController_CL
+from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui import canvas, ui_config
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib, GObject

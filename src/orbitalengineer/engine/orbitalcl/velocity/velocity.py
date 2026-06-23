@@ -1,7 +1,7 @@
 import pyopencl as cl
 import numpy as np
 
-from orbitalengineer.engine.cl.dimension import CLPipelineStep
+from orbitalengineer.engine.orbitalcl.dimension import CLPipelineStep
 
 KERNEL_FILE = "velocity/velocity.cl"
 

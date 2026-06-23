@@ -1,4 +1,4 @@
-from orbitalengineer.engine.cl import flags
+from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.ui.mainapp import App
 from orbitalengineer.helpers import create_primary, create_secondary, random_position, rng
 

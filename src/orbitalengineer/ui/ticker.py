@@ -2,7 +2,7 @@ import atexit
 import threading
 import time
 
-from orbitalengineer.engine.cl.orbitalcl import SimController_CL
+from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui.gtk4 import GLib
 

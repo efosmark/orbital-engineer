@@ -1,4 +1,4 @@
-from orbitalengineer.engine.cl import flags
+from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.engine.particle import ParticleRaw
 from orbitalengineer.ui.mainapp import App
 from orbitalengineer.helpers import random_position, rng
