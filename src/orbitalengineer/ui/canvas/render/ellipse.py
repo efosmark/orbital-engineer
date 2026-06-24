@@ -55,7 +55,7 @@ def draw_ellipse(cr: cairo.Context, cx, cy, a, b, scale, o: twobody.TwoBody, *, 
             cr.stroke()
     
     color = DEFAULT_ELLIPSE_COLOR_RGBA
-    color = (*DEFAULT_ELLIPSE_COLOR_RGBA[0:3], DEFAULT_ELLIPSE_COLOR_RGBA[3] * accuracy)
+    color = (*DEFAULT_ELLIPSE_COLOR_RGBA[0:3], DEFAULT_ELLIPSE_COLOR_RGBA[3])
 
     cr.save()
     cr.new_path()

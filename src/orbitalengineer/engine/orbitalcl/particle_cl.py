@@ -101,7 +101,11 @@ class ParticleCL(Particle):
         m2 = self.ctl.mass[secondary_idx]
         
         o = twobody.TwoBody(r1, r2, v1, v2, m1, m2)
+        if not o.is_bound or o.orbital_energy > -1000 or o.accuracy < 0.33:
+            return
+        
+        o.body_1 = focus_idx
+        o.body_2 = self.idx or -1
         o.accuracy = accuracy
-        if not o.is_bound:return
         return o
     

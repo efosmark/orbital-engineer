@@ -164,7 +164,7 @@ class FocusInfoRenderer(renderer.Renderer):
         cr.translate(0, 20 + h)
         
         fields = [
-            ('Accuracy',         f"{orbit.accuracy*100:.2f}%"),
+            ('Influence',        f"{orbit.accuracy*100:.2f}%"),
             ('Orbital Energy',   f"{mag_format(orbit.orbital_energy)}"),
             ('Eccentricity',     f"{orbit.eccentricity:.1f}"),
             ('Grav. Param.',     f"{mag_format(orbit.standard_grav_param)}"),
@@ -177,6 +177,7 @@ class FocusInfoRenderer(renderer.Renderer):
             ('Mean Anomaly',     f"{np.degrees(orbit.mean_anomaly):.1f}°"),
             ('Direction',        f"{orbit.direction}"),
             ('Distance',         f"{mag_format(orbit.distance)} m"),
+            ('Bodies',           f"{orbit.body_1} -> {orbit.body_2}"),
         ]
         
         a_max, b_max = 0,0

@@ -1,4 +1,4 @@
-from orbitalengineer.engine.cl import flags
+from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.engine.particle import ParticleRaw
 from orbitalengineer.helpers import random_color
 from orbitalengineer.ui.mainapp import App
@@ -11,7 +11,7 @@ def on_activate(app: App):
     r = 30
     v = 1
 
-    # Just to c enter things a bit
+    # Just to center things a bit
     origin = 0 # (((N-1) * r) - (r*10))
 
     for i in range(N-1):
@@ -32,6 +32,8 @@ def on_activate(app: App):
     ), color=(*random_color(), 1.0))
 
     app.orbital.Lx = Lx
+    app.view.speed = 10.0
+    app.clock.speed = 10.0
     app.orbital.coef_of_restitution = 0.99999
 
 def run():

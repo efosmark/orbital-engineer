@@ -165,7 +165,7 @@ def ellipse_axes(r:Vec2, v:Vec2, mu:float, e:float, eps:float=1e-12) -> tuple[fl
     """
     rmag = vec_norm(r) + eps
     v2 = vec_dot(v, v)
-    a = 1.0 / (2.0/rmag - v2/mu)
+    a = 1.0 / (2.0/rmag - v2/mu) if mu > 0 else 0
     b = a*math.sqrt(max(0.0, 1.0 - e*e))
     return a, b
 
@@ -187,8 +187,11 @@ def eccentricity_vec(r: Vec2, v: Vec2, mu: float) -> Vec2:
     rmag = vec_norm(r)
     v2 = vec_dot(v, v)
     rv = vec_dot(r, v)
-    ex = ((v2 - mu/rmag)*r[0] - rv*v[0]) / mu
-    ey = ((v2 - mu/rmag)*r[1] - rv*v[1]) / mu
+    if mu == 0:
+        ex = ey = 0
+    else:
+        ex = ((v2 - mu/rmag)*r[0] - rv*v[0]) / mu
+        ey = ((v2 - mu/rmag)*r[1] - rv*v[1]) / mu
     return (ex, ey)
 
 @jit(cache=False)
@@ -435,6 +438,8 @@ class TwoBody:
         periapsis
     
     """
+    body_1:int = -1
+    body_2:int = -1
     
     accuracy:float = 0.0
     

@@ -9,11 +9,11 @@ from matplotlib import colors
 
 cmap = plt.colormaps['plasma']
 
-Lx = 16
-N = 768
+Lx = 256
+N = 2048
 
 mass_min, mass_max = 1e2, 1e6
-dist_min, dist_max = 1, 9000
+dist_min, dist_max = 1, 15000
 
 mass_norm = colors.Normalize(mass_min, mass_max)
 
@@ -21,9 +21,8 @@ def on_activate(app: App):
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)
         pos = random_position(dist_min, dist_max)
-        velocity = 0+0j
-        #radius = np.cbrt(mass / np.pi) / 5.0
-        radius = 30.0
+        velocity = random_position(100, 350.0)
+        radius = np.cbrt(mass / np.pi) 
         
         app.insert_particle(ParticleRaw(
             position=pos,

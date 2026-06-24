@@ -17,7 +17,7 @@ cmap = plt.colormaps['gist_rainbow']
 
 Lx = 64
 N = 1024
-mass_min, mass_max = 1e3, 1e5
+mass_min, mass_max = 1e2, 1e6
 vel_min, vel_max = 0, 0
 radius_min, radius_max = 20, 100
 dist_min, dist_max = 1000, 20000

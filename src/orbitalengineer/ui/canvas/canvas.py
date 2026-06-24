@@ -3,6 +3,7 @@ from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui import model
 from orbitalengineer.ui.canvas.render.hud_clock import HudClockRenderer
+from orbitalengineer.ui.canvas.render.warning import WarningRenderer
 from orbitalengineer.ui.canvas.render.selection import SelectionRenderer
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, Gsk
 from orbitalengineer.ui.canvas import renderer
@@ -166,6 +167,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
             DebugInfoRenderer(self.view, self.camera, self.orbital, self.clock),
             FocusInfoRenderer(self.view, self.camera, self.orbital, self.clock),
             HudClockRenderer(self.view, self.camera, self.orbital, self.clock),
+            WarningRenderer(self.view, self.camera, self.orbital, self.clock),
         ]
         
         click_controller = Gtk.GestureClick.new()

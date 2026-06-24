@@ -1,3 +1,4 @@
+from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.engine.particle import Particle
 from orbitalengineer.ui.mainapp import App
 from orbitalengineer.helpers import angular_position, random_color, create_primary, create_secondary, random_position, rng
@@ -8,8 +9,12 @@ from matplotlib import colors
 
 cmap = plt.colormaps['gist_rainbow']
 
+from orbitalengineer.engine import config
+config.EPS_DIST = 0.00001
+config.EPS_TIME = 0.00001
+
 N = 512
-Lx = 64
+Lx = 256
 
 dist_min, dist_max = 0, 700
 dist_norm = colors.Normalize(dist_min, dist_max)
@@ -23,11 +28,11 @@ def on_activate(app: App):
             sol,
             mass=100,
             position=position,
-            radius=4,
+            flags=flags.BOUNCE
         ), color=cmap(1-dist_norm(abs(position))))
     
     app.orbital.Lx = Lx
-    app.orbital.coef_of_restitution = 0.85
+    app.orbital.coef_of_restitution = 0.99
     #app.orbit_ctl.speed = 2.0
     
 def run():

@@ -6,8 +6,6 @@ from orbitalengineer.engine.particle import Particle, ParticleRaw
 seed = 0xf00d1e1
 rng = np.random.default_rng(seed)
 
-Color_T = tuple[float, float, float, float]
-
 def r_from_mass(m: np.float64) -> np.float64:
     r = np.cbrt(m / np.pi)
     if r <= 0:
