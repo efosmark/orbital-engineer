@@ -3,6 +3,7 @@ from typing import Any, ClassVar, Sequence
 import numpy as np
 
 from orbitalengineer.engine import twobody
+from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.engine.particle import Particle
 
 
@@ -70,16 +71,24 @@ class ParticleCL(Particle):
     def get_focus(self) -> tuple[int,int]|None:
         idx_start = self.idx * self.ctl.N
         idx_stop = idx_start + self.ctl.N
-        
-        relative_distance = np.abs(self.ctl.position - self.ctl.position[self.idx])
+                
+        # Pull the acceleration for 0..N from the acceleration matrix (row=self.idx)
         accel = np.abs(np.nan_to_num(self.ctl._velocity._acceleration[idx_start:idx_stop]))
-        accel[self.idx] = 0.0
-        accel_over_distance = np.true_divide(accel, relative_distance + 1e-15)
-        accuracy = np.true_divide(accel_over_distance, np.sum(accel_over_distance) + 1e-15)
+        accel_total = np.sum(accel) + 1e-15
 
-        focus_idx = np.argmax(accel_over_distance)    
+        filter = self.ctl.mass <= self.get_mass()                     # Greater mass than self
+        filter |= (self.ctl.flags & flags.REMOVED) == flags.REMOVED   # Only valid bodies
+
+        # zero out for any invalid bodies (ensures they never get chosen as the focus)
+        accel[filter] = 0.0
+
+        # Normalize the acceleration
+        influence = np.true_divide(accel, accel_total)
+
+        # Find the top acceleration
+        focus_idx = np.argmax(influence)    
         if focus_idx is None or focus_idx == self.idx:return
-        return int(focus_idx), accuracy[focus_idx]
+        return int(focus_idx), influence[focus_idx]
 
     def get_orbit_info(self, circular_eps:float=1e-12) -> twobody.TwoBody|None:
         secondary_idx = self.idx
@@ -100,9 +109,11 @@ class ParticleCL(Particle):
         m1 = self.ctl.mass[focus_idx]
         m2 = self.ctl.mass[secondary_idx]
         
-        o = twobody.TwoBody(r1, r2, v1, v2, m1, m2)
-        if not o.is_bound or o.orbital_energy > -1000 or o.accuracy < 0.33:
-            return
+        radius1 = self.ctl.radius[focus_idx]
+        radius2 = self.ctl.radius[secondary_idx]
+        
+        o = twobody.TwoBody(r1, r2, v1, v2, m1, m2, radius1, radius2)
+        if not o.is_bound or o.orbital_energy > -1000: return
         
         o.body_1 = focus_idx
         o.body_2 = self.idx or -1

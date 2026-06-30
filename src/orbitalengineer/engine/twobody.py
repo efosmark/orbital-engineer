@@ -1,3 +1,4 @@
+import cmath
 from functools import cache
 import math
 import numpy as np
@@ -404,6 +405,15 @@ def escape_velocity(r_rel: Vec2, grav_param: float) -> float:
     """
     return np.sqrt((2 * grav_param) / vec_norm(r_rel))
 
+def periapsis(ellipse_center: Vec2, semi_major_axis:float, argument_of_periapsis:float) -> Vec2:
+    """Find the coordinate for the periapsis (closest point in the orbit)."""
+    pxy = complex(*ellipse_center) + cmath.rect(semi_major_axis, argument_of_periapsis)
+    return (pxy.real, pxy.imag)
+
+def apoapsis(ellipse_center: Vec2, semi_major_axis:float, argument_of_periapsis:float) -> Vec2:
+    """Find the coordinate for the apoapsis (furthest point in the orbit)."""
+    axy = complex(*ellipse_center) - cmath.rect(semi_major_axis, argument_of_periapsis)
+    return (axy.real, axy.imag)
 
 cached_property = cache(property)
 
@@ -444,12 +454,14 @@ class TwoBody:
     accuracy:float = 0.0
     
     # Body properties
-    r1: Point
-    r2: Point
-    v1: Vec2
-    v2: Vec2
-    m1: float
-    m2: float
+    r1: Point   # (x, y) location for body_1
+    r2: Point   # (x, y) location for body_2
+    v1: Vec2    # (vx, vy) velocity for body_1
+    v2: Vec2    # (vx, vy) velocity for body_2
+    m1: float   # Mass for body_1
+    m2: float   # Mass for body_2
+    radius1:float # Radius for body_1
+    radius2:float # Radius for body_2
     
     # Orbital State
     r_rel: tuple[float, float]
@@ -477,8 +489,11 @@ class TwoBody:
     v_esc: float
     direction: str
     time_periapsis: float
+    
+    apoapsis: Vec2
+    periapsis: Vec2
 
-    def __init__(self, r1: Vec2, r2: Vec2, v1: Vec2, v2: Vec2, m1: float, m2: float):
+    def __init__(self, r1: Vec2, r2: Vec2, v1: Vec2, v2: Vec2, m1: float, m2: float, radius1:float, radius2:float):
         self.r1, self.r2 = r1, r2
         self.v1, self.v2 = v1, v2
         self.m1, self.m2 = m1, m2
@@ -509,6 +524,15 @@ class TwoBody:
             self.time_periapsis = self.orbital_period - self.time_periapsis
         
         self.v_esc = escape_velocity(self.r_rel, self.standard_grav_param)
+        self.periapsis = periapsis(self.ellipse_center, self.semi_major_axis, self.argument_of_periapsis)
+        self.apoapsis = apoapsis(self.ellipse_center, self.semi_major_axis, self.argument_of_periapsis)
+
+        peri_rel = vec_sub(self.periapsis, r1)
+        peri_dist = vec_norm(peri_rel)
+        R = radius1 + radius2
+        
+        self.falling_in = peri_dist < R
+        
 
     def __str__(self):
         fields = [

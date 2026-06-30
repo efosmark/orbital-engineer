@@ -27,9 +27,9 @@ class MergePipeline(CLPipelineStep):
         self._flags_intermediate = np.zeros(self.N, dtype=np.uint32)
         self._flags_intermediate_cl = self._create_buffer(self._flags_intermediate)
         
-        self._groups = np.zeros(self.N, dtype=np.uint32)
+        self._groups = np.arange(self.N, dtype=np.uint32)
         self._groups_cl = self._create_buffer(self._groups)
-    
+        self._groups_prev = np.arange(self.N, dtype=np.uint32)
     
     def collide_merge_group_assign(self, dt_step: float, status: cl.Buffer, mass: cl.Buffer, velocity_relative: cl.Buffer, distance_edge: cl.Buffer):
         return self.tr.add("collide_merge_group_assign",
@@ -79,7 +79,7 @@ class MergePipeline(CLPipelineStep):
                 raise SystemExit
     
     
-    def compute_merging_collision(self, status: cl.Buffer, merge_group: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
+    def compute_merging_collision(self, status: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
         return self.tr.add("collide_merge",
             self._compute_merging_collision(
                 self.queue,
@@ -89,7 +89,7 @@ class MergePipeline(CLPipelineStep):
                 # Args
                 np.uint32(self.N),
                 status,
-                merge_group,
+                self._groups_cl,
                 position,
                 velocity,
                 mass,
@@ -104,10 +104,19 @@ class MergePipeline(CLPipelineStep):
     def __call__(self, dt_step, flags: cl.Buffer, velocity_relative:cl.Buffer, edge_distance: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
         self.collide_merge_group_assign(dt_step, flags, mass, velocity_relative, edge_distance)
         self.collide_merge_group_reduce(flags, mass)
-        self.compute_merging_collision(flags, self._groups_cl, position, velocity, mass, radius)
+        self.compute_merging_collision(flags, position, velocity, mass, radius)
         
         cl.enqueue_copy(self.queue, flags,    self._flags_intermediate_cl)
         cl.enqueue_copy(self.queue, position, self._position_intermediate_cl)
         cl.enqueue_copy(self.queue, velocity, self._velocity_intermediate_cl)
         cl.enqueue_copy(self.queue, mass,     self._mass_intermediate_cl)
         cl.enqueue_copy(self.queue, radius,   self._radius_intermediate_cl)
+
+    def find_merged_bodies(self):
+        """Finds the merge events that happened since the last time called."""
+        cl.enqueue_copy(self.queue, self._groups, self._groups_cl)
+        diff = np.argwhere(self._groups != self._groups_prev)
+        if len(diff) > 0: diff = diff[0]        
+        merged_ids = np.column_stack((diff, self._groups[diff]))
+        self._groups_prev[:] = self._groups
+        return merged_ids

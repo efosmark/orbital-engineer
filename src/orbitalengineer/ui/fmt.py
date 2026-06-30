@@ -58,3 +58,25 @@ def positive_angle(angle_rad: float) -> float:
     if angle_rad < 0:
         angle_rad += tau
     return angle_rad % tau
+
+def format_time(seconds:float):
+    if seconds < 1:
+        return f"{seconds*1000.0:.2f}ms"
+    
+    if seconds < 60:
+        return f"{seconds:4.1f}s"
+    
+    minutes, seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes:2.0f}m {seconds:4.1f}s"
+    
+    hours, minutes = divmod(minutes, 60)
+    if hours < 24:
+        return f"{hours:2.0f}h {minutes:2.0f}m {seconds:4.1f}s"
+    
+    days, hours = divmod(hours, 24)
+    if days < 365:
+        return f"{days:3.0f}d {hours:2.0f}h {minutes:2.0f}m {seconds:4.1f}s"
+
+    years, days = divmod(days, 365)
+    return f"{years:.0f}y {days:3.0f}d {hours:2.0f}h {minutes:2.0f}m {seconds:4.1f}s"

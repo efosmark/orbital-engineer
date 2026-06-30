@@ -47,7 +47,7 @@ class SimController_CL:
         self._particles:list = []
         self.accum = 0.0
         self.last_now:float|None = None
-        self.enable_profiling = True
+        self.enable_profiling = config.EMIT_METRICS
         self.is_initialized = False
 
         self.tr = EventTracer(self)
@@ -168,7 +168,7 @@ class SimController_CL:
         self._interaction(self.dt_base, self.flags_cl, self.pos_cl, self.vel_cl, self.radius_cl, self.mass_cl)
         self._relative_velocity(self.pos_cl, self.vel_cl, self.velocity_relative_cl)
         self.tr.add("edge_distance", self.compute_distance_edge())
-        self._nudge(self.pos_cl, self.mass_cl, self.distance_edge_cl)
+        #self._nudge(self.pos_cl, self.mass_cl, self.distance_edge_cl)
         self.is_initialized = True
 
     def add_particle(self, particle) -> int:
@@ -322,6 +322,8 @@ class SimController_CL:
                 ], dt_step=round(float(dt_step), 6))
             
             self.tick_id += 1
+        
+        self._merge.find_merged_bodies()
         
         return num_steps
 

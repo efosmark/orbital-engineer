@@ -6,7 +6,7 @@ from orbitalengineer.ui.fmt import mag_format
 
 MARGIN = 0
 X_PADDING = 10
-Y_PADDING = 4
+Y_PADDING = 2
 FONT_SIZE = 10
 
 class WarningRenderer(renderer.Renderer):
@@ -27,12 +27,12 @@ class WarningRenderer(renderer.Renderer):
         cr.translate(width - r_width, height - r_height)
         cr.move_to(0, 0)
         
-        set_source_hex(cr, "#AE474753")
+        set_source_hex(cr, "#721010FF")
         cr.rectangle(0, 0, r_width, r_height)
         cr.fill()
 
         cr.move_to(X_PADDING, Y_PADDING + te.height/1.25)
-        set_source_hex(cr, "#FF73736E")
+        set_source_hex(cr, "#FFFFFF99")
         cr.show_text(txt)
 
         cr.restore()

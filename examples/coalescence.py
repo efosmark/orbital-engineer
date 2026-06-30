@@ -10,10 +10,10 @@ from matplotlib import colors
 cmap = plt.colormaps['gist_rainbow']
 
 from orbitalengineer.engine import config
-config.EPS_DIST = 0.00001
-config.EPS_TIME = 0.00001
+config.EPS_DIST = 0.0001
+config.EPS_TIME = 0.0001
 
-N = 512
+N = 2048
 Lx = 256
 
 dist_min, dist_max = 0, 700
@@ -32,7 +32,7 @@ def on_activate(app: App):
         ), color=cmap(1-dist_norm(abs(position))))
     
     app.orbital.Lx = Lx
-    app.orbital.coef_of_restitution = 0.99
+    app.orbital.coef_of_restitution = 0.9
     #app.orbit_ctl.speed = 2.0
     
 def run():

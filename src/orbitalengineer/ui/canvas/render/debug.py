@@ -8,13 +8,13 @@ import cairo
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.gtk4 import Gdk
 
-X_PADDING = 10
-X_SPACING = 20
-X_MARGIN = 10
+X_PADDING = 5
+X_SPACING = 30
+X_MARGIN = 5
 
 Y_PADDING = 10
 Y_SPACING = 0
-Y_MARGIN = 10
+Y_MARGIN = 5
 
 FONT_SIZE = 9
 BG_COLOR = (0.05, 0, 0.05, 0.7)
@@ -46,11 +46,6 @@ FRAME_RATE_THRESHOLD:ThresholdProfile_T = [
     (0,    CRITICAL),
     (10,   WARNING),
     (15,   NOMINAL)
-]
-
-OVERFLOW_THRESHOLD:ThresholdProfile_T = [
-    (10,    WARNING),
-    (100,   CRITICAL)
 ]
 
 GPU_TEMP_THRESHOLD:ThresholdProfile_T = [
@@ -150,16 +145,13 @@ class DebugInfoRenderer(renderer.Renderer):
             num_bodies = self.orbital.N
         except AttributeError:
             num_bodies = 0
-        
-        speed = self.view.speed
-        
+                
         zoom = self.camera.zoom
         if zoom < 1: zoom = -1/zoom
         
         display:list[DebugDisplayField|None] = []
         display.extend([
             DebugDisplayField("Bodies", f"{self.orbital.get_valid_indices().size} / {int(num_bodies)}"),
-            DebugDisplayField("Speed",  speed, 1),
             DebugDisplayField("Zoom",   zoom, 1),
         ])
 
@@ -200,9 +192,6 @@ class DebugInfoRenderer(renderer.Renderer):
                 DebugDisplayField("Interval", t_tick_ms, 1, 'ms')
             ])
 
-        step_overflow = (self.orbital.accum // self.orbital.dt_base)
-        display.append(DebugDisplayField('Overflow', step_overflow, 0, 'steps', threhold_profile=OVERFLOW_THRESHOLD))
-        
         metrics_card = getattr(self.orbital, "drm_card_index", None)
         if metrics_card is None:
             metrics_card = detect_amd_card()
@@ -247,7 +236,7 @@ class DebugInfoRenderer(renderer.Renderer):
 
         ])
         
-        max_value_width = 110
+        max_value_width = 70
         # max_value_width = max([
         #    cr.text_extents(str(l.value)).x_advance for l in labels if l is not None
         # ])

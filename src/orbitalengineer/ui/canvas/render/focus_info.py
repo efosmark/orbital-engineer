@@ -6,7 +6,7 @@ import cairo
 from orbitalengineer.engine import twobody
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.gtk4 import Gtk, Graphene
-from orbitalengineer.ui.fmt import mag_format, positive_angle
+from orbitalengineer.ui.fmt import format_time, mag_format, positive_angle
 
 X_PADDING = 10
 X_SPACING = 30
@@ -172,8 +172,8 @@ class FocusInfoRenderer(renderer.Renderer):
             ('Arg. of Peri.',    f"{np.degrees(orbit.argument_of_periapsis):.1f}°"),
             ('Semi-Major Axis',  f"{mag_format(orbit.semi_major_axis)} m"),
             ('Escape Velocity',  f"{mag_format(orbit.v_esc)} m/s"),
-            ('Orbital Time',     f"{orbit.time_periapsis:.1f} s"),
-            ('Orbital Period',   f"{orbit.orbital_period:.1f} s"),
+            ('Orbital Time',     format_time(orbit.time_periapsis)),
+            ('Orbital Period',   format_time(orbit.orbital_period)),
             ('Mean Anomaly',     f"{np.degrees(orbit.mean_anomaly):.1f}°"),
             ('Direction',        f"{orbit.direction}"),
             ('Distance',         f"{mag_format(orbit.distance)} m"),

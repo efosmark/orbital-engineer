@@ -1,6 +1,8 @@
 import math
+from typing import cast
 import cairo
 from orbitalengineer.engine import twobody
+from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.color import hex_to_rgba
 
@@ -55,7 +57,8 @@ def draw_ellipse(cr: cairo.Context, cx, cy, a, b, scale, o: twobody.TwoBody, *, 
             cr.stroke()
     
     color = DEFAULT_ELLIPSE_COLOR_RGBA
-    color = (*DEFAULT_ELLIPSE_COLOR_RGBA[0:3], DEFAULT_ELLIPSE_COLOR_RGBA[3])
+    if o.falling_in:
+        color = [color[1], color[0], color[2], color[3]]
 
     cr.save()
     cr.new_path()
@@ -99,7 +102,7 @@ def draw_ellipse(cr: cairo.Context, cx, cy, a, b, scale, o: twobody.TwoBody, *, 
 class EllipseRenderer(renderer.Renderer):
 
     def draw_ellipse_for_body(self, cr:cairo.Context, body_id:int, faded:bool=False):
-        secondary = self.orbital.get_particle(body_id)
+        secondary = cast(ParticleCL, self.orbital.get_particle(body_id))
                 
         if faded: cr.set_source_rgba(*DEFAULT_ELLIPSE_COLOR_FADED_RGBA)
         else:     cr.set_source_rgba(*DEFAULT_ELLIPSE_COLOR_RGBA)

@@ -7,51 +7,71 @@ from matplotlib import colors
 
 SOL_COLOR = (0.95, 0.8, 0.45, 1.0)
 
-def brighten(color:tuple[float,float,float,float], amount=0.1) -> tuple[float,float,float,float]:
-    r = [*color]
-    for i in range(len(color) - 1):
-         r[i] = (color[i] + amount)# * color_norms[i]
-    return (r[0], r[1], r[2], color[-1])
 
 cmap = plt.colormaps['gist_rainbow']
 
-Lx = 64
+Lx = 256
 N = 1024
-mass_min, mass_max = 1e2, 1e6
-vel_min, vel_max = 0, 0
-radius_min, radius_max = 20, 100
-dist_min, dist_max = 1000, 20000
+mass_min, mass_max = 1e2, 1e8
+dist_min, dist_max = 2000, 200000
 
 po = 7000
 d = abs(po)
 
 def on_activate(app: App):
     global dist_min, dist_max
-    sol = create_primary(mass=3e9, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.BOUNCE_AS_PRIMARY|flags.MERGE_AS_PRIMARY)
-    app.insert_particle(sol, color=SOL_COLOR)
 
-    dist_norm = colors.Normalize(sol.get_radius() + dist_min, dist_max)
+    barycenter = create_primary(mass=1e12 / 4.0, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS)
+    #barycenter._radius = 1    
 
+    app.insert_particle(create_secondary(
+        barycenter,
+        mass=1e12,
+        position=complex(0, -10000),
+        flags=flags.MERGE,
+    ), color=SOL_COLOR)
+    
+    app.insert_particle(create_secondary(
+        barycenter,
+        mass=1e12,
+        position=complex(0, 10000),
+        flags=flags.MERGE,
+    ), color=SOL_COLOR)
+
+
+    #sol = create_primary(mass=1e10, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS|flags.REPEL_ON_OVERLAP)
+    #sol._radius = 30_000
+    #app.insert_particle(sol, color=(1,1,1,0.05))
+
+    #sol1 = create_primary(mass=3.5e10, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS|flags.MERGE_AS_PRIMARY)
+    #sol1._radius = 50
+    #app.insert_particle(sol1, color=SOL_COLOR)
+
+    #dist_norm = colors.Normalize(sol1.get_radius() + dist_min, dist_max)
+
+    barycenter = create_primary(mass=2e12, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS)
+    
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)
-        pos = random_position(sol.get_radius() + dist_min, dist_max)
+        pos = random_position(dist_min, dist_max)
         app.insert_particle(create_secondary(
-            sol,
+            barycenter,
             mass=mass,
             position=pos,
-            ecc=(0.75 + (0.5 * rng.random())),
+            #ecc=1.0,
             #radius=50,
             #prograde=(i <= N/2.0),
-            flags=flags.MERGE_AS_SECONDARY|flags.BOUNCE,
-        ), color=brighten(cmap(1-dist_norm(abs(pos))), 0))
+            #flags=flags.MERGE_AS_SECONDARY|flags.BOUNCE|flags.REPEL_ON_OVERLAP,
+            flags=flags  .MERGE,
+        #), color=cmap(1-dist_norm(abs(pos))))
+        ), color=(1,1,1,1))
 
     app.orbital.Lx = Lx
-    app.orbital.coef_of_restitution = 0.999
-    #app.view.show_all_history = True
+    app.orbital.coef_of_restitution = 0.98
     app.view.show_focused_history = True
     app.view.show_debug_info = False
     app.view.show_focus_info = True
-    app.relative_zoom(1/20.0)
+    app.relative_zoom(1/200.0)
 
 def run():
     app = App()
