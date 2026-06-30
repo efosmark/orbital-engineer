@@ -266,9 +266,16 @@ class SimController_CL:
         self.drift(dt_step)
         self.kick(dt_step / 2.0)
 
-        self._relative_velocity(self.pos_cl, self.vel_cl, self.velocity_relative_cl)
-        self._merge(dt_step, self.flags_cl, self.velocity_relative_cl, self.distance_edge_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
-        self._bounce(self.flags_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl, self.velocity_relative_cl, self.distance_edge_cl)
+        
+        if config.COLLISION_MERGE_ENABLE or config.COLLISION_BOUNCE_ENABLE:
+            self._relative_velocity(self.pos_cl, self.vel_cl, self.velocity_relative_cl)
+        
+        if config.COLLISION_MERGE_ENABLE:
+            self._merge(dt_step, self.flags_cl, self.velocity_relative_cl, self.distance_edge_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
+        
+        if config.COLLISION_BOUNCE_ENABLE:
+            self._bounce(self.flags_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl, self.velocity_relative_cl, self.distance_edge_cl)
+
         self._interaction(dt_step, self.flags_cl, self.pos_cl, self.vel_cl, self.radius_cl, self.mass_cl)
     
     def single_step(self, dt_step):

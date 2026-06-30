@@ -5,7 +5,7 @@ from orbitalengineer.helpers import create_primary, create_secondary, random_pos
 import matplotlib.pyplot as plt
 from matplotlib import colors
 
-SOL_COLOR = (0.95, 0.8, 0.45, 1.0)
+SOL_COLOR = (0.95, 0.8, 0.05, 1.0)
 
 
 cmap = plt.colormaps['gist_rainbow']
@@ -47,9 +47,9 @@ def on_activate(app: App):
     #sol1._radius = 50
     #app.insert_particle(sol1, color=SOL_COLOR)
 
-    #dist_norm = colors.Normalize(sol1.get_radius() + dist_min, dist_max)
-
     barycenter = create_primary(mass=2e12, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS)
+    
+    dist_norm = colors.Normalize(dist_min, dist_max)
     
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)
@@ -63,8 +63,8 @@ def on_activate(app: App):
             #prograde=(i <= N/2.0),
             #flags=flags.MERGE_AS_SECONDARY|flags.BOUNCE|flags.REPEL_ON_OVERLAP,
             flags=flags  .MERGE,
-        #), color=cmap(1-dist_norm(abs(pos))))
-        ), color=(1,1,1,1))
+        ), color=cmap(1-dist_norm(abs(pos))))
+        #), color=(1,1,1,1))
 
     app.orbital.Lx = Lx
     app.orbital.coef_of_restitution = 0.98

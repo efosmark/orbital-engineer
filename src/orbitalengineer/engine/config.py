@@ -27,6 +27,13 @@ MAX_STEPS_PER_TICK = int(1.0/np.sqrt(DEFAULT_DT_BASE))
 MAX_SUB_STEPS = 5
 
 #############################################
+# Features
+#############################################
+
+COLLISION_MERGE_ENABLE = True
+COLLISION_BOUNCE_ENABLE = True
+
+#############################################
 # IPC Settings
 #############################################
 
