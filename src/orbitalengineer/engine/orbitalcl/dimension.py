@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 from typing import Sequence
 import pyopencl as cl
-from numpy.typing import NDArray
 
 from orbitalengineer.engine.orbitalcl.tracer import EventTracer
 

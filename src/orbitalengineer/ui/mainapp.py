@@ -1,23 +1,17 @@
 import json
 from typing import cast
 
-from orbitalengineer.engine.particle import Particle
+from orbitalengineer.ipc.client import ClientSocketConnection
 from orbitalengineer.ui.select_device_window import SelectDeviceWindow
-
-from orbitalengineer.helpers import seed
-from orbitalengineer.names import make_name
-
 from orbitalengineer.ui import model, ui_config
 from orbitalengineer.ui.canvas import pz
-from orbitalengineer.ui.ticker import TickController
 from orbitalengineer.ui.mainwindow import MainWindow
-from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib, GObject
+from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject, GLib
 from orbitalengineer.ui.keyinput import KeyInput
-
-from orbitalengineer.engine import config, log_timing, logger
-from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
-from orbitalengineer.engine.clock import SimClock
-
+from orbitalengineer.engine.particle import Particle
+from orbitalengineer.engine import logger
+from orbitalengineer.helpers import seed
+from orbitalengineer.names import make_name
 
 class App(Gtk.Application):
     
@@ -29,8 +23,7 @@ class App(Gtk.Application):
         self.resume_from_file = resume_from_file
         
         self.view = model.ViewModel()
-        self.clock = SimClock()
-        self.orbital = SimController_CL()
+        self.orbital = ClientSocketConnection()
         self.camera = pz.Camera2D()
         
         self.view.connect("notify::paused", self.on_paused_changed)
@@ -43,30 +36,21 @@ class App(Gtk.Application):
         self._toggle_paused()
     
     def on_speed_changed(self, model, param):
-        self.clock.speed = self.view.props.speed
-
-    def start_tick(self):
-        self.orbital.accum = 0
-        self.orbital.last_now = None
-        self.clock.start()
-        self.tick_ctl = TickController(self.orbital, self.clock)
-        self.tick_ctl.start()
+        self.orbital.set_clock_speed(self.view.props.speed)
         
     def _toggle_paused(self):
         if self.view.props.paused:
-            self.clock.stop()
-            if hasattr(self, 'tick_ctl'):
-                self.tick_ctl.stop()
+            self.orbital.stop()
         else:
-            self.start_tick()
+            self.orbital.start()
 
     def tick_once(self):
         if not self.view.props.paused: return
-        self.orbital.accum = 0
-        self.orbital.last_now = None
-        self.clock.increment_by (self.orbital.dt_base)
-        if self.orbital.tick(self.clock.time()) > 0:
-            GLib.idle_add(self.orbital.sync)
+        #self.orbital.accum = 0
+        #self.orbital.last_now = None
+        #self.clock.increment_by(self.orbital.dt_base)
+        if self.orbital.tick(self.orbital.clock.time()) > 0:
+           GLib.idle_add(self.orbital.sync)
 
     def insert_particle(self, particle:Particle, color:tuple[float, float, float, float]=(1,1,1,1)) -> int:
         idx = self.orbital.add_particle(particle)
@@ -93,7 +77,7 @@ class App(Gtk.Application):
             camera=self.camera,
             view=self.view,
             ctl=self.orbital,
-            clock=self.clock,
+            clock=self.orbital.clock,
         )
         self.key_input = KeyInput(self, win)
         win.present()
@@ -152,7 +136,7 @@ class App(Gtk.Application):
 
     def to_dict(self) -> dict:
         return {
-            "clock": self.clock.to_dict(),
+            #"clock": self.clock.to_dict(),
             "camera": self.camera.to_dict(),
             "orbital": self.orbital.to_dict(),
             "view": self.view.to_dict(),
@@ -170,16 +154,16 @@ class App(Gtk.Application):
         self.platform_id = obj.get('platform_id', self.platform_id)
         self.device_id = obj.get('device_id', self.device_id)
         
-        self.clock = SimClock()
-        self.clock._speed = obj["clock"]["_speed"]
-        self.clock._duration = obj["clock"]["_duration"]
-        self.clock.running = obj["clock"]["running"]
+        #self.clock = SimClock()
+        #self.clock.speed = obj["clock"]["speed"]
+        #self.clock._duration = obj["clock"]["duration"]
+        #self.clock.running = obj["clock"]["running"]
         
         self.camera.zoom = obj["camera"]["zoom"]
         self.camera.offset = obj["camera"]["offset"]
         
         self.view.load_from_dict(obj["view"])
-        self.orbital.load_from_dict(obj["orbital"])
+        self.orbital.load_from_dict(obj)
     
     def save_scenario(self):
         if self.orbital.is_initialized:

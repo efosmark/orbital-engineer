@@ -17,7 +17,7 @@ class VelocityPipeline(CLPipelineStep):
         self.grid_stride_global_work_size = (self.N * self.Lx, )
         self.grid_stride_local_work_size = (self.Lx, )
     
-    def compute_velocity(self, dt_step:float, status: cl.Buffer, position: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer, distance_edge: cl.Buffer, velocity: cl.Buffer):
+    def compute_velocity(self, dt_step:float, status: cl.Buffer, position: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer, velocity: cl.Buffer, force: cl.Buffer):
         return self.tr.add("velocity",
             self._compute_velocity(
                 self.queue,
@@ -31,11 +31,9 @@ class VelocityPipeline(CLPipelineStep):
                 position,
                 mass,
                 radius,
-                distance_edge,
-                self._acceleration_cl,
-                velocity
+                velocity,
+                force
             ))
 
-    def __call__(self, dt_step:float, status: cl.Buffer, position: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer, distance_edge: cl.Buffer, velocity: cl.Buffer):
-        self.compute_velocity(dt_step, status, position, mass, radius, distance_edge, velocity)
-        cl.enqueue_copy(self.queue, self._acceleration, self._acceleration_cl)
+    def __call__(self, dt_step:float, status: cl.Buffer, position: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer, velocity: cl.Buffer, force: cl.Buffer):
+        self.compute_velocity(dt_step, status, position, mass, radius, velocity, force)

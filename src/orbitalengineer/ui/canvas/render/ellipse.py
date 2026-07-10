@@ -1,7 +1,7 @@
 import math
 from typing import cast
 import cairo
-from orbitalengineer.engine import twobody
+from orbitalengineer.twobody import twobody
 from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.color import hex_to_rgba

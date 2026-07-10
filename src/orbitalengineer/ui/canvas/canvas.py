@@ -1,13 +1,14 @@
+import numpy as np
+
 from orbitalengineer.engine.orbitalcl import flags
-from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui import model
-from orbitalengineer.ui.canvas.render.hud_clock import HudClockRenderer
-from orbitalengineer.ui.canvas.render.warning import WarningRenderer
-from orbitalengineer.ui.canvas.render.selection import SelectionRenderer
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, Gsk
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.canvas.pz import Camera2D, Camera2DController
+from orbitalengineer.ui.canvas.render.hud_clock import HudClockRenderer
+from orbitalengineer.ui.canvas.render.warning import WarningRenderer
+from orbitalengineer.ui.canvas.render.selection import SelectionRenderer
 from orbitalengineer.ui.canvas.render.focus_info import FocusInfoRenderer
 from orbitalengineer.ui.canvas.render.force import ForceVectorRenderer
 from orbitalengineer.ui.canvas.render.debug import DebugInfoRenderer
@@ -19,14 +20,14 @@ from orbitalengineer.ui.canvas.render.particle import ParticleRenderer
 from orbitalengineer.ui.canvas.render.pinpoint import PinpointRenderer
 from orbitalengineer.ui.canvas.render.reticle import ReticleRenderer
 
-import numpy as np
-import pyopencl as cl
+from orbitalengineer.ipc.client import ClientSocketConnection
+
 
 HOVER_MARGIN = 15
 
 class MoveParticleController:
 
-    def __init__(self, canvas, camera, orbital, view_model):
+    def __init__(self, canvas, camera, orbital:ClientSocketConnection, view_model):
         self.canvas = canvas
         self.camera = camera
         self.orbital = orbital
@@ -57,7 +58,7 @@ class MoveParticleController:
             &(self.orbital.position.imag <= y_end)
             &(self.orbital.position.imag >  y_start)
             &((self.orbital.flags & flags.REMOVED) != flags.REMOVED)
-        )[0]
+        )[0].tolist()
 
     def on_drag_begin(self, gesture, start_x, start_y):
         event = gesture.get_last_event(None)
@@ -96,8 +97,9 @@ class MoveParticleController:
             if self._orig_particle_positions is None:
                 self._orig_particle_positions = self.orbital.position[self.view.selected_particles]
             offset = np.complex64(offset_x, offset_y)
-            self.orbital.position[self.view.selected_particles] = self._orig_particle_positions + offset              
-            cl.enqueue_copy(self.orbital.q, self.orbital.pos_cl, self.orbital.position)  
+            self.orbital.rel_move(self.view.selected_particles, offset_x, offset_y)
+            #self.orbital.position[self.view.selected_particles] = self._orig_particle_positions + offset              
+            #cl.enqueue_copy(self.orbital.q, self.orbital.pos_cl, self.orbital.position)  
         
     def on_drag_end(self, gesture, start_x, start_y):
         self.view.props.dragging_particle = None
@@ -135,7 +137,7 @@ class MouseController:
 class OrbitalCanvas(Gtk.DrawingArea):
     hud_renderers:list[renderer.Renderer]
 
-    def __init__(self, camera:Camera2D, view: model.ViewModel, orbital:SimController_CL, clock:SimClock):
+    def __init__(self, camera:Camera2D, view: model.ViewModel, orbital:ClientSocketConnection, clock:SimClock):
         super().__init__()
         
         self.camera = camera
@@ -154,13 +156,13 @@ class OrbitalCanvas(Gtk.DrawingArea):
         ]
         
         self.scene_renderers = [
-            HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
-            ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
+            #HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
+            #ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
             EllipseRenderer(self.view, self.camera, self.orbital, self.clock),
             ParticleRenderer(self.view, self.camera, self.orbital, self.clock),
             SelectionRenderer(self.view, self.camera, self.orbital, self.clock),
             ReticleRenderer(self.view, self.camera, self.orbital, self.clock),
-            PinpointRenderer(self.view, self.camera, self.orbital, self.clock),
+            #PinpointRenderer(self.view, self.camera, self.orbital, self.clock),
         ]
         
         self.hud_fg_renderers = [

@@ -2,7 +2,7 @@ import time
 from typing import Any, ClassVar, Sequence
 import numpy as np
 
-from orbitalengineer.engine import twobody
+from orbitalengineer.twobody import twobody
 from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.engine.particle import Particle
 
@@ -72,18 +72,18 @@ class ParticleCL(Particle):
         idx_start = self.idx * self.ctl.N
         idx_stop = idx_start + self.ctl.N
                 
-        # Pull the acceleration for 0..N from the acceleration matrix (row=self.idx)
-        accel = np.abs(np.nan_to_num(self.ctl._velocity._acceleration[idx_start:idx_stop]))
-        accel_total = np.sum(accel) + 1e-15
+        # Pull the velocity for 0..N from the velocity matrix (row=self.idx)
+        force = np.abs(np.nan_to_num(self.ctl.force[idx_start:idx_stop]))
+        force_total = np.sum(force) + 1e-15
 
         filter = self.ctl.mass <= self.get_mass()                     # Greater mass than self
         filter |= (self.ctl.flags & flags.REMOVED) == flags.REMOVED   # Only valid bodies
 
         # zero out for any invalid bodies (ensures they never get chosen as the focus)
-        accel[filter] = 0.0
+        force[filter] = 0.0
 
-        # Normalize the acceleration
-        influence = np.true_divide(accel, accel_total)
+        # Normalize the force
+        influence = np.true_divide(force, force_total)
 
         # Find the top acceleration
         focus_idx = np.argmax(influence)    

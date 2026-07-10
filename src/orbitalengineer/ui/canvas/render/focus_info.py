@@ -3,9 +3,8 @@ from typing import cast
 import numpy as np
 import cairo
 
-from orbitalengineer.engine import twobody
+from orbitalengineer.twobody import twobody
 from orbitalengineer.ui.canvas import renderer
-from orbitalengineer.ui.gtk4 import Gtk, Graphene
 from orbitalengineer.ui.fmt import format_time, mag_format, positive_angle
 
 X_PADDING = 10
@@ -135,12 +134,6 @@ class FocusInfoRenderer(renderer.Renderer):
         mag, angle = polar(velocity)
         angle_degrees = np.degrees(positive_angle(angle))
         
-        min_dt = b.get_min_toi()
-        if np.isinf(min_dt):
-            min_dt = '--.--- s'
-        else:
-            min_dt = f"{min_dt:.3f} s"
-        
         disp.extend([
             ("Velocity",  f"{mag_format(mag)} m/s"),
             ("Heading",   f"{angle_degrees:.1f}°"),
@@ -164,7 +157,6 @@ class FocusInfoRenderer(renderer.Renderer):
         cr.translate(0, 20 + h)
         
         fields = [
-            ('Influence',        f"{orbit.accuracy*100:.2f}%"),
             ('Orbital Energy',   f"{mag_format(orbit.orbital_energy)}"),
             ('Eccentricity',     f"{orbit.eccentricity:.1f}"),
             ('Grav. Param.',     f"{mag_format(orbit.standard_grav_param)}"),

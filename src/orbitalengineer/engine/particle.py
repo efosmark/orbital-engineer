@@ -35,6 +35,16 @@ class Particle(Protocol):
         ])
         return f"{self.__class__.__name__}({field_string})"
 
+    def asdict(self) -> dict:
+        p = self.get_position()
+        v = self.get_velocity()
+        return {
+            'flags': self.get_flags(),
+            'position': [round(p.real, 6), round(p.imag, 6)],
+            'velocity': [round(v.real, 6), round(v.imag, 6)],
+            'mass': self.get_mass(),
+            'radius': self.get_radius(),
+        }
 
 class ParticleRaw(Particle):
     idx:int|None = None

@@ -55,7 +55,6 @@ kernels. Supports body merging or collision bouncing.
     │  - position                    │         ┃ 
     │  - mass                        │         ┃ 
     │  - radius                      │         ┃ 
-    │  - edge_distance               │         ┃ 
     │                                │         ┃ 
     ╰─╥──────────────────────────────╯        ━┛
       ║                                         
@@ -67,17 +66,7 @@ kernels. Supports body merging or collision bouncing.
     │  - node_min_dt     - position  │         ┃
     │  - velocity                    │         ┃
     │                                │         ┃
-    ╰─╥──────────────────────────────╯         ┃ 
-      ║                                        ┃
-    ╭─╨───────────────────────────────────╮    ┃
-    │ compute_edge_distance               │    ┃
-    ├─────────────────────────────────────┤    ┃
-    │                                     │    ┃
-    │  IN:               OUT:             │    ┃
-    │  - position        - edge_distance  │    ┃
-    │  - radius                           │    ┃
-    │                                     │    ┃
-    ╰─╥───────────────────────────────────╯   ━┛
+    ╰─╥──────────────────────────────╯        ━┛
       ║                                         
     ╭─╨──────────────────────────────╮        ━┓
     │ compute_velocity               │         ┃ KICK

@@ -1,15 +1,15 @@
 from typing import Any, cast
 
-from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui import canvas, ui_config
-from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib, GObject
+from orbitalengineer.ipc.client import ClientSocketConnection
+from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib
 from orbitalengineer.ui.model import ViewModel
 
 
 class MainWindow(Gtk.ApplicationWindow):
 
-    def __init__(self, application, title, camera, view: ViewModel, ctl:SimController_CL, clock:SimClock):
+    def __init__(self, application, title, camera, view: ViewModel, ctl:ClientSocketConnection, clock:SimClock):
         Gtk.ApplicationWindow.__init__(self, application=application, title=title)
         self.ctl = ctl
         self.clock = clock
@@ -35,6 +35,11 @@ class MainWindow(Gtk.ApplicationWindow):
         menu_button.set_menu_model(self.__build_menu())
         header.pack_end(menu_button)
         self._init_menu_actions()
+
+        def on_tick(widget, frame_clock):
+            self.ctl.sync()
+            return True
+        self.add_tick_callback(on_tick)
 
     def _init_menu_actions(self):
         app = cast(Any, self.get_application())

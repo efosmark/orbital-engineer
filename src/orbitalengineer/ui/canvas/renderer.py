@@ -1,8 +1,8 @@
 import cairo
-from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui import model
 from orbitalengineer.ui.canvas import pz
+from orbitalengineer.ipc.client import ClientSocketConnection
 from orbitalengineer.ui.gtk4 import GObject, Graphene
 
 
@@ -12,7 +12,7 @@ class Renderer(GObject.GObject):
     camera = GObject.Property(type=object)
     orbital:OrbitalSimController = GObject.Property(type=object) # type:ignore
     
-    def __init__(self, view:model.ViewModel, camera:pz.Camera2D, orbital:SimController_CL, clock:SimClock):
+    def __init__(self, view:model.ViewModel, camera:pz.Camera2D, orbital:ClientSocketConnection, clock:SimClock):
         super().__init__()
         self.view = view
         self.camera = camera

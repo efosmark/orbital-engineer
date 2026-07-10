@@ -20,7 +20,7 @@ class BouncePipeline(CLPipelineStep):
         self._position_intermediate_cl = self._create_buffer(self._position_intermediate)
 
 
-    def __call__(self, status: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer, velocity_relative: cl.Buffer, distance_edge: cl.Buffer):
+    def __call__(self, status: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
         self.tr.add("collide_bounce",
             self._compute_bouncing_collision(
                 self.queue,
@@ -34,8 +34,6 @@ class BouncePipeline(CLPipelineStep):
                 velocity,
                 mass,
                 radius,
-                velocity_relative,
-                distance_edge,
                 self._velocity_intermediate_cl,
                 self._position_intermediate_cl,
                 self.collision_point_cl

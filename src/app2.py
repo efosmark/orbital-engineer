@@ -10,7 +10,7 @@ from matplotlib import colors
 cmap = plt.colormaps['plasma']
 
 Lx = 256
-N = 2048
+N = 1024
 
 mass_min, mass_max = 1e2, 1e6
 dist_min, dist_max = 1, 15000
@@ -29,7 +29,7 @@ def on_activate(app: App):
             velocity=velocity,
             radius=radius,
             mass=mass,
-            flags=flags.MERGE#|flags.DISABLE_BOUNCE|flags.REPEL_ON_OVERLAP
+            flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY
          ), color=cmap(mass_norm(mass)))
 
     # for i in range(128):
@@ -46,10 +46,10 @@ def on_activate(app: App):
     #         mass=mass
     #     ), color=(0.5,1,0.5,1))
 
-    app.orbital.Lx = Lx
+    #app.orbital.Lx = Lx
     
     #app.orbital.collision_strategy = CollisionStrategy.BOUNCE
-    app.orbital.coef_of_restitution = 0.92
+    app.orbital.coef_of_restitution = 0.62
     app.view.show_focused_history = True
     #app.view.show_debug_info = False
     #app.view.show_focus_info = True
@@ -57,10 +57,7 @@ def on_activate(app: App):
     #app.view.show_plot_at_startup = False
     app.relative_zoom(1.0)
  
-def run():
+if __name__ == "__main__":
     app = App()
     app.connect("activate", on_activate)
     app.run(None)
-
-if __name__ == "__main__":
-    run()

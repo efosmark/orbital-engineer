@@ -4,7 +4,6 @@ import time
 
 from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
 from orbitalengineer.engine.clock import SimClock
-from orbitalengineer.ui.gtk4 import GLib
 
 class TickController:
         
@@ -24,7 +23,7 @@ class TickController:
                 continue
 
             if self.orbital.tick(now) > 0:
-                GLib.idle_add(self.orbital.sync)
+                self.orbital.sync()
 
             now = self.clock.time()
             next_tick_at += (self.orbital.dt_base / self.clock.speed) * 0.4

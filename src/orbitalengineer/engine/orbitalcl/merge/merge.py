@@ -31,7 +31,7 @@ class MergePipeline(CLPipelineStep):
         self._groups_cl = self._create_buffer(self._groups)
         self._groups_prev = np.arange(self.N, dtype=np.uint32)
     
-    def collide_merge_group_assign(self, dt_step: float, status: cl.Buffer, mass: cl.Buffer, velocity_relative: cl.Buffer, distance_edge: cl.Buffer):
+    def collide_merge_group_assign(self, flags: cl.Buffer, position: cl.Buffer, radius: cl.Buffer):
         return self.tr.add("collide_merge_group_assign",
             self._assign_merge_groups(
                 self.queue,
@@ -40,17 +40,15 @@ class MergePipeline(CLPipelineStep):
                 
                 # Args
                 np.uint32(self.N),
-                np.float32(dt_step),
-                status,
-                mass,
-                velocity_relative,
-                distance_edge,
+                flags,
+                position,
+                radius,
                 self._groups_cl
             )
         )
     
     
-    def collide_merge_group_reduce(self, status: cl.Buffer, mass: cl.Buffer):
+    def collide_merge_group_reduce(self, flags: cl.Buffer):
         num_workgroups = (self.N // self.Lx) + 1
         result_indices = np.zeros(num_workgroups, dtype=np.uint32)
         result_buffer = self._create_buffer(result_indices)
@@ -66,8 +64,7 @@ class MergePipeline(CLPipelineStep):
                 
                 # Args
                 np.uint32(self.N),
-                status,
-                mass,
+                flags,
                 self._groups_cl,
                 result_buffer,
             ))
@@ -101,9 +98,9 @@ class MergePipeline(CLPipelineStep):
                 self._radius_intermediate_cl
             ))        
     
-    def __call__(self, dt_step, flags: cl.Buffer, velocity_relative:cl.Buffer, edge_distance: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
-        self.collide_merge_group_assign(dt_step, flags, mass, velocity_relative, edge_distance)
-        self.collide_merge_group_reduce(flags, mass)
+    def __call__(self, flags: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
+        self.collide_merge_group_assign(flags, position, radius)
+        self.collide_merge_group_reduce(flags)
         self.compute_merging_collision(flags, position, velocity, mass, radius)
         
         cl.enqueue_copy(self.queue, flags,    self._flags_intermediate_cl)

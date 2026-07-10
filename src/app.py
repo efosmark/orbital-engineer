@@ -11,9 +11,9 @@ SOL_COLOR = (0.95, 0.8, 0.05, 1.0)
 cmap = plt.colormaps['gist_rainbow']
 
 Lx = 256
-N = 1024
-mass_min, mass_max = 1e2, 1e8
-dist_min, dist_max = 2000, 200000
+N = (1024 * 4) - 2
+mass_min, mass_max = 100, 10000
+dist_min, dist_max = 1000, 10_000
 
 po = 7000
 d = abs(po)
@@ -21,57 +21,39 @@ d = abs(po)
 def on_activate(app: App):
     global dist_min, dist_max
 
-    barycenter = create_primary(mass=1e12 / 4.0, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS)
-    #barycenter._radius = 1    
+    center = create_primary(mass=1e8, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS)
+    app.insert_particle(center, color=SOL_COLOR)
 
     app.insert_particle(create_secondary(
-        barycenter,
-        mass=1e12,
-        position=complex(0, -10000),
+        center,
+        mass=1e7,
+        position=complex(0, dist_max / 2.0),
         flags=flags.MERGE,
-    ), color=SOL_COLOR)
-    
-    app.insert_particle(create_secondary(
-        barycenter,
-        mass=1e12,
-        position=complex(0, 10000),
-        flags=flags.MERGE,
-    ), color=SOL_COLOR)
+    ), color=(1,1,1,1))
 
-
-    #sol = create_primary(mass=1e10, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS|flags.REPEL_ON_OVERLAP)
-    #sol._radius = 30_000
-    #app.insert_particle(sol, color=(1,1,1,0.05))
-
-    #sol1 = create_primary(mass=3.5e10, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS|flags.MERGE_AS_PRIMARY)
-    #sol1._radius = 50
-    #app.insert_particle(sol1, color=SOL_COLOR)
-
-    barycenter = create_primary(mass=2e12, flags=flags.FIXED_POSITION|flags.FIXED_VELOCITY|flags.FIXED_RADIUS)
-    
     dist_norm = colors.Normalize(dist_min, dist_max)
     
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)
         pos = random_position(dist_min, dist_max)
         app.insert_particle(create_secondary(
-            barycenter,
+            center,
             mass=mass,
             position=pos,
             #ecc=1.0,
             #radius=50,
             #prograde=(i <= N/2.0),
+            #flags=flags.REPEL_ON_OVERLAP,
             #flags=flags.MERGE_AS_SECONDARY|flags.BOUNCE|flags.REPEL_ON_OVERLAP,
-            flags=flags  .MERGE,
+            flags=flags.MERGE,
         ), color=cmap(1-dist_norm(abs(pos))))
-        #), color=(1,1,1,1))
 
-    app.orbital.Lx = Lx
+    #app.orbital.Lx = Lx
     app.orbital.coef_of_restitution = 0.98
     app.view.show_focused_history = True
     app.view.show_debug_info = False
     app.view.show_focus_info = True
-    app.relative_zoom(1/200.0)
+    app.relative_zoom(1/40.0)
 
 def run():
     app = App()

@@ -13,11 +13,9 @@
  */
 __kernel void collide_merge_group_assign(
                const uint    N,
-               const float   dt,
     __global   const uint*   restrict flags,
-    __global   const float*  restrict mass,
-    __global   const float*  restrict velocity_relative,
-    __global   const float*  restrict edge_distance,
+    __global   const float2* restrict position,
+    __global   const float*  restrict radius,
     __global         uint*   restrict merge_group
 ) {
     GRID_STRIDE_INIT();
@@ -26,7 +24,8 @@ __kernel void collide_merge_group_assign(
     uint min_index = i;
 
     GRID_STRIDE_IJ(
-        if ((flags[j]&REMOVED) || edge_distance[IDX] > EPS_DIST) {
+        float edge_dist = fast_length(position[j] - position[i]) - radius[i] - radius[j];
+        if ((flags[j]&REMOVED) || edge_dist > EPS_DIST) {
             continue;
         } else if ((flags[j]&MERGE_AS_PRIMARY) && (flags[i]&MERGE_AS_SECONDARY) && j < i) {
             min_index = j;
@@ -48,7 +47,6 @@ __kernel void collide_merge_group_assign(
 __kernel void collide_merge_group_reduce(
              const uint    N,
     __global const uint*   restrict flags,
-    __global const float*  restrict mass,
     __global       uint*   restrict merge_group,
     __global       uint*   restrict has_updates
 ) {
