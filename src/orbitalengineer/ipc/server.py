@@ -1,13 +1,15 @@
-import json
 import socket
 
+from orbitalengineer.engine import logger
+
 from orbitalengineer.engine.clock import SimClock
+from orbitalengineer.engine.config import SERVER_IPC_HOST, SERVER_IPC_PORT
 from orbitalengineer.engine.orbitalcl import orbitalcl
-from orbitalengineer.ipc.response import _SharedMemoryState, ConfigResponse, DeviceResponse, ServerResponse, SharedMemoryStateResponse, StatusResponse
+from orbitalengineer.ipc import transport
 from orbitalengineer.ipc.ticker import TickController
 
-HOST = ''        # Symbolic name meaning all available interfaces
-PORT = 50008     # Arbitrary non-privileged port
+import pyopencl as cl
+import numpy as np
 
 class OrbitalControlServer:
     tick_ctl:TickController
@@ -16,118 +18,135 @@ class OrbitalControlServer:
         self.orbital = orbitalcl.SimController_CL()
         self.clock = SimClock()
 
-    def serve(self):
+    def serve(self, host=SERVER_IPC_HOST, port=SERVER_IPC_PORT):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind((HOST, PORT))
+            s.bind((host, port))
             s.listen(1)
-            print(f"Orbital Server started. {HOST=} {PORT=}")
-            while True:
-                conn, addr = s.accept()
+            print(f"Orbital Server started. {host=} {port=}")
+            conn, addr = s.accept()
+            try:
                 self._handle_client(conn, addr)
+            except ConnectionResetError as e:
+                print("Connection reset by peer.")
         self.orbital.disconnect()
+
+    def initialize(self, platform_id:int, device_id:int, particles):
+        if self.orbital.is_initialized:
+            logger.warning("Already initialized. Re-initializing...")
+            self.end()
+        self.orbital.set_cl_device(platform_id, device_id)
+        self.orbital.init_sim(particles)
+
+    def start(self):
+        self.tick_ctl = TickController(self.orbital, self.clock)
+        self.tick_ctl.start()
+        self.clock.start()
+
+    def pause(self):
+        if hasattr(self, 'tick_ctl'):
+            self.tick_ctl.stop()
+        self.clock.stop()
+    
+    def end(self):
+        self.pause()
+        self.orbital.disconnect()
+        self.orbital.is_initialized = False
+
+    def _get_shared_memory_info(self, field) -> transport.SharedMemoryInfo:
+        return transport.SharedMemoryInfo(
+            name=self.orbital.shm[field].name,
+            dtype=str(getattr(self.orbital, field).dtype),
+            size=self.orbital.shm[field].size,
+            shape=getattr(self.orbital, field).shape
+        )
+
+    def _get_init_response(self):            
+        return transport.InitResponse(
+            initialized=self.orbital.is_initialized,
+            config=self._get_config_response(),
+            memory=self._get_shared_memory_response()
+        )
+
+    def _get_config_response(self):
+        return transport.ConfigResponse(
+            G = self.orbital.G,
+            N = self.orbital.N,
+            coef_of_restitution=self.orbital.coef_of_restitution,
+            dt_base=self.orbital.dt_base,
+            EPS_DIST=self.orbital.EPS_DIST,
+            EPS_TIME=self.orbital.EPS_TIME
+        )
+
+    def _get_shared_memory_response(self):
+        return transport.SharedMemoryResponse(
+            flags=self._get_shared_memory_info('flags'),
+            velocity=self._get_shared_memory_info('velocity'),
+            position=self._get_shared_memory_info('position'),
+            mass=self._get_shared_memory_info('mass'),
+            radius=self._get_shared_memory_info('radius'),
+            force=self._get_shared_memory_info('force'),
+        )
+
+    def _get_status_response(self):
+        return transport.StatusResponse(
+            initialized=self.orbital.is_initialized,
+            tick_id=self.orbital.tick_id,
+            accum=float(self.orbital.accum),
+            clock=self.clock,
+        )
 
     def _handle_client(self, conn, addr):
         print("Connection from", addr)
         try:
-            buffer = b''
             while True:
-                data = conn.recv(1024)
-                buffer += data
-                if not data: break
-                if b'\n' not in buffer: continue
-                
-                data, buffer = buffer.split(b'\n', 1)
-                parsed = json.loads(data)
-                response = self.handle_request(parsed)
-                conn.sendall(json.dumps(response.to_dict()).encode() + b"\n")
+                try:
+                    _, message_type, payload = transport.recv_message(conn, transport.MessageType)
+                except ConnectionError as e:
+                    logger.error("Connection error: %s", e)
+                    break
+                self._handle_request(conn, transport.MessageType(message_type), payload)
         except KeyboardInterrupt:
-            self.orbital.disconnect()
-        
-        if hasattr(self, 'tick_ctl'):
-            self.tick_ctl.stop()
+            print("Shutting down server.")
+        self.end()
 
-    def _get_shared_memory_state(self) -> SharedMemoryStateResponse:
-        def _get_shared_memory_state(field):
-            return _SharedMemoryState(
-                name=self.orbital.shm[field].name,
-                dtype=str(getattr(self.orbital, field).dtype),
-                size=self.orbital.shm[field].size,
-                shape=getattr(self.orbital, field).shape
-            )  
-        m = SharedMemoryStateResponse()
-        m.flags = _get_shared_memory_state('flags')
-        m.velocity = _get_shared_memory_state('velocity')
-        m.position = _get_shared_memory_state('position')
-        m.mass = _get_shared_memory_state('mass')
-        m.radius = _get_shared_memory_state('radius')
-        m.force = _get_shared_memory_state('force')
-        return m    
-    
-    def handle_request(self, req):
-        resp = ServerResponse()
+    def _handle_request(self, conn:socket.socket, message_type:transport.MessageType, payload):
+        if message_type == transport.MessageType.INIT:
+            req = transport.InitRequest.from_dict(payload)
+            self.initialize(req.device_id, req.platform_id, req.particles)
+            transport.send_message(conn, transport.MessageType.INIT, self._get_init_response())
         
-        if 'reset' in req:
-            self.orbital = orbitalcl.SimController_CL()
-            self.clock = SimClock()
-            resp.reset = True
-        
-        if 'load' in req:
-            self.orbital.load_from_dict(req['load'])
-            resp.load = True
-         
-        if 'device' in req:
-            device = req['device']
-            self.orbital.set_cl_device(device['platform_id'], device['device_id'])
-            resp.device = DeviceResponse(**device)
-        
-        if req.get('init', False):
-            if not self.orbital.is_initialized:
-                self.orbital.init_sim(req["particles"])
-                resp.init = True
-                resp.config = ConfigResponse(
-                    G = self.orbital.G,
-                    N = self.orbital.N,
-                    coef_of_restitution=self.orbital.coef_of_restitution,
-                    dt_base=self.orbital.dt_base,
-                    EPS_DIST=self.orbital.EPS_DIST,
-                    EPS_TIME=self.orbital.EPS_TIME
-                )
-            resp.clock = self.clock
-            resp.memory = self._get_shared_memory_state()
-        
-        if req.get('sync', False):
+        elif message_type == transport.MessageType.SYNC:
             self.orbital.sync()
-            resp.sync = True
-            resp.clock = self.clock
+            transport.send_message(conn, transport.MessageType.STATUS, self._get_status_response())
+
+        elif message_type == transport.MessageType.STATUS:
+            transport.send_message(conn, transport.MessageType.STATUS, self._get_status_response())
         
-        if req.get('start', False):
-            self.tick_ctl = TickController(self.orbital, self.clock)
-            self.tick_ctl.start()
-            self.clock.start()
-            resp.start = True
+        elif message_type == transport.MessageType.BODY_SHIFT:
+            req = transport.ShiftVectorsRequest(**payload)
+            self.orbital.apply_vector_offset(req.vector_name, req.ids, req.op, req.offset)
+            self.orbital.nudge()
+            transport.send_message(conn, transport.MessageType.SUCCESS)
         
-        if req.get('stop', False):
-            if hasattr(self, 'tick_ctl'):
-                self.tick_ctl.stop()
-            self.clock.stop()
-            resp.stop = True
-            resp.clock = self.clock
+        elif message_type == transport.MessageType.CLOCK_START:
+            self.start()
+            transport.send_message(conn, transport.MessageType.SUCCESS)
         
-        if 'clock' in req:
-            self.clock.update(req['clock'])
-            resp.clock = self.clock
+        elif message_type == transport.MessageType.CLOCK_PAUSE:
+            self.pause()
+            transport.send_message(conn, transport.MessageType.SUCCESS)
         
-        if 'tick' in req:
-            n_ticks = self.orbital.tick_dt(req['tick'])
-            resp.tick = n_ticks > 0
+        elif message_type == transport.MessageType.CLOCK_SET_SPEED:
+            req = transport.ClockSetSpeedRequest(**payload)
+            self.clock.speed = req.speed
+            transport.send_message(conn, transport.MessageType.SUCCESS)
         
-        if self.orbital.is_initialized:
-            resp.status = StatusResponse(
-                tick_id = self.orbital.tick_id,
-                accum = float(self.orbital.accum)
-            )
+        elif message_type == transport.MessageType.END:
+            self.end()
+            transport.send_message(conn, transport.MessageType.SUCCESS)
         
-        return resp
+        else:
+            logger.error("Unrecognized message_type %s", message_type)
 
 if __name__ == "__main__":
     server = OrbitalControlServer()

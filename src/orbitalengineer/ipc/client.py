@@ -1,20 +1,20 @@
-import atexit
-import json
 import socket
 from multiprocessing import shared_memory
-from typing import Sequence, cast
+from typing import Any, Sequence, cast
+from dataclasses import fields
 
 import numpy as np
 from numpy.typing import NDArray
 
+from orbitalengineer.engine import logger
+from orbitalengineer.engine import config
 from orbitalengineer.engine.clock import SimClock
+from orbitalengineer.engine.config import SERVER_IPC_HOST, SERVER_IPC_PORT
 from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
 from orbitalengineer.engine.particle import Particle
-from orbitalengineer.ipc.response import _SharedMemoryState, ConfigResponse, ServerResponse, SharedMemoryStateResponse
+from orbitalengineer.ipc import transport
 
-HOST = ''    # The remote host
-PORT = 50008 # The same port as used by the server
 
 class ClientSocketConnection:
     _shared:dict = {}
@@ -23,12 +23,12 @@ class ClientSocketConnection:
     tick_id:int = 0
 
     accum:float = 0
-    dt_base:float
-    N:int
-    G:float
-    coef_of_restitution:float
-    EPS_DIST:float
-    EPS_TIME:float
+    dt_base:float = config.DEFAULT_DT_BASE
+    N:int = 0
+    G:float = config.DEFAULT_G
+    coef_of_restitution:float = config.COEF_OF_RESTITUTION
+    EPS_DIST:float = config.EPS_DIST
+    EPS_TIME:float = config.EPS_TIME
     
     flags:NDArray[np.uint32]
     position:NDArray[np.complex64]
@@ -39,22 +39,15 @@ class ClientSocketConnection:
     
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.connect((HOST, PORT))
+        self.s.connect((SERVER_IPC_HOST, SERVER_IPC_PORT))
+        print(f"Connected to {(SERVER_IPC_HOST, SERVER_IPC_PORT)}")
         self.clock = SimClock()
-        atexit.register(self.disconnect)
-        
         self._prev = None
-        self._uninitialized_bodies:list[Particle] = []
-
-    def disconnect(self):
-        self.s.close()
-        for name, shm in self._shared.items():
-            try:
-                shm.close()
-            except FileNotFoundError:
-                ...
+        self._uninitialized_bodies:list[transport.ParticleInit] = []
 
     def get_valid_indices(self) -> NDArray:
+        if not self.is_initialized:
+            return np.empty(0, dtype=np.uint32)
         return np.where((self.flags & flags.REMOVED) != flags.REMOVED)[0]
 
     def find_bodies_at(self, x:float, y:float, margin:float=10):
@@ -73,11 +66,18 @@ class ClientSocketConnection:
         # Get the indices 
         return indices[mask]
 
-    def add_particle(self, particle:Particle):
+    def add_particle(self, position:complex, velocity:complex, mass:float, radius:float, flags:int=0):
         if self.is_initialized:
-            #logger.warning("Cannot add a particle once the simulation has started.")
+            logger.warning("Cannot add a particle once the simulation has started.")
             return -1
-        self._uninitialized_bodies.append(particle)
+        p = transport.ParticleInit(
+            flags=flags,
+            position=(position.real, position.imag),
+            velocity=(velocity.real, velocity.imag),
+            mass=mass,
+            radius=radius
+        )
+        self._uninitialized_bodies.append(p)
         return len(self._uninitialized_bodies) - 1
 
     def get_particle(self, particle_id:int) -> Particle:
@@ -86,96 +86,121 @@ class ClientSocketConnection:
     def __iter__(self):
         for i in self.get_valid_indices():
             yield self.get_particle(int(i))
-
-    def send_packet(self, data):
-        self.s.sendall(json.dumps(data).encode() + b'\n')
-        resp = json.loads(self.s.recv(1024).strip())
-        r = ServerResponse.from_dict(resp)
-        self.handle_response(r)
-        return resp
-
-    def handle_response(self, resp:ServerResponse):
-        if resp.status:
-            self.accum = resp.status.accum
-            self.tick_id = resp.status.tick_id
-        if resp.memory:
-            self._connect_shared_memory(resp.memory)
-        if resp.config:
-            self._set_config_defs(resp.config)
-        if resp.device:
-            self.platform_id = resp.device.platform_id
-            self.device_id = resp.device.device_id
-        if resp.clock:
-            self.clock.duration = resp.clock.duration
-            self.clock.speed = resp.clock.speed
-            self.clock.running = resp.clock.running
-            self.clock.last_time_ms = resp.clock.last_time_ms
-
-    def _connect_shared_memory(self, mem):
-        for field in SharedMemoryStateResponse._FIELDS:
-            shm_state = cast(_SharedMemoryState, getattr(mem, field))
-            shm = shared_memory.SharedMemory(name=shm_state.name, size=shm_state.size)            
-            self._shared[field] = shm
-            setattr(self, field, np.ndarray(shm_state.shape, dtype=shm_state.dtype, buffer=shm.buf))
-    
-    def _set_config_defs(self, config:ConfigResponse):
+        
+    def _apply_config(self, config: transport.ConfigResponse):
         self.N = config.N
         self.G = config.G
         self.coef_of_restitution = config.coef_of_restitution
         self.dt_base = config.dt_base
         self.EPS_DIST = config.EPS_DIST
         self.EPS_TIME = config.EPS_TIME
+        logger.info("Config applied: %s", config)
 
-    def set_cl_device(self, platform_id:int, device_id:int):
-        return self.send_packet({
-            'device': {
-                'platform_id': platform_id,
-                'device_id': device_id
-            }
-        })
+    def _connect_shared_memory(self, shared: transport.SharedMemoryResponse):
+        for f in fields(transport.SharedMemoryResponse):
+            shm_state = cast(transport.SharedMemoryInfo, getattr(shared, f.name))
+            shm = shared_memory.SharedMemory(name=shm_state.name, size=shm_state.size, track=False)            
+            self._shared[f.name] = shm
+            setattr(self, f.name, np.ndarray(shm_state.shape, dtype=shm_state.dtype, buffer=shm.buf))
+            logger.info("Connected memory %s %s %s %s %s", f.name, shm_state.name, shm_state.size, shm_state.dtype, shm_state.shape)
 
-    def load_from_dict(self, data):
-        return self.send_packet({
-            'load': data["orbital"],
-            'clock': data["clock"]
-        })
+    def send_message(self, message_enum: transport.MessageType, message:Any|None=None) -> bool:
+        if message_enum != transport.MessageType.SYNC:
+            logger.info("SEND %s", message_enum.name)
+        transport.send_message(self.s, message_enum, message)
+        return self._handle_response()
 
-    def init_sim(self):
-        init = self.send_packet({
-            'init': True,
-            'particles': [ p.asdict() for p in self._uninitialized_bodies ]
-        })
-        return 'init' in init
+    def _handle_response(self) -> bool:
+        _, message_type, payload = transport.recv_message(self.s, transport.MessageType)
+        
+        if message_type == transport.MessageType.SUCCESS:
+            return True
+         
+        elif message_type == transport.MessageType.INIT:
+            req = transport.InitResponse.from_dict(payload)
+            self.is_initialized = req.initialized
+            self._apply_config(req.config)
+            self._connect_shared_memory(req.memory)
+            return self.is_initialized
+        
+        elif message_type == transport.MessageType.STATUS:
+            req = transport.StatusResponse.from_dict(payload)
+            self.is_initialized = req.initialized
+            self.tick_id = req.tick_id
+            self.accum = req.accum
+            self.clock.update(req.clock)
+            return True
+    
+        elif message_type == transport.MessageType.ERROR:
+            req = transport.ErrorResponse(**payload)
+            logger.error(req.error_message)
+            # TODO: Emit the error so it can be displayed by the interface
+            return False
+        
+        return False
+
+    
+    def init_sim(self, platform_id:int, device_id:int):
+        logger.info("Initializing sim...")
+        self.platform_id = platform_id
+        self.device_id = device_id
+        result = self.send_message(
+            transport.MessageType.INIT,
+            transport.InitRequest(
+                particles=self._uninitialized_bodies,
+                platform_id=self.platform_id,
+                device_id=self.device_id
+            ))
+        logger.info("Initializing sim completed with result: %s", result)
+        return result
     
     def set_clock_speed(self, speed):
-        return self.send_packet({
-            'clock': {
-                'speed':speed
-            }
-        })
-    
-    def reset(self):
-        return self.send_packet({ 'reset': True })
+        return self.send_message(
+            transport.MessageType.CLOCK_SET_SPEED,
+            transport.ClockSetSpeedRequest(speed=speed)
+        )
     
     def start(self):
-        return self.send_packet({ 'start': True })
+        self.send_message(transport.MessageType.CLOCK_START)
     
     def stop(self):
-        return self.send_packet({ 'stop': True })
+        self.send_message(transport.MessageType.CLOCK_PAUSE)
     
     def sync(self):
-        return self.send_packet({ 'sync': True })
-    
-    def tick(self, now):
-        return self.send_packet({ 'tick': now })
+        self.send_message(transport.MessageType.SYNC)
 
-    def rel_move(self, ids:Sequence[int], offset_x:float, offset_y:float):
-        self.send_packet({
-            'rel_move': {
-                'ids': ids,
-                'offset': [offset_x, offset_y]
-            }
-        })
+    def rel_move(self, ids:Sequence[int], offset:complex):
+        self.send_message(
+            transport.MessageType.BODY_SHIFT,
+            transport.ShiftVectorsRequest(
+                vector_name='position',
+                ids=ids,
+                op="add",
+                offset=(offset.real, offset.imag)
+            )
+        )
+
+    def rel_velocity(self, ids:Sequence[int], offset:complex):
+        self.send_message(
+            transport.MessageType.BODY_SHIFT,
+            transport.ShiftVectorsRequest(
+                vector_name='velocity',
+                ids=ids,
+                op="mul",
+                offset=(offset.real, offset.imag)
+            )
+        )
+
+    def rel_mass(self, ids:Sequence[int], offset:float):
+        self.send_message(
+            transport.MessageType.BODY_SHIFT,
+            transport.ShiftVectorsRequest(
+                vector_name='mass',
+                ids=ids,
+                op="mul",
+                offset=(offset.real, 0)
+            )
+        )
 
     def to_dict(self) -> dict:
         self.sync()

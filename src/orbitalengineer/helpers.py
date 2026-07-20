@@ -1,6 +1,7 @@
 import math
 import numpy as np
 
+from orbitalengineer.engine import config
 from orbitalengineer.engine.particle import Particle, ParticleRaw
 
 seed = 0xf00d1e1
@@ -44,12 +45,12 @@ def random_position(min_distance, max_distance) -> complex:
     y = r * math.sin(theta)
     return complex(x, y)
 
-def create_primary(*, mass:float = 332000, flags=0) -> Particle:
+def create_primary(*, mass:float = 332000, radius:float|None=None, flags=0) -> Particle:
     return ParticleRaw(
         position=0+0j,
         velocity=0+0j,
         mass=mass,
-        radius=r_from_mass(np.float64(mass)),
+        radius=radius if radius is not None else r_from_mass(np.float64(mass)),
         flags=flags
     )
 
@@ -79,7 +80,7 @@ def create_secondary(
     dist = abs(position)
     velocity = vis_viva(
         position=position,
-        mu=primary_body.get_mass(),
+        mu=(config.DEFAULT_G * (primary_body.get_mass() + mass)),
         a=dist if ecc is None else dist * ecc,
         prograde=prograde
     )

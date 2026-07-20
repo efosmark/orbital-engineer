@@ -6,7 +6,7 @@ from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 from orbitalengineer.ui import model, ui_config
 from orbitalengineer.ui.canvas import pz
 from orbitalengineer.ui.mainwindow import MainWindow
-from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject, GLib
+from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject
 from orbitalengineer.ui.keyinput import KeyInput
 from orbitalengineer.engine.particle import Particle
 from orbitalengineer.engine import logger
@@ -44,16 +44,14 @@ class App(Gtk.Application):
         else:
             self.orbital.start()
 
-    def tick_once(self):
-        if not self.view.props.paused: return
-        #self.orbital.accum = 0
-        #self.orbital.last_now = None
-        #self.clock.increment_by(self.orbital.dt_base)
-        if self.orbital.tick(self.orbital.clock.time()) > 0:
-           GLib.idle_add(self.orbital.sync)
-
     def insert_particle(self, particle:Particle, color:tuple[float, float, float, float]=(1,1,1,1)) -> int:
-        idx = self.orbital.add_particle(particle)
+        idx = self.orbital.add_particle(
+            position=particle.get_position(),
+            velocity=particle.get_velocity(),
+            mass=particle.get_mass(),
+            radius=particle.get_radius(),
+            flags=particle.get_flags()
+        )
         self.view.particle_colors[idx] = random_color() if color is None else color
         self.view.particle_names[idx] = make_name(seed + idx)
         return idx
@@ -66,8 +64,7 @@ class App(Gtk.Application):
         platform_id, device_id = selection
         self.platform_id = platform_id
         self.device_id = device_id
-        self.orbital.set_cl_device(platform_id, device_id)
-        self.orbital.init_sim()
+        self.orbital.init_sim(platform_id, device_id)
         self.init_mainwindow()
     
     def init_mainwindow(self) -> MainWindow:
@@ -85,16 +82,15 @@ class App(Gtk.Application):
         return win
     
     def do_activate(self):
-        if self.resume_from_file:
-            self.load_from_file()
+        #if self.resume_from_file:
+        #    self.load_from_file()
         if self.platform_id == -1 or self.device_id == -1:
             dialog = SelectDeviceWindow()
             dialog.set_application(self)
             dialog.connect("close-request", self._on_close_request)
             dialog.present()
         else:
-            self.orbital.set_cl_device(self.platform_id, self.device_id)
-            self.orbital.init_sim()
+            self.orbital.init_sim(self.platform_id, self.device_id)
             self.init_mainwindow()
 
 
@@ -142,28 +138,28 @@ class App(Gtk.Application):
             "view": self.view.to_dict(),
         }
     
-    def load_from_file(self):
-        if self.resume_from_file is False: return
+    # def load_from_file(self):
+    #     if self.resume_from_file is False: return
 
-        file_name = ui_config.DEFAULT_SCENARIO_FILE
-        if isinstance(self.resume_from_file, str):
-            file_name = self.resume_from_file
-        logger.info(f"Loading from {file_name}")
-        obj = cast(dict, json.load(open(file_name, "r")))
+    #     file_name = ui_config.DEFAULT_SCENARIO_FILE
+    #     if isinstance(self.resume_from_file, str):
+    #         file_name = self.resume_from_file
+    #     logger.info(f"Loading from {file_name}")
+    #     obj = cast(dict, json.load(open(file_name, "r")))
         
-        self.platform_id = obj.get('platform_id', self.platform_id)
-        self.device_id = obj.get('device_id', self.device_id)
+    #     self.platform_id = obj.get('platform_id', self.platform_id)
+    #     self.device_id = obj.get('device_id', self.device_id)
         
-        #self.clock = SimClock()
-        #self.clock.speed = obj["clock"]["speed"]
-        #self.clock._duration = obj["clock"]["duration"]
-        #self.clock.running = obj["clock"]["running"]
+    #     #self.clock = SimClock()
+    #     #self.clock.speed = obj["clock"]["speed"]
+    #     #self.clock._duration = obj["clock"]["duration"]
+    #     #self.clock.running = obj["clock"]["running"]
         
-        self.camera.zoom = obj["camera"]["zoom"]
-        self.camera.offset = obj["camera"]["offset"]
+    #     self.camera.zoom = obj["camera"]["zoom"]
+    #     self.camera.offset = obj["camera"]["offset"]
         
-        self.view.load_from_dict(obj["view"])
-        self.orbital.load_from_dict(obj)
+    #     self.view.load_from_dict(obj["view"])
+    #     self.orbital.load_from_dict(obj)
     
     def save_scenario(self):
         if self.orbital.is_initialized:

@@ -22,11 +22,10 @@ class TickController:
                 time.sleep(next_tick_at - now)
                 continue
 
-            if self.orbital.tick(now) > 0:
-                self.orbital.sync()
+            self.orbital.tick(now)
 
             now = self.clock.time()
-            next_tick_at += (self.orbital.dt_base / self.clock.speed) * 0.4
+            next_tick_at += (self.orbital.dt_base / self.clock.speed) #* 0.2
             if next_tick_at < now:
                 next_tick_at = now
     

@@ -1,5 +1,5 @@
 from multiprocessing import shared_memory
-from typing import cast
+from typing import Sequence, cast
 from pathlib import Path
 from numpy.typing import NDArray
 import numpy as np
@@ -19,6 +19,8 @@ from orbitalengineer.engine.orbitalcl.nudge.nudge import NudgePipeline
 from orbitalengineer.engine.orbitalcl.position.position import PositionPipeline
 from orbitalengineer.engine.orbitalcl.velocity.velocity import VelocityPipeline
 from orbitalengineer.engine.orbitalcl.bounce.bounce import BouncePipeline
+from orbitalengineer.helpers import r_from_mass
+from orbitalengineer.ipc import transport
 
 mf = cl.mem_flags
 kernel_dir = Path(__file__).parent
@@ -65,13 +67,13 @@ class SimController_CL:
                 ...
 
     @log_timing
-    def _populate_particle_fields(self, particles):
+    def _populate_particle_fields(self, particles:Sequence[transport.ParticleInit]):
         for i,p in enumerate(particles):
-            self.flags[i] = np.uint32(p["flags"])
-            self.velocity[i] = np.complex64(*p["velocity"])
-            self.position[i] = np.complex64(*p["position"])
-            self.mass[i] = np.float32(p["mass"])
-            self.radius[i] = np.float32(p["radius"])
+            self.flags[i] = np.uint32(p.flags)
+            self.velocity[i] = np.complex64(*p.velocity)
+            self.position[i] = np.complex64(*p.position)
+            self.mass[i] = np.float32(p.mass)
+            self.radius[i] = np.float32(p.radius)
 
     @log_timing
     def _allocate_memory(self):
@@ -145,17 +147,16 @@ class SimController_CL:
     
     def set_cl_device(self, platform_id:int, device_id:int):
         if self.is_initialized:
-            logger.error("Cannot set CL device after initialization.")
-            return
+            logger.warning("set_cl_device called after initialization.")
         self.device = CLDeviceManager(platform_id, device_id)
         self.ctx = cl.Context([self.device._device])        
         logger.info("CL device set to (%s, %s)", platform_id, device_id)
     
     @log_timing
-    def init_sim(self, particles):
+    def init_sim(self, particles:Sequence[transport.ParticleInit]):
         if self.is_initialized:
-            logger.warning("Attempted to init_sim after simulation was already started.")
-            return
+            self.is_initialized = False
+            logger.warning("Re-initializing with new settings...")
         self.N = len(particles)
         self._allocate_memory()
         self._populate_particle_fields(particles)
@@ -163,47 +164,45 @@ class SimController_CL:
         self._init_kernel()
         self._create_buffers()
         self._interaction(self.dt_base, self.flags_cl, self.pos_cl, self.vel_cl, self.radius_cl, self.mass_cl)
-        #self._nudge(self.pos_cl, self.mass_cl, self.distance_edge_cl)
+        if config.NUDGE_ON_START_ENABLE:
+            self.nudge()
         self.is_initialized = True
     
-    def set_position(self, body_id, x, y):
-        self.position[body_id] = complex(x, y)
-        cl.enqueue_copy(self.q, self.pos_cl, self.position).wait()
+    def apply_vector_offset(self, vector_name:str, ids:Sequence[int], op:str, offset:tuple[float,float]):
+        if vector_name == "position":
+            vector = self.position
+            buffer = self.pos_cl
+            value = np.complex64(offset[0], offset[1])
+        elif vector_name == "velocity":
+            vector = self.velocity
+            buffer = self.vel_cl
+            value = np.complex64(offset[0], offset[1])
+        elif vector_name == "mass":
+            vector = self.mass
+            buffer = self.mass_cl
+            value = np.float32(offset[0])
+        elif vector_name == "radius":
+            vector = self.radius
+            buffer = self.radius_cl
+            value = np.float32(offset[0])
+        else:
+            logger.error("Invalid vector name for apply_vector_offset. "
+                         "Must be one of: position, velocity, mass, or radius.")
+            return
+        
+        if op == 'add':
+            vector[ids] += value
+        elif op == 'mul':
+            vector[ids] *= value
+        cl.enqueue_copy(self.q, buffer, vector)
+        
+        if vector_name == "mass":
+            self.radius[ids] = np.vectorize(r_from_mass)(self.mass[ids])
+            cl.enqueue_copy(self.q, self.radius_cl, self.radius)
     
-    def set_velocity(self, body_id, x, y):
-        self.velocity[body_id] = complex(x, y)
-        cl.enqueue_copy(self.q, self.vel_cl, self.velocity).wait()
-
-    # def find_bodies_at(self, x:float, y:float, margin:float=10):
-    #     indices = self.get_valid_indices()
-    #    
-    #     # Apply a bit of margin to the radius (e.g. if a radius is too small, it cant be clicked)
-    #     radius = self.radius[indices] + margin
-    #
-    #     # Relative difference between the click and every location
-    #     p = self.position[indices]
-    #     d = np.complex128(x, y) - p
-    #   
-    #     # Create a mask indicating where there is crossover
-    #     mask = (np.abs(d) <= radius)
-    #   
-    #     # Get the indices 
-    #     return indices[mask]
-    #
-    # def get_valid_indices(self) -> NDArray:
-    #     """Get the list of nodes that are still considered valid (e.g. not removed)."""
-    #     return np.where((self.flags & flags.REMOVED) != flags.REMOVED)[0]
-    #
-    # def get_particle(self, particle_id:int):
-    #     return ParticleCL(particle_id, self)
-    #
-    # def __iter__(self):
-    #     for i in self.get_valid_indices():
-    #         yield self.get_particle(int(i))
-
     def _has_queue(self) -> bool:
         if not hasattr(self, 'q'):
-            logger.warning("")
+            logger.warning("No queue found.")
             return False
         return True
 
@@ -219,6 +218,9 @@ class SimController_CL:
         cl.enqueue_copy(self.q, self.radius, self.radius_cl)
         cl.enqueue_copy(self.q, self._interaction.toi, self._interaction.toi_cl)
         self.q.finish()
+    
+    def nudge(self):
+        return self._nudge(self.flags_cl, self.pos_cl, self.mass_cl, self.radius_cl)
     
     def kick(self, dt_step):
         self._velocity(dt_step, self.flags_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.vel_cl, self.force_cl)
@@ -272,24 +274,7 @@ class SimController_CL:
             for t in timeline
         ], dt_step=round(float(dt_step_size), 6))
 
-    def tick_dt(self, dt:float):
-        if not self.is_initialized:
-            logger.warning("tick_dt() was called before simulation initialization.")
-            return 0
-        
-        num_steps = np.ceil(dt / self.dt_base)
-        if num_steps == 0: return 0
-        
-        step = self.dt_base if dt > self.dt_base else dt
-        count, dt_processed = self.single_step(step)
-        #print(count, dt_processed)
-        self.emit_metrics(step)
-        self.tick_id += 1
-        dt -= self.dt_base
-        
-        return int(num_steps)
-
-    def tick(self, now):
+    def tick(self, now:float):
         if not self.is_initialized:
            logger.warning("tick() was called before simulation initialization.")
            return 0
@@ -313,9 +298,7 @@ class SimController_CL:
             #self.accum -= (dt_step - dt_unprocessed) # type: ignore
             self.emit_metrics(float(dt_step))
             self.tick_id += 1
-        
-        self._merge.find_merged_bodies()
-        
+                
         return num_steps
 
     # def to_dict(self) -> dict:

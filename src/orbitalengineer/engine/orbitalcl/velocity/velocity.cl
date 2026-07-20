@@ -38,7 +38,7 @@ __kernel void compute_velocity(
         if ((flags[j]&REMOVED)) continue;
         float2 f = compute_gravitation(position[i], position[j], mass[i], mass[j]);
         force[IDX] = f;
-        float repel = (flags[i]&REPEL_ON_OVERLAP) ? -1.0f : 0;
+        float repel = (flags[i]&REPEL_ON_OVERLAP) ? -100.0f : 0;
         float edge_dist = fast_length(position[j] - position[i]) - radius[i] - radius[j];
         float2 accel = f * inv_mass_i * ((edge_dist < 0) ? repel : 1.0f);
         A += accel;

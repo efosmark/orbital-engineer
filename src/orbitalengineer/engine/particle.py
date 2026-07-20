@@ -49,6 +49,7 @@ class Particle(Protocol):
 class ParticleRaw(Particle):
     idx:int|None = None
     
+    _flags:int
     _position:complex
     _velocity:complex
     _mass:float

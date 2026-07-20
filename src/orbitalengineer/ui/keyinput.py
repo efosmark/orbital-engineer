@@ -35,8 +35,8 @@ class KeyInput(GObject.GObject):
         elif keyval in [self.TAB_PREV, self.TAB_NEXT] and self.app.view.secondary_body is not None:    
             direction = -1 if keyval == self.TAB_PREV else 1
             self.cycle_particles(direction)
-        elif keyval == Gdk.KEY_s and self.props.ctrl_held:
-            self.app.save_scenario()
+        # elif keyval == Gdk.KEY_s and self.props.ctrl_held:
+        #     self.app.save_scenario()
         elif keyval in self.WASD_KEYS:
             self.on_wasd(keyval)
         elif keyval == Gdk.KEY_Left:
@@ -56,6 +56,19 @@ class KeyInput(GObject.GObject):
         return False
 
     def on_wasd(self, keyval):
+        
+        # Temporary test controls for apply_vector_offset
+        if self.props.ctrl_held:
+            if keyval == Gdk.KEY_w:
+                self.app.orbital.rel_mass(self.app.view.selected_particles, 1.1)
+            elif keyval == Gdk.KEY_s:
+                self.app.orbital.rel_mass(self.app.view.selected_particles, 1/1.1)
+            elif keyval == Gdk.KEY_a:
+                self.app.orbital.rel_velocity(self.app.view.selected_particles, 1.1)
+            elif keyval == Gdk.KEY_s:
+                self.app.orbital.rel_velocity(self.app.view.selected_particles, 1/1.1)
+            return
+        
         if self.app.view.secondary_body is None: return
         b = self.app.orbital.get_particle(self.app.view.secondary_body)
         r, angle = cmath.polar(b.get_velocity())

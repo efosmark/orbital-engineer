@@ -112,7 +112,10 @@ class ParticleCL(Particle):
         radius1 = self.ctl.radius[focus_idx]
         radius2 = self.ctl.radius[secondary_idx]
         
-        o = twobody.TwoBody(r1, r2, v1, v2, m1, m2, radius1, radius2)
+        try:
+            o = twobody.TwoBody(r1, r2, v1, v2, m1, m2, radius1, radius2)
+        except ZeroDivisionError:
+            return
         if not o.is_bound or o.orbital_energy > -1000: return
         
         o.body_1 = focus_idx

@@ -32,8 +32,9 @@ class MoveParticleController:
         self.camera = camera
         self.orbital = orbital
         self.view = view_model
-        
-        self._orig_particle_positions = None
+            
+        self._prev_dx = 0
+        self._prev_dy = 0
 
         drag = Gtk.GestureDrag.new()
         drag.set_button(Gdk.BUTTON_PRIMARY)
@@ -82,9 +83,9 @@ class MoveParticleController:
     def on_drag_update(self, gesture, dx, dy):
         if not self.view.drag_start: return
 
-        offset_x = dx / self.camera.zoom
-        offset_y = dy / self.camera.zoom
-        
+        offset_x = (dx - self._prev_dx) / self.camera.zoom
+        offset_y = (dy - self._prev_dy) / self.camera.zoom
+
         if offset_x > 15 or offset_y > 15:
             self.view.props.paused = True
         
@@ -94,19 +95,17 @@ class MoveParticleController:
         if self.view.props.dragging_particle is None:
             self._update_selection()
         else:
-            if self._orig_particle_positions is None:
-                self._orig_particle_positions = self.orbital.position[self.view.selected_particles]
-            offset = np.complex64(offset_x, offset_y)
-            self.orbital.rel_move(self.view.selected_particles, offset_x, offset_y)
-            #self.orbital.position[self.view.selected_particles] = self._orig_particle_positions + offset              
-            #cl.enqueue_copy(self.orbital.q, self.orbital.pos_cl, self.orbital.position)  
+            self._prev_dx = dx
+            self._prev_dy = dy
+            offset = complex(offset_x, offset_y)
+            self.orbital.rel_move(self.view.selected_particles, offset)
         
     def on_drag_end(self, gesture, start_x, start_y):
         self.view.props.dragging_particle = None
-        self.view.props.dragging_particle_offset = (0, 0)
         self.view.props.drag_start = None
         self.view.props.drag_end = None
-        self._orig_particle_positions = None
+        self._prev_dx = 0
+        self._prev_dy = 0
 
 class MouseController:
     

@@ -12,7 +12,7 @@ class NudgePipeline(CLPipelineStep):
         self._position_intermediate = np.zeros(self.N, dtype=np.complex64)
         self._position_intermediate_cl = self._create_buffer(self._position_intermediate)
 
-    def __call__(self, position: cl.Buffer, mass: cl.Buffer, distance_edge: cl.Buffer):
+    def __call__(self, flags: cl.Buffer, position: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
         self.tr.add("apply_nudge",
             self._apply_nudge(
                 self.queue,
@@ -21,9 +21,10 @@ class NudgePipeline(CLPipelineStep):
                             
                 # Args
                 np.uint32(self.N),
+                flags,
                 position,
                 mass,
-                distance_edge,
+                radius,
                 self._position_intermediate_cl,
             )
         )

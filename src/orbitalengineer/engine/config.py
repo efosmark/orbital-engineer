@@ -21,7 +21,7 @@ DEFAULT_G = 1.0
 # Tick-rate Settings
 #############################################
 
-DEFAULT_DT_BASE =  1/20.0
+DEFAULT_DT_BASE =  1/30.0
 DEFAULT_SPEED = 1.0
 MAX_STEPS_PER_TICK = int(1.0/np.sqrt(DEFAULT_DT_BASE))
 MAX_SUB_STEPS = 5
@@ -32,6 +32,7 @@ MAX_SUB_STEPS = 5
 
 COLLISION_MERGE_ENABLE = True
 COLLISION_BOUNCE_ENABLE = True
+NUDGE_ON_START_ENABLE = True
 
 #############################################
 # IPC Settings
@@ -39,6 +40,9 @@ COLLISION_BOUNCE_ENABLE = True
 
 EMIT_METRICS = True
 METRIC_SOCKET_PATH = "/tmp/kernel-metrics.sock"
+
+SERVER_IPC_HOST = ''
+SERVER_IPC_PORT = 50055
 
 #############################################
 # SerDe Settings
