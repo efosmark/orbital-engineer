@@ -5,7 +5,7 @@ from orbitalengineer.engine import logger
 from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.engine.config import SERVER_IPC_HOST, SERVER_IPC_PORT
 from orbitalengineer.engine.orbitalcl import orbitalcl
-from orbitalengineer.ipc import transport
+from orbitalengineer.ipc import message, transport
 from orbitalengineer.ipc.ticker import TickController
 
 import pyopencl as cl
@@ -52,8 +52,8 @@ class OrbitalControlServer:
         self.orbital.disconnect()
         self.orbital.is_initialized = False
 
-    def _get_shared_memory_info(self, field) -> transport.SharedMemoryInfo:
-        return transport.SharedMemoryInfo(
+    def _get_shared_memory_info(self, field) -> message.SharedMemoryInfo:
+        return message.SharedMemoryInfo(
             name=self.orbital.shm[field].name,
             dtype=str(getattr(self.orbital, field).dtype),
             size=self.orbital.shm[field].size,
@@ -61,14 +61,14 @@ class OrbitalControlServer:
         )
 
     def _get_init_response(self):            
-        return transport.InitResponse(
+        return message.InitResponse(
             initialized=self.orbital.is_initialized,
             config=self._get_config_response(),
             memory=self._get_shared_memory_response()
         )
 
     def _get_config_response(self):
-        return transport.ConfigResponse(
+        return message.ConfigResponse(
             G = self.orbital.G,
             N = self.orbital.N,
             coef_of_restitution=self.orbital.coef_of_restitution,
@@ -78,7 +78,7 @@ class OrbitalControlServer:
         )
 
     def _get_shared_memory_response(self):
-        return transport.SharedMemoryResponse(
+        return message.SharedMemoryResponse(
             flags=self._get_shared_memory_info('flags'),
             velocity=self._get_shared_memory_info('velocity'),
             position=self._get_shared_memory_info('position'),
@@ -88,7 +88,7 @@ class OrbitalControlServer:
         )
 
     def _get_status_response(self):
-        return transport.StatusResponse(
+        return message.StatusResponse(
             initialized=self.orbital.is_initialized,
             tick_id=self.orbital.tick_id,
             accum=float(self.orbital.accum),
@@ -100,50 +100,51 @@ class OrbitalControlServer:
         try:
             while True:
                 try:
-                    _, message_type, payload = transport.recv_message(conn, transport.MessageType)
+                    _, message_type, payload = transport.recv_message(conn, message.MessageType)
                 except ConnectionError as e:
                     logger.error("Connection error: %s", e)
                     break
-                self._handle_request(conn, transport.MessageType(message_type), payload)
+                self._handle_request(conn, message.MessageType(message_type), payload)
         except KeyboardInterrupt:
             print("Shutting down server.")
         self.end()
 
-    def _handle_request(self, conn:socket.socket, message_type:transport.MessageType, payload):
-        if message_type == transport.MessageType.INIT:
-            req = transport.InitRequest.from_dict(payload)
+    def _handle_request(self, conn:socket.socket, message_type:message.MessageType, payload):
+        if message_type == message.MessageType.INIT_REQ:
+            req = message.InitRequest.from_dict(payload)
             self.initialize(req.device_id, req.platform_id, req.particles)
-            transport.send_message(conn, transport.MessageType.INIT, self._get_init_response())
+            transport.send_message(conn, message.MessageType.INIT_RESP, self._get_init_response())
         
-        elif message_type == transport.MessageType.SYNC:
+        elif message_type == message.MessageType.SYNC_REQ:
             self.orbital.sync()
-            transport.send_message(conn, transport.MessageType.STATUS, self._get_status_response())
+            transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
 
-        elif message_type == transport.MessageType.STATUS:
-            transport.send_message(conn, transport.MessageType.STATUS, self._get_status_response())
+        elif message_type == message.MessageType.STATUS_REQ:
+            transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
         
-        elif message_type == transport.MessageType.BODY_SHIFT:
-            req = transport.ShiftVectorsRequest(**payload)
+        elif message_type == message.MessageType.SHIFT_VECTOR_REQ:
+            req = message.ShiftVectorsRequest(**payload)
             self.orbital.apply_vector_offset(req.vector_name, req.ids, req.op, req.offset)
             self.orbital.nudge()
-            transport.send_message(conn, transport.MessageType.SUCCESS)
+            transport.send_message(conn, message.MessageType.SUCCESS)
         
-        elif message_type == transport.MessageType.CLOCK_START:
-            self.start()
-            transport.send_message(conn, transport.MessageType.SUCCESS)
+        elif message_type == message.MessageType.CLOCK_UPDATE:
+            req = message.ClockUpdateRequest.from_dict(payload)
+            
+            if req.running is not None:
+                if req.running:
+                    self.start()
+                else:
+                    self.pause()
+            
+            if req.speed is not None:
+                self.clock.speed = req.speed
+                
+            transport.send_message(conn, message.MessageType.SUCCESS)
         
-        elif message_type == transport.MessageType.CLOCK_PAUSE:
-            self.pause()
-            transport.send_message(conn, transport.MessageType.SUCCESS)
-        
-        elif message_type == transport.MessageType.CLOCK_SET_SPEED:
-            req = transport.ClockSetSpeedRequest(**payload)
-            self.clock.speed = req.speed
-            transport.send_message(conn, transport.MessageType.SUCCESS)
-        
-        elif message_type == transport.MessageType.END:
+        elif message_type == message.MessageType.END_REQ:
             self.end()
-            transport.send_message(conn, transport.MessageType.SUCCESS)
+            transport.send_message(conn, message.MessageType.SUCCESS)
         
         else:
             logger.error("Unrecognized message_type %s", message_type)

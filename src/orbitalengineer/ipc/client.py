@@ -13,7 +13,7 @@ from orbitalengineer.engine.config import SERVER_IPC_HOST, SERVER_IPC_PORT
 from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
 from orbitalengineer.engine.particle import Particle
-from orbitalengineer.ipc import transport
+from orbitalengineer.ipc import message, transport
 
 
 class ClientSocketConnection:
@@ -43,7 +43,7 @@ class ClientSocketConnection:
         print(f"Connected to {(SERVER_IPC_HOST, SERVER_IPC_PORT)}")
         self.clock = SimClock()
         self._prev = None
-        self._uninitialized_bodies:list[transport.ParticleInit] = []
+        self._uninitialized_bodies:list[message.ParticleInit] = []
 
     def get_valid_indices(self) -> NDArray:
         if not self.is_initialized:
@@ -70,7 +70,7 @@ class ClientSocketConnection:
         if self.is_initialized:
             logger.warning("Cannot add a particle once the simulation has started.")
             return -1
-        p = transport.ParticleInit(
+        p = message.ParticleInit(
             flags=flags,
             position=(position.real, position.imag),
             velocity=(velocity.real, velocity.imag),
@@ -87,7 +87,7 @@ class ClientSocketConnection:
         for i in self.get_valid_indices():
             yield self.get_particle(int(i))
         
-    def _apply_config(self, config: transport.ConfigResponse):
+    def _apply_config(self, config: message.ConfigResponse):
         self.N = config.N
         self.G = config.G
         self.coef_of_restitution = config.coef_of_restitution
@@ -96,16 +96,16 @@ class ClientSocketConnection:
         self.EPS_TIME = config.EPS_TIME
         logger.info("Config applied: %s", config)
 
-    def _connect_shared_memory(self, shared: transport.SharedMemoryResponse):
-        for f in fields(transport.SharedMemoryResponse):
-            shm_state = cast(transport.SharedMemoryInfo, getattr(shared, f.name))
+    def _connect_shared_memory(self, shared: message.SharedMemoryResponse):
+        for f in fields(message.SharedMemoryResponse):
+            shm_state = cast(message.SharedMemoryInfo, getattr(shared, f.name))
             shm = shared_memory.SharedMemory(name=shm_state.name, size=shm_state.size, track=False)            
             self._shared[f.name] = shm
             setattr(self, f.name, np.ndarray(shm_state.shape, dtype=shm_state.dtype, buffer=shm.buf))
             logger.info("Connected memory %s %s %s %s %s", f.name, shm_state.name, shm_state.size, shm_state.dtype, shm_state.shape)
 
     def send_message(self, message_enum: transport.MessageType, message:Any|None=None) -> bool:
-        if message_enum != transport.MessageType.SYNC:
+        if message_enum != transport.MessageType.SYNC_REQ:
             logger.info("SEND %s", message_enum.name)
         transport.send_message(self.s, message_enum, message)
         return self._handle_response()
@@ -115,16 +115,16 @@ class ClientSocketConnection:
         
         if message_type == transport.MessageType.SUCCESS:
             return True
-         
-        elif message_type == transport.MessageType.INIT:
-            req = transport.InitResponse.from_dict(payload)
+        
+        elif message_type == transport.MessageType.INIT_RESP:
+            req = message.InitResponse.from_dict(payload)
             self.is_initialized = req.initialized
             self._apply_config(req.config)
             self._connect_shared_memory(req.memory)
             return self.is_initialized
         
-        elif message_type == transport.MessageType.STATUS:
-            req = transport.StatusResponse.from_dict(payload)
+        elif message_type == transport.MessageType.STATUS_RESP:
+            req = message.StatusResponse.from_dict(payload)
             self.is_initialized = req.initialized
             self.tick_id = req.tick_id
             self.accum = req.accum
@@ -132,7 +132,7 @@ class ClientSocketConnection:
             return True
     
         elif message_type == transport.MessageType.ERROR:
-            req = transport.ErrorResponse(**payload)
+            req = message.ErrorResponse(**payload)
             logger.error(req.error_message)
             # TODO: Emit the error so it can be displayed by the interface
             return False
@@ -145,8 +145,8 @@ class ClientSocketConnection:
         self.platform_id = platform_id
         self.device_id = device_id
         result = self.send_message(
-            transport.MessageType.INIT,
-            transport.InitRequest(
+            message.MessageType.INIT_REQ,
+            message.InitRequest(
                 particles=self._uninitialized_bodies,
                 platform_id=self.platform_id,
                 device_id=self.device_id
@@ -156,23 +156,29 @@ class ClientSocketConnection:
     
     def set_clock_speed(self, speed):
         return self.send_message(
-            transport.MessageType.CLOCK_SET_SPEED,
-            transport.ClockSetSpeedRequest(speed=speed)
+            message.MessageType.CLOCK_UPDATE,
+            message.ClockUpdateRequest(speed=speed)
         )
     
     def start(self):
-        self.send_message(transport.MessageType.CLOCK_START)
+        return self.send_message(
+            message.MessageType.CLOCK_UPDATE,
+            message.ClockUpdateRequest(running=True)
+        )
     
     def stop(self):
-        self.send_message(transport.MessageType.CLOCK_PAUSE)
+        return self.send_message(
+            message.MessageType.CLOCK_UPDATE,
+            message.ClockUpdateRequest(running=False)
+        )
     
     def sync(self):
-        self.send_message(transport.MessageType.SYNC)
+        self.send_message(message.MessageType.SYNC_REQ)
 
     def rel_move(self, ids:Sequence[int], offset:complex):
         self.send_message(
-            transport.MessageType.BODY_SHIFT,
-            transport.ShiftVectorsRequest(
+            message.MessageType.SHIFT_VECTOR_REQ,
+            message.ShiftVectorsRequest(
                 vector_name='position',
                 ids=ids,
                 op="add",
@@ -182,8 +188,8 @@ class ClientSocketConnection:
 
     def rel_velocity(self, ids:Sequence[int], offset:complex):
         self.send_message(
-            transport.MessageType.BODY_SHIFT,
-            transport.ShiftVectorsRequest(
+            message.MessageType.SHIFT_VECTOR_REQ,
+            message.ShiftVectorsRequest(
                 vector_name='velocity',
                 ids=ids,
                 op="mul",
@@ -193,8 +199,8 @@ class ClientSocketConnection:
 
     def rel_mass(self, ids:Sequence[int], offset:float):
         self.send_message(
-            transport.MessageType.BODY_SHIFT,
-            transport.ShiftVectorsRequest(
+            message.MessageType.SHIFT_VECTOR_REQ,
+            message.ShiftVectorsRequest(
                 vector_name='mass',
                 ids=ids,
                 op="mul",
