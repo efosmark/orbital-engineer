@@ -1,10 +1,6 @@
-from orbitalengineer.engine.cl import flags
-from orbitalengineer.engine.particle import Particle
+from orbitalengineer import flags
 from orbitalengineer.ui.mainapp import App
-from orbitalengineer.helpers import angular_position, random_color, create_primary, create_secondary, random_position, rng
-
-import numpy as np
-
+from orbitalengineer.helpers import create_primary, create_secondary
 
 
 SOL_COLOR = (1.0, 0.98, 0.45, 1.0)
@@ -22,7 +18,7 @@ def on_activate(app: App):
     global dist_min, dist_max
     sol = create_primary(mass=1e8, flags=flags.BOUNCE)
     app.insert_particle(sol, color=SOL_COLOR)
-    sol._radius = 1000
+    sol._radius = 1000 # type:ignore
 
     mass = 5e6
     
@@ -46,11 +42,7 @@ def on_activate(app: App):
         flags=flags.BOUNCE
     ), color=(1,1,1,1))
 
-    app.orbital.Lx = Lx
     app.orbital.coef_of_restitution = 0.999
-    #app.orbit_ctl.init_sim()
-    #app.tick_ctl.start()
-    #app.orbit_ctl.speed = 10.0
     app.relative_zoom(1/30.0)
 
 def run():

@@ -3,7 +3,7 @@ import threading
 import time
 
 from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
-from orbitalengineer.engine.clock import SimClock
+from orbitalengineer.ipc.clock import SimClock
 
 class TickController:
         

@@ -20,13 +20,16 @@ class SimClock:
         self.running = False
         return self.duration
     
+    def reset(self):
+        self.duration = 0.0
+        self.running = False
+        self.last_time_ms = 0.0
+        self.speed = config.DEFAULT_SPEED
+    
     def time(self) -> float:
         if self.running:
             self._update()
         return self.duration
-    
-    def real_time(self) -> float:
-        return time.monotonic()
     
     def _update(self):
         t = time.monotonic()

@@ -7,7 +7,7 @@ from multiprocessing import Barrier
 from typing import Sequence
 
 from orbitalengineer.engine import logger
-from orbitalengineer.engine.clock import SimClock
+from orbitalengineer.ipc.clock import SimClock
 from orbitalengineer.engine.orbitalnp.memory import INTERACTION_MERGED, STATUS_DELETED, STATUS_NOMINAL #, OrbitalMemory
 from orbitalengineer.engine.orbitalnp import orbitalmemory, worker
 from orbitalengineer.engine.particle import Particle

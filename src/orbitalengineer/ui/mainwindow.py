@@ -1,10 +1,10 @@
 from typing import Any, cast
 
-from orbitalengineer.engine.clock import SimClock
 from orbitalengineer.ui import canvas, ui_config
-from orbitalengineer.ipc.client import ClientSocketConnection
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib
 from orbitalengineer.ui.model import ViewModel
+from orbitalengineer.ipc.clock import SimClock
+from orbitalengineer.ipc.client import ClientSocketConnection
 
 
 class MainWindow(Gtk.ApplicationWindow):

@@ -14,11 +14,11 @@ def r_from_mass(m: np.float64) -> np.float64:
     return r
 
 def vis_viva(position: complex, mu: float, a: float, prograde: bool = True) -> complex:
-    r = abs(position)                              # radius
-    v_mag = math.sqrt(mu * (2.0/r - 1.0/a))        # vis-viva speed
-    r_hat = position / r                           # unit radial (complex)
-    t_hat = r_hat * (1j if prograde else -1j)      # rotate ±90° for tangent
-    return v_mag * t_hat                           # velocity vector (complex)
+    r = abs(position)                          # radius
+    v_mag = math.sqrt(mu * (2.0/r - 1.0/a))    # vis-viva speed
+    r_hat = position / r                       # unit radial (complex)
+    t_hat = r_hat * (1j if prograde else -1j)  # rotate ±90° for tangent
+    return v_mag * t_hat                       # velocity vector (complex)
 
 
 def random_color() -> tuple[float, float, float]:
@@ -63,7 +63,7 @@ def create_secondary(
     mass:float=0,
     ecc:float|None=None,
     radius:float|None=None,
-    flags=0
+    flags:int=0
 ):
     if dist is not None:
         if isinstance(dist, tuple):

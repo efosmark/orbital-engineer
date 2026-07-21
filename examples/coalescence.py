@@ -1,9 +1,7 @@
-from orbitalengineer.engine.orbitalcl import flags
-from orbitalengineer.engine.particle import Particle
+from orbitalengineer import flags
 from orbitalengineer.ui.mainapp import App
-from orbitalengineer.helpers import angular_position, random_color, create_primary, create_secondary, random_position, rng
+from orbitalengineer.helpers import create_primary, create_secondary, random_position
 
-import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 
@@ -30,10 +28,8 @@ def on_activate(app: App):
             position=position,
             flags=flags.BOUNCE
         ), color=cmap(1-dist_norm(abs(position))))
-    
-    app.orbital.Lx = Lx
+
     app.orbital.coef_of_restitution = 0.9
-    #app.orbit_ctl.speed = 2.0
     
 def run():
     app = App()

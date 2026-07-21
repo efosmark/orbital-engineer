@@ -1,17 +1,18 @@
 import json
-from typing import cast
 
-from orbitalengineer.ipc.client import ClientSocketConnection
-from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 from orbitalengineer.ui import model, ui_config
+from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 from orbitalengineer.ui.canvas import pz
 from orbitalengineer.ui.mainwindow import MainWindow
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject
 from orbitalengineer.ui.keyinput import KeyInput
-from orbitalengineer.engine.particle import Particle
+from orbitalengineer.ui.names import make_name
+
 from orbitalengineer.engine import logger
+from orbitalengineer.engine.particle import Particle
+from orbitalengineer.ipc.client import ClientSocketConnection
 from orbitalengineer.helpers import seed
-from orbitalengineer.names import make_name
+
 
 class App(Gtk.Application):
     
@@ -24,6 +25,7 @@ class App(Gtk.Application):
         
         self.view = model.ViewModel()
         self.orbital = ClientSocketConnection()
+        self.orbital.connect()
         self.camera = pz.Camera2D()
         
         self.view.connect("notify::paused", self.on_paused_changed)

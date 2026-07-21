@@ -6,14 +6,13 @@ from dataclasses import fields
 import numpy as np
 from numpy.typing import NDArray
 
-from orbitalengineer.engine import logger
-from orbitalengineer.engine import config
-from orbitalengineer.engine.clock import SimClock
-from orbitalengineer.engine.config import SERVER_IPC_HOST, SERVER_IPC_PORT
-from orbitalengineer.engine.orbitalcl import flags
+from orbitalengineer import flags
+from orbitalengineer.engine import logger, config
 from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
 from orbitalengineer.engine.particle import Particle
 from orbitalengineer.ipc import message, transport
+from orbitalengineer.ipc.clock import SimClock
+from orbitalengineer.ipc.config import SERVER_IPC_HOST, SERVER_IPC_PORT
 
 
 class ClientSocketConnection:
@@ -21,11 +20,11 @@ class ClientSocketConnection:
     
     is_initialized:bool = False
     tick_id:int = 0
-
     accum:float = 0
-    dt_base:float = config.DEFAULT_DT_BASE
     N:int = 0
+    
     G:float = config.DEFAULT_G
+    dt_base:float = config.DEFAULT_DT_BASE
     coef_of_restitution:float = config.COEF_OF_RESTITUTION
     EPS_DIST:float = config.EPS_DIST
     EPS_TIME:float = config.EPS_TIME
@@ -39,11 +38,16 @@ class ClientSocketConnection:
     
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.connect((SERVER_IPC_HOST, SERVER_IPC_PORT))
-        print(f"Connected to {(SERVER_IPC_HOST, SERVER_IPC_PORT)}")
         self.clock = SimClock()
         self._prev = None
         self._uninitialized_bodies:list[message.ParticleInit] = []
+
+    def connect(self):
+        self.s.connect((SERVER_IPC_HOST, SERVER_IPC_PORT))
+        logger.info("Connected to %s %s", SERVER_IPC_HOST, SERVER_IPC_PORT)
+    
+    #def disconnect(self):
+    #    return self.send_message(message.MessageType.DISCONNECT)
 
     def get_valid_indices(self) -> NDArray:
         if not self.is_initialized:
@@ -139,7 +143,6 @@ class ClientSocketConnection:
         
         return False
 
-    
     def init_sim(self, platform_id:int, device_id:int):
         logger.info("Initializing sim...")
         self.platform_id = platform_id
@@ -155,22 +158,13 @@ class ClientSocketConnection:
         return result
     
     def set_clock_speed(self, speed):
-        return self.send_message(
-            message.MessageType.CLOCK_UPDATE,
-            message.ClockUpdateRequest(speed=speed)
-        )
+        return self.send_message(message.MessageType.CLOCK_UPDATE, message.ClockUpdateRequest(speed=speed))
     
     def start(self):
-        return self.send_message(
-            message.MessageType.CLOCK_UPDATE,
-            message.ClockUpdateRequest(running=True)
-        )
+        return self.send_message(message.MessageType.CLOCK_UPDATE, message.ClockUpdateRequest(running=True))
     
     def stop(self):
-        return self.send_message(
-            message.MessageType.CLOCK_UPDATE,
-            message.ClockUpdateRequest(running=False)
-        )
+        return self.send_message(message.MessageType.CLOCK_UPDATE, message.ClockUpdateRequest(running=False))
     
     def sync(self):
         self.send_message(message.MessageType.SYNC_REQ)

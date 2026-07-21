@@ -41,9 +41,6 @@ NUDGE_ON_START_ENABLE = True
 EMIT_METRICS = True
 METRIC_SOCKET_PATH = "/tmp/kernel-metrics.sock"
 
-SERVER_IPC_HOST = ''
-SERVER_IPC_PORT = 50055
-
 #############################################
 # SerDe Settings
 #############################################

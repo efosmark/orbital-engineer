@@ -1,9 +1,8 @@
-import time
 from typing import Any, ClassVar, Sequence
 import numpy as np
 
 from orbitalengineer.twobody import twobody
-from orbitalengineer.engine.orbitalcl import flags
+from orbitalengineer import flags
 from orbitalengineer.engine.particle import Particle
 
 

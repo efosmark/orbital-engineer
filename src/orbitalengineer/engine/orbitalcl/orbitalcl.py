@@ -2,25 +2,25 @@ from multiprocessing import shared_memory
 from typing import Sequence, cast
 from pathlib import Path
 from numpy.typing import NDArray
+
 import numpy as np
 import pyopencl as cl
 
 from orbitalengineer.engine import log_timing, logger, config
 from orbitalengineer.engine.metric import MetricsProducer
+
 from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.engine.orbitalcl.device import CLDeviceManager
-from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
 from orbitalengineer.engine.orbitalcl.tracer import EventTracer
-
-# Integrator kernels
 from orbitalengineer.engine.orbitalcl.merge.merge import MergePipeline
 from orbitalengineer.engine.orbitalcl.interaction.interaction import InteractionGroupPipeline
 from orbitalengineer.engine.orbitalcl.nudge.nudge import NudgePipeline
 from orbitalengineer.engine.orbitalcl.position.position import PositionPipeline
 from orbitalengineer.engine.orbitalcl.velocity.velocity import VelocityPipeline
 from orbitalengineer.engine.orbitalcl.bounce.bounce import BouncePipeline
+
 from orbitalengineer.helpers import r_from_mass
-from orbitalengineer.ipc import transport
+from orbitalengineer.ipc import message
 
 mf = cl.mem_flags
 kernel_dir = Path(__file__).parent
@@ -31,9 +31,7 @@ class SimController_CL:
     G = config.DEFAULT_G
     EPS_DIST:float = config.EPS_DIST
     EPS_TIME:float = config.EPS_TIME
-    
     N:int = 1024
-    #Lx:int = 256
     
     shm:dict[str, shared_memory.SharedMemory] = dict()
     
@@ -42,10 +40,8 @@ class SimController_CL:
         self.last_now:float|None = None
         self.enable_profiling = config.EMIT_METRICS
         self.is_initialized = False
-
         self.tr = EventTracer(self)
         self.metrics = MetricsProducer(config.METRIC_SOCKET_PATH)
-
         self.tick_id = 0
         self.step_count = 0
         self.device = None
@@ -67,7 +63,7 @@ class SimController_CL:
                 ...
 
     @log_timing
-    def _populate_particle_fields(self, particles:Sequence[transport.ParticleInit]):
+    def _populate_particle_fields(self, particles:Sequence[message.ParticleInit]):
         for i,p in enumerate(particles):
             self.flags[i] = np.uint32(p.flags)
             self.velocity[i] = np.complex64(*p.velocity)
@@ -153,7 +149,7 @@ class SimController_CL:
         logger.info("CL device set to (%s, %s)", platform_id, device_id)
     
     @log_timing
-    def init_sim(self, particles:Sequence[transport.ParticleInit]):
+    def init_sim(self, particles:Sequence[message.ParticleInit]):
         if self.is_initialized:
             self.is_initialized = False
             logger.warning("Re-initializing with new settings...")
@@ -188,7 +184,7 @@ class SimController_CL:
         else:
             logger.error("Invalid vector name for apply_vector_offset. "
                          "Must be one of: position, velocity, mass, or radius.")
-            return
+            return False
         
         if op == 'add':
             vector[ids] += value
@@ -199,6 +195,8 @@ class SimController_CL:
         if vector_name == "mass":
             self.radius[ids] = np.vectorize(r_from_mass)(self.mass[ids])
             cl.enqueue_copy(self.q, self.radius_cl, self.radius)
+        
+        return True
     
     def _has_queue(self) -> bool:
         if not hasattr(self, 'q'):
@@ -223,11 +221,11 @@ class SimController_CL:
         return self._nudge(self.flags_cl, self.pos_cl, self.mass_cl, self.radius_cl)
     
     def kick(self, dt_step):
-        self._velocity(dt_step, self.flags_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.vel_cl, self.force_cl)
-
+        return self._velocity(dt_step, self.flags_cl, self.pos_cl, self.mass_cl, self.radius_cl, self.vel_cl, self.force_cl)
+    
     def drift(self, dt_step):
-        self._position(dt_step, self.flags_cl, self.vel_cl, self.pos_cl)
-
+        return self._position(dt_step, self.flags_cl, self.vel_cl, self.pos_cl)
+    
     def _minimum_viable_dt(self, dt_step):
         cl.enqueue_copy(self.q, self._interaction.node_dt, self._interaction.node_dt_cl).wait()
         try:
@@ -259,7 +257,7 @@ class SimController_CL:
             count += 1
         
         if count >= 10 and dt_step > config.EPS_TIME:
-            print(f"Over-iterated step. Remaining {dt_step=}, {initial_dt_step=}")
+            logger.warning(f"Over-iterated step. Remaining {dt_step=}, {initial_dt_step=}")
         
         return count, dt_step
     

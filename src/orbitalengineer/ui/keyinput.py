@@ -65,7 +65,7 @@ class KeyInput(GObject.GObject):
                 self.app.orbital.rel_mass(self.app.view.selected_particles, 1/1.1)
             elif keyval == Gdk.KEY_a:
                 self.app.orbital.rel_velocity(self.app.view.selected_particles, 1.1)
-            elif keyval == Gdk.KEY_s:
+            elif keyval == Gdk.KEY_d:
                 self.app.orbital.rel_velocity(self.app.view.selected_particles, 1/1.1)
             return
         

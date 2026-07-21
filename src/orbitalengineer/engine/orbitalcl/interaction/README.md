@@ -1,4 +1,4 @@
-# Interaction Prediction
+# Swept Detection / Interaction Prediction
 
 ## The Problem
 

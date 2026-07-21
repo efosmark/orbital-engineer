@@ -1,4 +1,4 @@
-from orbitalengineer.engine.orbitalcl import flags
+from orbitalengineer import flags
 from orbitalengineer.engine.particle import ParticleRaw
 from orbitalengineer.helpers import random_color
 from orbitalengineer.ui.mainapp import App
@@ -31,14 +31,13 @@ def on_activate(app: App):
         flags=flags.BOUNCE
     ), color=(*random_color(), 1.0))
 
-    app.orbital.Lx = Lx
     app.view.speed = 10.0
-    app.clock.speed = 10.0
     app.orbital.coef_of_restitution = 0.99999
 
 def run():
     app = App()
     app.connect("activate", on_activate)
+    app.orbital.set_clock_speed(10.0)
     app.run(None)
 
 if __name__ == "__main__":

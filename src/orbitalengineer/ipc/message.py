@@ -1,7 +1,7 @@
 from dataclasses import dataclass, fields
 from enum import IntEnum
 from typing import Literal, Self, Sequence, Protocol
-from orbitalengineer.engine.clock import SimClock
+from orbitalengineer.ipc.clock import SimClock
 
 
 class SupportsFromDict(Protocol):
@@ -11,6 +11,7 @@ class SupportsFromDict(Protocol):
 
 @dataclass
 class ErrorResponse:
+    success: bool
     error_message:str
     
     @classmethod
@@ -33,9 +34,9 @@ class ParticleInit:
 
 @dataclass
 class InitRequest:
-    particles: list
     device_id: int
     platform_id: int
+    particles: list
     
     @classmethod
     def from_dict(cls, d:dict) -> Self: 
@@ -154,6 +155,7 @@ class MessageType(IntEnum):
     STATUS_RESP = 15
     SYNC_REQ = 16
     SHIFT_VECTOR_REQ = 17
+    DISCONNECT = 18
 
 
 mtype_to_cls:dict[MessageType, SupportsFromDict|None] = {

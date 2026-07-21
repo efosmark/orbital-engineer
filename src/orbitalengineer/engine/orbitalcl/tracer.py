@@ -1,8 +1,6 @@
 import pyopencl as cl
 from dataclasses import dataclass
 
-from orbitalengineer.engine import logger
-
 @dataclass
 class TraceEvent:
     name: str

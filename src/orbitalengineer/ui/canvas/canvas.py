@@ -1,9 +1,8 @@
 import numpy as np
 
-from orbitalengineer.engine.orbitalcl import flags
-from orbitalengineer.engine.clock import SimClock
+from orbitalengineer import flags
 from orbitalengineer.ui import model
-from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, Gsk
+from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.canvas.pz import Camera2D, Camera2DController
 from orbitalengineer.ui.canvas.render.hud_clock import HudClockRenderer
@@ -21,7 +20,7 @@ from orbitalengineer.ui.canvas.render.pinpoint import PinpointRenderer
 from orbitalengineer.ui.canvas.render.reticle import ReticleRenderer
 
 from orbitalengineer.ipc.client import ClientSocketConnection
-
+from orbitalengineer.ipc.clock import SimClock
 
 HOVER_MARGIN = 15
 
