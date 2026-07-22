@@ -36,15 +36,18 @@ class SimController_CL:
     shm:dict[str, shared_memory.SharedMemory] = dict()
     
     def __init__(self):
-        self.accum = 0.0
-        self.last_now:float|None = None
         self.enable_profiling = config.EMIT_METRICS
-        self.is_initialized = False
         self.tr = EventTracer(self)
         self.metrics = MetricsProducer(config.METRIC_SOCKET_PATH)
+        self.device = None
+        self.reset()
+
+    def reset(self):
+        self.accum = 0.0
+        self.last_now:float|None = None
+        self.is_initialized = False
         self.tick_id = 0
         self.step_count = 0
-        self.device = None
 
     def _shared_memory(self, field_name:str, size:int, dtype:type) -> NDArray:
         t = np.dtype(dtype)
@@ -55,12 +58,15 @@ class SimController_CL:
     def disconnect(self):
         if not hasattr(self, 'shm'):
             return
+        closed = []
         for name, shm in self.shm.items():
             try:
                 shm.close()
                 shm.unlink()
+                closed.append(name)
             except FileNotFoundError:
                 ...
+        logger.info("Closed shared memory: %s", ','.join(closed))
 
     @log_timing
     def _populate_particle_fields(self, particles:Sequence[message.ParticleInit]):
@@ -70,6 +76,7 @@ class SimController_CL:
             self.position[i] = np.complex64(*p.position)
             self.mass[i] = np.float32(p.mass)
             self.radius[i] = np.float32(p.radius)
+        logger.info("Populated %s bodies", len(particles))
 
     @log_timing
     def _allocate_memory(self):
@@ -150,9 +157,6 @@ class SimController_CL:
     
     @log_timing
     def init_sim(self, particles:Sequence[message.ParticleInit]):
-        if self.is_initialized:
-            self.is_initialized = False
-            logger.warning("Re-initializing with new settings...")
         self.N = len(particles)
         self._allocate_memory()
         self._populate_particle_fields(particles)

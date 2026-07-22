@@ -14,22 +14,27 @@ A kernel that will cause colliding bodies to bounce off of each-other.
 These steps are ran for each colliding pair $(i, j)$.
 
 1. Normalize the difference in position
+
    $$
    r_{norm} = |r_j - r_i|
    $$
 
 2. Find the relative speed along normal
+
    $$
    v_{nrel} = \operatorname{Re}((v_i - v_j) \cdot \overline{r_{norm}})
    $$
 
 3. Get the scalar impulse magnitude
+
    $$
    \frac{1.0 + (e \cdot v_{nrel})}{
       \frac{1}{M_i} + \frac{1}{M_j}
    }
    $$
+
 4. Apply the final impulse
+
    $$
     V_i = V_i + \frac{r_{norm} \cdot \text{scalar impulse}}{M_i}
    $$

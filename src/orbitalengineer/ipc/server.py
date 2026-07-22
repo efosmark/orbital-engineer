@@ -32,6 +32,7 @@ class OrbitalControlServer:
         if self.orbital.is_initialized:
             logger.warning("Already initialized. Re-initializing...")
             self.end()
+            self.orbital.reset()
         self.enabled = True
         self.orbital.set_cl_device(platform_id, device_id)
         self.orbital.init_sim(particles)
