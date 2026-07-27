@@ -33,21 +33,28 @@ class ParticleInit:
 
 
 @dataclass
-class InitRequest:
-    device_id: int
+class Device:
     platform_id: int
+    device_id: int
+    
+    @classmethod
+    def from_dict(cls, d:dict) -> Self:
+        return cls(**d)
+
+@dataclass
+class InitRequest:
+    device: Device
     particles: list
     
     @classmethod
     def from_dict(cls, d:dict) -> Self: 
         return cls(
-            device_id=d["device_id"],
-            platform_id=d["platform_id"],
+            device=Device.from_dict(d["device"]),
             particles=[
                 ParticleInit.from_dict(p)
                 for p in d["particles"]
             ]
-        )
+        )   
 
 
 @dataclass
@@ -143,6 +150,19 @@ class StatusResponse:
             clock=SimClock(**d['clock']),
         )
 
+@dataclass
+class StateResponse:
+    status: StatusResponse
+    config: ConfigResponse|None
+    memory: SharedMemoryResponse|None
+    
+    @classmethod
+    def from_dict(cls, d:dict) -> Self:
+        return cls(
+            status=StatusResponse.from_dict(d['status']),
+            config=ConfigResponse.from_dict(d['config']) if d['config'] is not None else None,
+            memory=SharedMemoryResponse.from_dict(d['memory']) if d['memory'] is not None else None
+        )
 
 class MessageType(IntEnum):
     SUCCESS = 0
@@ -155,8 +175,9 @@ class MessageType(IntEnum):
     STATUS_RESP = 15
     SYNC_REQ = 16
     SHIFT_VECTOR_REQ = 17
-    DISCONNECT = 18
-
+    STATE_REQ = 18
+    STATE_RESP = 19
+    DISCONNECT = 20
 
 mtype_to_cls:dict[MessageType, SupportsFromDict|None] = {
     MessageType.SUCCESS: None,
@@ -168,5 +189,6 @@ mtype_to_cls:dict[MessageType, SupportsFromDict|None] = {
     MessageType.STATUS_RESP: StatusResponse,
     MessageType.SYNC_REQ: None,
     MessageType.END_REQ: None,
-    MessageType.SHIFT_VECTOR_REQ: ShiftVectorsRequest
+    MessageType.SHIFT_VECTOR_REQ: ShiftVectorsRequest,
+    MessageType.STATE_RESP: StateResponse
 }

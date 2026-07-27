@@ -15,17 +15,14 @@ from orbitalengineer.helpers import seed
 
 
 class App(Gtk.Application):
-    
     platform_id = GObject.Property(type=int, default=-1)
     device_id = GObject.Property(type=int, default=-1)
     
-    def __init__(self, resume_from_file:str|bool=False, platform_id=-1, device_id=-1):
-        super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        self.resume_from_file = resume_from_file
-        
+    
+    def __init__(self, platform_id=-1, device_id=-1):
+        super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)        
         self.view = model.ViewModel()
-        self.orbital = ClientSocketConnection()
-        self.orbital.connect()
+        self.client = ClientSocketConnection()
         self.camera = pz.Camera2D()
         
         self.view.connect("notify::paused", self.on_paused_changed)
@@ -33,21 +30,30 @@ class App(Gtk.Application):
         self.view.props.paused = True
         self.platform_id = platform_id
         self.device_id = device_id
+        self.client.set_device(platform_id, device_id)
+
+    def bootstrap(self):
+        self.client.connect()
+        self.client.sync_full_state()
 
     def on_paused_changed(self, model, param):
+        if not self.client.is_initialized:
+            return
         self._toggle_paused()
     
     def on_speed_changed(self, model, param):
-        self.orbital.set_clock_speed(self.view.props.speed)
-        
+        if not self.client.is_initialized:
+            return
+        self.client.set_clock_speed(self.view.props.speed)
+    
     def _toggle_paused(self):
         if self.view.props.paused:
-            self.orbital.stop()
+            self.client.stop()
         else:
-            self.orbital.start()
+            self.client.start()
 
     def insert_particle(self, particle:Particle, color:tuple[float, float, float, float]=(1,1,1,1)) -> int:
-        idx = self.orbital.add_particle(
+        idx = self.client.add_particle(
             position=particle.get_position(),
             velocity=particle.get_velocity(),
             mass=particle.get_mass(),
@@ -58,72 +64,67 @@ class App(Gtk.Application):
         self.view.particle_names[idx] = make_name(seed + idx)
         return idx
     
-    def _on_close_request(self, dialog: SelectDeviceWindow):
-        selection = dialog.get_selection()
-        if selection is None:
-            self.quit()
-            return
-        platform_id, device_id = selection
-        self.platform_id = platform_id
-        self.device_id = device_id
-        self.orbital.init_sim(platform_id, device_id)
-        self.init_mainwindow()
-    
     def init_mainwindow(self) -> MainWindow:
         win = MainWindow(
             application=self,
             title=ui_config.DEFAULT_WINDOW_TITLE,
             camera=self.camera,
             view=self.view,
-            ctl=self.orbital,
-            clock=self.orbital.clock,
+            ctl=self.client,
+            clock=self.client.clock,
         )
         self.key_input = KeyInput(self, win)
         win.present()
-        if self.view.start_maximized: win.maximize()
+        if self.view.start_maximized:
+            win.maximize()
         return win
     
+    def select_device(self):
+        def _on_close_device_selection(dialog: SelectDeviceWindow):
+            selection = dialog.get_selection()
+            if selection is None:
+                return self.quit()
+            self.client.set_device(selection[0], selection[1])
+            self.init_mainwindow()
+        dialog = SelectDeviceWindow()
+        dialog.set_application(self)
+        dialog.connect("close-request", _on_close_device_selection)
+        dialog.present()
+    
     def do_activate(self):
-        #if self.resume_from_file:
-        #    self.load_from_file()
         if self.platform_id == -1 or self.device_id == -1:
-            dialog = SelectDeviceWindow()
-            dialog.set_application(self)
-            dialog.connect("close-request", self._on_close_request)
-            dialog.present()
+            self.select_device()
         else:
-            self.orbital.init_sim(self.platform_id, self.device_id)
+            self.client.set_device(self.platform_id, self.device_id)
             self.init_mainwindow()
 
-
     def shift_focus(self, particle_id):
-        b = self.orbital.get_particle(particle_id)
+        b = self.client.get_particle(particle_id)
         if b is None:
             logger.warning(f"Unknown focus: {particle_id}")
             return
         self.view.secondary_body = particle_id
 
-        win = self.props.active_window
-        if not win:
-            available_size = 300
-        else:
-            available_size = min(win.get_allocated_height(), win.get_allocated_width()) * 0.25
-
-        radius = b.get_radius()
-        diameter = 3 * radius
-        
+        # win = self.props.active_window
+        # if not win:
+        #     available_size = 300
+        # else:
+        #     available_size = min(win.get_allocated_height(), win.get_allocated_width()) * 0.25
+        # radius = b.get_radius()
+        # diameter = 3 * radius
         #if self.view.follow_tracked_body:
         #    if diameter * self.camera.zoom > available_size:
         #        self.camera.zoom = available_size / diameter
         #    elif diameter * self.camera.zoom < 10:
         #        self.camera.zoom = 10 / diameter
 
+    
     def relative_zoom(self, factor):
         self.camera.zoom_at(0, 0, 0, 0, factor)
 
     # def on_collision(self, event:BouncingCollisionEvent):
-    #     r1 = self.orbital.get_particle(event.i).get_radius()
-    #     r2 = self.orbital.get_particle(event.j).get_radius()
+    #     r1 = self.client.get_particle(event.i).get_radius()
+    #     r2 = self.client.get_particle(event.j).get_radius()
     #     size = min(r1, r2)/2.0
     #     self.view.pinpoint.append(model.Pinpoint(
     #         position=event.collision_point,
@@ -134,9 +135,8 @@ class App(Gtk.Application):
 
     def to_dict(self) -> dict:
         return {
-            #"clock": self.clock.to_dict(),
             "camera": self.camera.to_dict(),
-            "orbital": self.orbital.to_dict(),
+            "orbital": self.client.to_dict(),
             "view": self.view.to_dict(),
         }
     
@@ -164,6 +164,6 @@ class App(Gtk.Application):
     #     self.orbital.load_from_dict(obj)
     
     def save_scenario(self):
-        if self.orbital.is_initialized:
+        if self.client.is_initialized:
             logger.info(f"Saving to {ui_config.DEFAULT_SCENARIO_FILE}")
             json.dump(self.to_dict(), open(ui_config.DEFAULT_SCENARIO_FILE, "w"))

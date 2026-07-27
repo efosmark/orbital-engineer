@@ -122,6 +122,8 @@ Each message is sent in a packet that contains
   1. Client sends a `STATUS_REQ` message (no payload).
   2. Server responds with `STATUS_RESP` payload: [StatusResponse](#statusrequest)
 
+Note that the status is returned as the response to many other message types. See below.
+
 #### Sync Shared Memory
 
   1. Client sends a `SYNC_REQ` message (no payload).
@@ -166,9 +168,11 @@ Each message is sent in a packet that contains
 #### InitRequest
 
     {
-        device_id: uint,                   // OpenCL device ID 
-        platform_id: uint,                 // OpenCL platform ID
-        particles=[
+        device: {
+            device_id: uint,               // OpenCL device ID 
+            platform_id: uint,             // OpenCL platform ID
+        }
+        particles: [
             {
                 flags: uint,
                 position: [float, float],  // (x, y)
@@ -177,7 +181,8 @@ Each message is sent in a packet that contains
                 radius: float
             },
             ... 
-        ]
+        ],
+        reinit: true                       // will force a re-init if already running
     }
 
 #### InitResponse

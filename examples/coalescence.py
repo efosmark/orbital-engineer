@@ -29,7 +29,7 @@ def on_activate(app: App):
             flags=flags.BOUNCE
         ), color=cmap(1-dist_norm(abs(position))))
 
-    app.orbital.coef_of_restitution = 0.9
+    app.client.coef_of_restitution = 0.9
     
 def run():
     app = App()

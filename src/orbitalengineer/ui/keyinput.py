@@ -60,17 +60,17 @@ class KeyInput(GObject.GObject):
         # Temporary test controls for apply_vector_offset
         if self.props.ctrl_held:
             if keyval == Gdk.KEY_w:
-                self.app.orbital.rel_mass(self.app.view.selected_particles, 1.1)
+                self.app.client.rel_mass(self.app.view.selected_particles, 1.1)
             elif keyval == Gdk.KEY_s:
-                self.app.orbital.rel_mass(self.app.view.selected_particles, 1/1.1)
+                self.app.client.rel_mass(self.app.view.selected_particles, 1/1.1)
             elif keyval == Gdk.KEY_a:
-                self.app.orbital.rel_velocity(self.app.view.selected_particles, 1.1)
+                self.app.client.rel_velocity(self.app.view.selected_particles, 1.1)
             elif keyval == Gdk.KEY_d:
-                self.app.orbital.rel_velocity(self.app.view.selected_particles, 1/1.1)
+                self.app.client.rel_velocity(self.app.view.selected_particles, 1/1.1)
             return
         
         if self.app.view.secondary_body is None: return
-        b = self.app.orbital.get_particle(self.app.view.secondary_body)
+        b = self.app.client.get_particle(self.app.view.secondary_body)
         r, angle = cmath.polar(b.get_velocity())
         if keyval == Gdk.KEY_a:
             angle -= ((2*cmath.pi) / 360.0)
@@ -86,7 +86,7 @@ class KeyInput(GObject.GObject):
             velocity = cmath.rect(r / 1.005, angle)
         else:
             return
-        self.app.orbital.set_velocity(self.app.view.secondary_body, velocity.real, velocity.imag)
+        self.app.client.set_velocity(self.app.view.secondary_body, velocity.real, velocity.imag)
 
     def on_escape(self):
         if self.app.view.secondary_body is not None:
@@ -101,7 +101,7 @@ class KeyInput(GObject.GObject):
         return False
 
     def cycle_particles(self, direction:int):
-        valid_indices:list = self.app.orbital.get_valid_indices().tolist()
+        valid_indices:list = self.app.client.get_valid_indices().tolist()
         try:
             idx_current = valid_indices.index(self.app.view.secondary_body)
             idx_new = idx_current + direction

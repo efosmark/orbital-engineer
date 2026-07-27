@@ -32,12 +32,12 @@ def on_activate(app: App):
     ), color=(*random_color(), 1.0))
 
     app.view.speed = 10.0
-    app.orbital.coef_of_restitution = 0.99999
+    app.client.coef_of_restitution = 0.99999
 
 def run():
     app = App()
     app.connect("activate", on_activate)
-    app.orbital.set_clock_speed(10.0)
+    app.client.set_clock_speed(10.0)
     app.run(None)
 
 if __name__ == "__main__":

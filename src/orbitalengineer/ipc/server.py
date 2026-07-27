@@ -28,13 +28,13 @@ class OrbitalControlServer:
                     print("Connection reset by peer:", addr)
             self.end()
 
-    def initialize(self, platform_id:int, device_id:int, particles):
+    def initialize(self, particles):
         if self.orbital.is_initialized:
             logger.warning("Already initialized. Re-initializing...")
             self.end()
             self.orbital.reset()
         self.enabled = True
-        self.orbital.set_cl_device(platform_id, device_id)
+        self.orbital.set_cl_device(self.device.platform_id, self.device.device_id)
         self.orbital.init_sim(particles)
         self.clock.reset()
         logger.info("Initialized.")
@@ -43,13 +43,13 @@ class OrbitalControlServer:
         self.tick_ctl = TickController(self.orbital, self.clock)
         self.tick_ctl.start()
         self.clock.start()
-        logger.info("Started.")
+        logger.info("Started. tick_id=%.0f  time=%.2f", self.orbital.tick_id, self.clock.time())
 
     def pause(self):
         if hasattr(self, 'tick_ctl'):
             self.tick_ctl.stop()
         self.clock.stop()
-        logger.info("Paused.")
+        logger.info("Paused.  tick_id=%.0f  time=%.2f", self.orbital.tick_id, self.clock.time())
     
     def end(self):
         logger.info("Ending simulation.")
@@ -100,6 +100,13 @@ class OrbitalControlServer:
             accum=float(self.orbital.accum),
             clock=self.clock,
         )
+    
+    def _get_state_response(self):
+        return message.StateResponse(
+            status=self._get_status_response(),
+            config=self._get_config_response() if self.orbital.is_initialized else None,
+            memory=self._get_shared_memory_response() if self.orbital.is_initialized else None
+        )
 
     def _handle_client(self, conn, addr):
         print("Connection from", addr)
@@ -120,7 +127,8 @@ class OrbitalControlServer:
     def _handle_request(self, conn:socket.socket, message_type:message.MessageType, payload):
         if message_type == message.MessageType.INIT_REQ:
             req = message.InitRequest.from_dict(payload)
-            self.initialize(req.device_id, req.platform_id, req.particles)
+            self.device = req.device
+            self.initialize(req.particles)
             transport.send_message(conn, message.MessageType.INIT_RESP, self._get_init_response())
         
         elif message_type == message.MessageType.SYNC_REQ:
@@ -147,6 +155,9 @@ class OrbitalControlServer:
                 self.clock.speed = req.speed
             transport.send_message(conn, message.MessageType.SUCCESS)
         
+        elif message_type == message.MessageType.STATE_REQ:
+            transport.send_message(conn, message.MessageType.STATE_RESP, self._get_state_response())
+                
         elif message_type == message.MessageType.END_REQ:
             self.end()
             transport.send_message(conn, message.MessageType.SUCCESS)

@@ -51,6 +51,7 @@ class SimController_CL:
 
     def _shared_memory(self, field_name:str, size:int, dtype:type) -> NDArray:
         t = np.dtype(dtype)
+        logger.info("shm: %s size=%s dtype=%s", field_name, size, t)
         self.shm[field_name] = shared_memory.SharedMemory(create=True, size=t.itemsize * size)
         array = np.ndarray(size, dtype=dtype, buffer=self.shm[field_name].buf)
         return array
@@ -294,13 +295,11 @@ class SimController_CL:
         
         if num_steps > 0:
             count, dt_unprocessed = self.single_step(dt_step)
-            
             self.accum -= dt_step
             #self.accum -= dt_unprocessed # type: ignore
             #self.accum -= (dt_step - dt_unprocessed) # type: ignore
             self.emit_metrics(float(dt_step))
             self.tick_id += 1
-                
         return num_steps
 
     # def to_dict(self) -> dict:

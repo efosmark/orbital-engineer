@@ -42,7 +42,7 @@ def on_activate(app: App):
         flags=flags.BOUNCE
     ), color=(1,1,1,1))
 
-    app.orbital.coef_of_restitution = 0.999
+    app.client.coef_of_restitution = 0.999
     app.relative_zoom(1/30.0)
 
 def run():
