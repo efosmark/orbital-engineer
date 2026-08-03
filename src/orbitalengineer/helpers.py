@@ -4,7 +4,7 @@ import numpy as np
 from orbitalengineer.engine import config
 from orbitalengineer.engine.particle import Particle, ParticleRaw
 
-seed = 0xf00d1e1
+seed = 0xf00d11
 rng = np.random.default_rng(seed)
 
 def r_from_mass(m: np.float64) -> np.float64:

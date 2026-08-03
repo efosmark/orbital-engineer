@@ -10,6 +10,7 @@ from orbitalengineer.engine import log_timing, logger, config
 from orbitalengineer.engine.metric import MetricsProducer
 
 from orbitalengineer.engine.orbitalcl import flags
+from orbitalengineer.engine.orbitalcl.cgroup.cgroup import CGroupPipeline
 from orbitalengineer.engine.orbitalcl.device import CLDeviceManager
 from orbitalengineer.engine.orbitalcl.tracer import EventTracer
 from orbitalengineer.engine.orbitalcl.merge.merge import MergePipeline
@@ -87,6 +88,8 @@ class SimController_CL:
         self.mass = self._shared_memory('mass', self.N, np.float32)
         self.radius = self._shared_memory('radius', self.N, np.float32)
         self.force = self._shared_memory('force', self.N * self.N, np.complex64)
+        self.cgroup = self._shared_memory('cgroup', self.N, np.uint32)
+        self.cgroup[:] = np.arange(self.N, dtype=np.uint32)
 
     @log_timing
     def _create_buffers(self):
@@ -96,6 +99,7 @@ class SimController_CL:
         self.mass_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.mass)
         self.radius_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.radius)
         self.force_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.force)
+        self.cgroup_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.cgroup)
 
     @log_timing
     def _init_queue(self):
@@ -144,10 +148,12 @@ class SimController_CL:
             self._interaction = InteractionGroupPipeline(self.N, self.ctx, self.q, self.tr, build_options)
             self._nudge = NudgePipeline(self.N, self.ctx, self.q, self.tr, build_options)
             self._merge = MergePipeline(self.N, self.ctx, self.q, self.tr, build_options)
+            self._cgroup = CGroupPipeline(self.N, self.ctx, self.q, self.tr, build_options)
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
             import sys
             print(e, file=sys.stderr)
-            raise SystemExit
+            return False
+        return True
     
     def set_cl_device(self, platform_id:int, device_id:int):
         if self.is_initialized:
@@ -162,12 +168,14 @@ class SimController_CL:
         self._allocate_memory()
         self._populate_particle_fields(particles)
         self._init_queue()
-        self._init_kernel()
+        if not self._init_kernel():
+            return False
         self._create_buffers()
         self._interaction(self.dt_base, self.flags_cl, self.pos_cl, self.vel_cl, self.radius_cl, self.mass_cl)
         if config.NUDGE_ON_START_ENABLE:
             self.nudge()
         self.is_initialized = True
+        return True
     
     def apply_vector_offset(self, vector_name:str, ids:Sequence[int], op:str, offset:tuple[float,float]):
         if vector_name == "position":
@@ -220,6 +228,7 @@ class SimController_CL:
         cl.enqueue_copy(self.q, self.mass, self.mass_cl)
         cl.enqueue_copy(self.q, self.radius, self.radius_cl)
         cl.enqueue_copy(self.q, self._interaction.toi, self._interaction.toi_cl)
+        cl.enqueue_copy(self.q, self.cgroup, self.cgroup_cl)
         self.q.finish()
     
     def nudge(self):
@@ -249,8 +258,10 @@ class SimController_CL:
             self.drift(dt)
             self.kick(dt / 2.0)
             
+            self._cgroup(self.flags_cl, self.pos_cl, self.radius_cl, self.cgroup_cl)
+                        
             if config.COLLISION_MERGE_ENABLE:
-                self._merge(self.flags_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
+                self._merge(self.flags_cl, self.cgroup_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
             
             if config.COLLISION_BOUNCE_ENABLE:
                 self._bounce(self.flags_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
@@ -294,7 +305,12 @@ class SimController_CL:
         self.last_now = now
         
         if num_steps > 0:
-            count, dt_unprocessed = self.single_step(dt_step)
+            try:
+                count, dt_unprocessed = self.single_step(dt_step)
+            except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
+                import sys
+                print(e, file=sys.stderr)
+                return False
             self.accum -= dt_step
             #self.accum -= dt_unprocessed # type: ignore
             #self.accum -= (dt_step - dt_unprocessed) # type: ignore

@@ -14,7 +14,7 @@ DV_MAX = 1e10
 # Simulation Settings
 #############################################
 
-COEF_OF_RESTITUTION = 0.90
+COEF_OF_RESTITUTION = 0.75
 DEFAULT_G = 1.0
 
 #############################################

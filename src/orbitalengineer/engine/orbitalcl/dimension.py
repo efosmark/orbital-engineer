@@ -25,6 +25,8 @@ class CLPipelineStep:
     
     def __init__(self, N:int, ctx:cl.Context, queue:cl.CommandQueue, tr:EventTracer, build_options:Sequence|None=None):
         self.N = N
+        if N < self.Lx:
+            self.Lx = N
         
         self.default_build_options = build_options or ['-cl-std=CL2.0']
         self.ctx = ctx

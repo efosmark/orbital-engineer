@@ -2,6 +2,7 @@ import numpy as np
 
 from orbitalengineer import flags
 from orbitalengineer.ui import model
+from orbitalengineer.ui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.canvas.pz import Camera2D, Camera2DController
@@ -156,11 +157,13 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.scene_renderers = [
             #HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
             #ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
+            CGroupRenderer(self.view, self.camera, self.orbital, self.clock),
             EllipseRenderer(self.view, self.camera, self.orbital, self.clock),
             ParticleRenderer(self.view, self.camera, self.orbital, self.clock),
             SelectionRenderer(self.view, self.camera, self.orbital, self.clock),
             ReticleRenderer(self.view, self.camera, self.orbital, self.clock),
             #PinpointRenderer(self.view, self.camera, self.orbital, self.clock),
+            CGroupConnectionRenderer(self.view, self.camera, self.orbital, self.clock),
         ]
         
         self.hud_fg_renderers = [
@@ -225,7 +228,11 @@ class OrbitalCanvas(Gtk.DrawingArea):
             
             for r in self.hud_renderers:
                 cr.save()
-                r.draw(cr, width, height)
+                try:
+                    r.draw(cr, width, height)
+                except Exception as e:
+                    self.scene_renderers.remove(r)
+                    raise e
                 cr.restore()
             
             cr.save()
@@ -233,14 +240,22 @@ class OrbitalCanvas(Gtk.DrawingArea):
 
             for r in self.scene_renderers:
                 cr.save()
-                r.draw(cr, width, height)
+                try:
+                    r.draw(cr, width, height)
+                except Exception as e:
+                    self.scene_renderers.remove(r)
+                    raise e
                 cr.restore()
             
             cr.restore()
             
             for r in self.hud_fg_renderers:
                 cr.save()
-                r.draw(cr, width, height)
+                try:
+                    r.draw(cr, width, height)
+                except Exception as e:
+                    self.hud_fg_renderers.remove(r)
+                    raise e
                 cr.restore()
         except Exception as e:
             #print("EXCEPTION", e.wit)

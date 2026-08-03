@@ -35,6 +35,7 @@ class ClientSocketConnection:
     mass:NDArray[np.float32]
     radius:NDArray[np.float32]
     force:NDArray[np.complex64]
+    cgroup:NDArray[np.uint32]
     
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

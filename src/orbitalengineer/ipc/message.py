@@ -95,6 +95,7 @@ class SharedMemoryResponse:
     mass: SharedMemoryInfo
     radius: SharedMemoryInfo
     force: SharedMemoryInfo
+    cgroup: SharedMemoryInfo
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:
