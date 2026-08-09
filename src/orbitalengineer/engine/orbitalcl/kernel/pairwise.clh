@@ -1,18 +1,25 @@
-/*
-i     = 0..N
-lane  = 0..Lx
-Lx    = 64, 128, or 256
-*/
+#ifndef PAIRWISE_CLH_
+#define PAIRWISE_CLH_
 
+typedef struct {
+    const uint idx;
+    const uint i;
+    const uint j;
+} Pair;
 
-#define GRID_STRIDE_INIT()                    \
+inline uint triu_index(uint i, uint j, uint N) {
+    return i * (N - 1u) - (i * (i - 1u)) / 2u + (j - i - 1u);
+}
+
+#define PAIR_STRIDE_INIT()                    \
     uint i = get_group_id(0);                 \
     uint lane = get_local_id(0);              \
     uint Lx = get_local_size(0);
 
 
-#define GRID_STRIDE_IJ( ...)                  \
+#define PAIR_STRIDE_IJ( ...)                  \
     do {                                      \
+        if (i >= N) return;                   \
         uint row_start = i * N;               \
         for (uint j = lane; j < N; j += Lx) { \
             if (j == i) continue;             \
@@ -21,5 +28,4 @@ Lx    = 64, 128, or 256
         }                                     \
     } while (0)
 
-
-#define FLOAT2_WG_REDUCE_ADD(var) ((float2)(work_group_reduce_add(var.x), work_group_reduce_add(var.y)))
+#endif // PAIRWISE_CLH_

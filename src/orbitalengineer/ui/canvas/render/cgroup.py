@@ -19,8 +19,9 @@ class CGroupRenderer(renderer.Renderer):
 class CGroupConnectionRenderer(renderer.Renderer):
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        cr.set_source_rgba(1, 1, 1, 0.6)
-        cr.set_line_width(3.0/self.camera.zoom)
+        cr.set_source_rgba(1, 1, 1, 0.5)
+        cr.set_line_width(10.0/self.camera.zoom)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
         
         for b in self.orbital:
             cgroup = int(self.orbital.cgroup[b.idx])

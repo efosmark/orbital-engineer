@@ -1,40 +1,91 @@
 #include "kernel/stride.clh"
 #include "flags.clh"
+#include "kernel/pairwise.clh"
 
+
+__kernel void find_contacting_bodies_orig(
+             const uint    N,
+    __global const Pair*   restrict pairs,
+    __global const uint*   restrict flags,
+    __global const float2* restrict position,
+    __global const float*  restrict radius,
+    __global const float2* restrict time_of_interaction,
+    __global       uint*   restrict num_contacts_per_lane, // (N * lane_count)
+    __global       uint*   restrict contacts_per_lane      // (N * N)
+) {
+    GRID_STRIDE_INIT();
+
+    uint lane_width = (uint) (N / (Lx * 1.0));
+    uint lane_offset = lane * lane_width;
+    uint num_contacts = 0;
+
+    float2 position_i = position[i];
+    float radius_i = radius[i];
+
+    GRID_STRIDE_IJ(
+        float2 ttc_ij = time_of_interaction[row_start + j];
+        float ttc_min = fmin(fabs(ttc_ij.x), fabs(ttc_ij.y));
+
+        float edge_dist = fast_distance(position_i, position[j]) - radius_i - radius[j];
+
+        if ((flags[j]&REMOVED) || edge_dist > fmin(radius_i, radius[j]) * 0.1) {
+            continue;
+        } 
+
+        contacts_per_lane[row_start + lane_offset + num_contacts] = j;
+        num_contacts++;
+    );
+    num_contacts_per_lane[(Lx * i) + lane] = num_contacts;
+}
+
+
+//#define MAX_NUM_COLLISIONS_PER_LANE 8
+//#define MAX_NUM_COLLISIONS 24
 
 
 __kernel void find_contacting_bodies(
              const uint    N,
+             const uint    num_paris,
+    __global const Pair*   restrict pair,
     __global const uint*   restrict flags,
     __global const float2* restrict position,
     __global const float*  restrict radius,
-    __global       float*  restrict edge_dist,
+    __global const float2* restrict time_of_interaction,
     __global       uint*   restrict num_contacts_per_lane, // (N * lane_count)
-    __global       uint*   restrict contacts               // (N * N)
+    __global       uint*   restrict contacts_per_lane      // (N * N)
 ) {
-    uint i = get_group_id(0);
+
+    uint g0 = get_group_id(0);
+    //if (g0 >= num_paris) return;
+
     uint lane = get_local_id(0);
     uint Lx = get_local_size(0);
 
-    if (i >= N) return;
-    uint row_start = i * N;
-
-    uint lane_width = (uint)ceil(N / (Lx * 1.0));
+    uint lane_width = (uint) (N / (Lx * 1.0));
     uint lane_offset = lane * lane_width;
+    
+    printf("g0=%u, lane=%u, Lx=%u", g0, lane, Lx);
+    for (uint n = lane; n < num_paris; n += Lx) {
+        uint i = pair[((g0 * Lx) + n)].i;
+        uint j = pair[((g0 * Lx) + n)].j;
 
-    uint num_contacts = 0;    
-    for (uint j = lane; j < N; j += Lx) {
-        if (j == i) continue;
-     
-        float edge_dist = fast_length(position[j] - position[i]) - radius[i] - radius[j];
-        if ((flags[j]&REMOVED) || edge_dist >= max(radius[i], radius[j]) * 0.25) {
-            continue;
-        }
+        //printf("i=%u, j=%u, n=%u, g0=%u, lane=%u", i, j, n, g0, lane);
 
-        contacts[row_start + lane_offset + num_contacts] = j;
-        num_contacts++;
+        float2 ttc_ij = time_of_interaction[(N * i) + j];
+        float ttc_min = fmin(fabs(ttc_ij.x), fabs(ttc_ij.y));
+
+        float edge_dist = fast_distance(position[i], position[j]) - radius[i] - radius[j];
+        if ((flags[j]&REMOVED) || edge_dist > fmin(radius[i], radius[j]) * 0.5) continue;
+
+        uint ncontacts_i = num_contacts_per_lane[(Lx * i) + lane];
+        uint ncontacts_j = num_contacts_per_lane[(Lx * j) + lane];
+
+        contacts_per_lane[(N * i) + lane_offset + ncontacts_i] = j;
+        contacts_per_lane[(N * j) + lane_offset + ncontacts_j] = i;
+
+        num_contacts_per_lane[(Lx * i) + lane]++;
+        num_contacts_per_lane[(Lx * j) + lane]++;
     }
-    num_contacts_per_lane[(Lx * i) + lane] = num_contacts;
 }
 
 
@@ -63,102 +114,46 @@ __kernel void find_contacting_bodies_reduce(
 }
 
 
-// global work siz e = (len(ids), )
-// local work size  = (max(num_contacts), )
 __kernel void cgroup_assign(
              const uint  N,
     __global const uint* restrict ids_reduced,      // (num_ids, )
     __global const uint* restrict num_contacts,     // (num_ids, )
-    __global       uint* restrict contacts_reduced, // (N * N)
+    __global const uint* restrict contacts_reduced, // (N * N)
     __global const uint* restrict cgroup_src,       
     __global       uint* restrict cgroup_dest,      
     __global       uint* restrict has_updates       
 ) {
-    uint gid = get_global_id(0);
+    uint gid = get_group_id(0);
+    uint lid = get_local_id(0);
+    uint Lx = get_local_size(0);
+
     uint i = ids_reduced[gid];
+    bool updated = false;
+    uint min_contact = i;
 
-    // each lane gets a different contacting body
+    // Ensure this lane is in-bounds
+    if (lid < num_contacts[i]) {
 
-    for (uint n=0; n < num_contacts[i]; n++) {
-        uint j = contacts_reduced[(N * i) + n];
-        
-        while (cgroup_src[j] < j) {
-            j = cgroup_src[j];
-            contacts_reduced[(N * i) + n] = j;
-            has_updates[i] = true;
-        }
+        // Our current min ID based on our collision neighbors
+        min_contact = cgroup_src[i];
 
-        if (j < cgroup_src[i]) {
-            cgroup_dest[i] = j;
-            has_updates[i] = true;
+        // Get the individual collision
+        uint j = contacts_reduced[(N * i) + lid];
+
+        // Look up its current min ID based on _its_ collision neighbors
+        uint j_min_contact = cgroup_src[j];
+
+        // Check whether it is smaller than our current min ID
+        if (j_min_contact < min_contact) {
+            min_contact = j_min_contact;
+            updated = true;
         }
     }
 
-    //bool wg_has_updated = work_group_any(updated);
-    //uint wg_min_index = work_group_reduce_min(min_index);
-    //if (get_local_id(0) == 0 && wg_has_updated) {
-    //if (updated) {
-    //    cgroup[i] = min_index;
-    //    has_updates[i] = updated;
-        //printf("Recording cgroup[%u] = %u, updated=%u", i, cgroup[i], updated);
-    //}
-
-    //}
+    bool wg_has_updated = work_group_any(updated);
+    uint wg_min_index = work_group_reduce_min(min_contact);
+    if (lid == 0) {
+        cgroup_dest[i] = wg_min_index;
+        has_updates[i] = wg_has_updated;
+    }
 }
-
-
-/////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////
-
-
-// __kernel void compute_edge_distance(
-//                const uint    N,
-//     __global   const float2* restrict position,
-//     __global   const float*  restrict radius,
-//     __global         float*  restrict edge_dist
-// ) {
-//     GRID_STRIDE_INIT();
-//     GRID_STRIDE_IJ(
-//         edge_dist[IDX] = fast_length(position[j] - position[i]) - radius[i] - radius[j];
-//     );
-// }
-
-// __kernel void collision_group_assign(
-//                const uint    N,
-//     __global   const uint*   restrict flags,
-//     __global   const float*  restrict radius,
-//     __global   const float*  restrict edge_dist,
-//     __global   const uint*   restrict cgroup,
-//     __global         uint*   restrict new_cgroup,
-//     __global         uint*   restrict has_updates
-// ) {
-//     GRID_STRIDE_INIT();
-//     if (lane == 0) new_cgroup[i] = cgroup[i];
-//     if ((flags[i]&REMOVED)) return;
-
-
-//     uint min_index = cgroup[i];
-//     bool updated = false;
-
-//     GRID_STRIDE_IJ(
-//         if ((flags[j]&REMOVED) || edge_dist[IDX] >= max(radius[i], radius[j]) * 0.25) {
-//             continue;
-//         } else if (cgroup[j] < cgroup[i]) {
-//             min_index = cgroup[j];
-//             updated = true;
-//         }
-//     );
-
-//     while (cgroup[min_index] < min_index) {
-//         min_index = cgroup[min_index];
-//         updated = true;
-//     }
-
-//     bool wg_has_updated = work_group_any(updated);
-//     uint wg_min_index = work_group_reduce_min(min_index);
-//     if (lane == 0) {
-//         new_cgroup[i] = wg_min_index;
-//         has_updates[i] = wg_has_updated;
-//     }
-// }
- 

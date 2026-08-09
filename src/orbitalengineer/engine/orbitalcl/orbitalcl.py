@@ -126,6 +126,22 @@ class SimController_CL:
         }
         return [ f'-D{k}={v}' for k,v in defs.items() ]
     
+    def _create_pairs(self):
+        pair_dtype = np.dtype([
+            ("idx",    np.uint32),  # Pairwise index
+            ("i",      np.uint32),  #  
+            ("j",      np.uint32),
+        ], align=True)
+
+        self.ix, self.jx = np.triu_indices(int(self.N), k=1)
+        self.num_pairs = self.ix.size
+        self.pairs_host = np.zeros(self.ix.size, dtype=pair_dtype)
+        for x in range(self.pairs_host.size):
+            self.pairs_host["idx"][x] = x
+            self.pairs_host["i"][x] = self.ix[x]
+            self.pairs_host["j"][x] = self.jx[x]
+        self.pairs_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=self.pairs_host)
+    
     @log_timing
     def _init_kernel(self):
         if self.device is None:
@@ -152,6 +168,7 @@ class SimController_CL:
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
             import sys
             print(e, file=sys.stderr)
+            raise SystemExit
             return False
         return True
     
@@ -171,6 +188,7 @@ class SimController_CL:
         if not self._init_kernel():
             return False
         self._create_buffers()
+        self._create_pairs()
         self._interaction(self.dt_base, self.flags_cl, self.pos_cl, self.vel_cl, self.radius_cl, self.mass_cl)
         if config.NUDGE_ON_START_ENABLE:
             self.nudge()
@@ -227,7 +245,7 @@ class SimController_CL:
         cl.enqueue_copy(self.q, self.velocity, self.vel_cl)
         cl.enqueue_copy(self.q, self.mass, self.mass_cl)
         cl.enqueue_copy(self.q, self.radius, self.radius_cl)
-        cl.enqueue_copy(self.q, self._interaction.toi, self._interaction.toi_cl)
+        #cl.enqueue_copy(self.q, self._interaction.toi, self._interaction.toi_cl)
         cl.enqueue_copy(self.q, self.cgroup, self.cgroup_cl)
         self.q.finish()
     
@@ -258,7 +276,7 @@ class SimController_CL:
             self.drift(dt)
             self.kick(dt / 2.0)
             
-            self._cgroup(self.flags_cl, self.pos_cl, self.radius_cl, self.cgroup_cl)
+            self._cgroup(int(self.ix.size), self.pairs_cl, self.flags_cl, self.pos_cl, self.radius_cl, self._interaction.toi_cl, self.cgroup_cl)
                         
             if config.COLLISION_MERGE_ENABLE:
                 self._merge(self.flags_cl, self.cgroup_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
@@ -272,7 +290,7 @@ class SimController_CL:
             self.step_count += 1
             count += 1
         
-        if count >= 10 and dt_step > config.EPS_TIME:
+        if count >= 100 and dt_step > config.EPS_TIME:
             logger.warning(f"Over-iterated step. Remaining {dt_step=}, {initial_dt_step=}")
         
         return count, dt_step
@@ -310,6 +328,7 @@ class SimController_CL:
             except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
                 import sys
                 print(e, file=sys.stderr)
+                raise e
                 return False
             self.accum -= dt_step
             #self.accum -= dt_unprocessed # type: ignore

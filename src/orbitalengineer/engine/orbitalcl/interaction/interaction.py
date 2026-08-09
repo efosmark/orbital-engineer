@@ -13,7 +13,7 @@ class InteractionGroupPipeline(CLPipelineStep):
         #self._reduce_interaction_groups = self._load_kernel("reduce_interaction_groups", KERNEL_FILE_LOCATION)
         #self._collect_group_members = self._load_kernel("collect_group_members", KERNEL_FILE_LOCATION)
     
-        self.toi = np.zeros(self.N * self.N, dtype=np.float32)
+        self.toi = np.zeros(self.N * self.N * 2, dtype=np.float32)
         self.toi_cl = self._create_buffer(self.toi)
 
         self.node_dt = np.array([np.inf for i in range(self.N)], dtype=np.float32)
