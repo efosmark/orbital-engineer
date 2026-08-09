@@ -163,7 +163,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
             SelectionRenderer(self.view, self.camera, self.orbital, self.clock),
             ReticleRenderer(self.view, self.camera, self.orbital, self.clock),
             #PinpointRenderer(self.view, self.camera, self.orbital, self.clock),
-            CGroupConnectionRenderer(self.view, self.camera, self.orbital, self.clock),
+            #CGroupConnectionRenderer(self.view, self.camera, self.orbital, self.clock),
         ]
         
         self.hud_fg_renderers = [

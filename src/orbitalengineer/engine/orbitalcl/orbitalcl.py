@@ -152,6 +152,7 @@ class SimController_CL:
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
             import sys
             print(e, file=sys.stderr)
+            raise SystemExit
             return False
         return True
     
@@ -227,7 +228,7 @@ class SimController_CL:
         cl.enqueue_copy(self.q, self.velocity, self.vel_cl)
         cl.enqueue_copy(self.q, self.mass, self.mass_cl)
         cl.enqueue_copy(self.q, self.radius, self.radius_cl)
-        cl.enqueue_copy(self.q, self._interaction.toi, self._interaction.toi_cl)
+        #cl.enqueue_copy(self.q, self._interaction.toi, self._interaction.toi_cl)
         cl.enqueue_copy(self.q, self.cgroup, self.cgroup_cl)
         self.q.finish()
     
@@ -258,7 +259,7 @@ class SimController_CL:
             self.drift(dt)
             self.kick(dt / 2.0)
             
-            self._cgroup(self.flags_cl, self.pos_cl, self.radius_cl, self.cgroup_cl)
+            self._cgroup(self.flags_cl, self.pos_cl, self.radius_cl, self._interaction.toi_cl, self.cgroup_cl)
                         
             if config.COLLISION_MERGE_ENABLE:
                 self._merge(self.flags_cl, self.cgroup_cl, self.pos_cl, self.vel_cl, self.mass_cl, self.radius_cl)
@@ -272,7 +273,7 @@ class SimController_CL:
             self.step_count += 1
             count += 1
         
-        if count >= 10 and dt_step > config.EPS_TIME:
+        if count >= 100 and dt_step > config.EPS_TIME:
             logger.warning(f"Over-iterated step. Remaining {dt_step=}, {initial_dt_step=}")
         
         return count, dt_step
@@ -310,6 +311,7 @@ class SimController_CL:
             except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
                 import sys
                 print(e, file=sys.stderr)
+                raise e
                 return False
             self.accum -= dt_step
             #self.accum -= dt_unprocessed # type: ignore

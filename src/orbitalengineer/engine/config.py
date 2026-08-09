@@ -14,7 +14,7 @@ DV_MAX = 1e10
 # Simulation Settings
 #############################################
 
-COEF_OF_RESTITUTION = 0.75
+COEF_OF_RESTITUTION = 0.4
 DEFAULT_G = 1.0
 
 #############################################
@@ -46,3 +46,9 @@ METRIC_SOCKET_PATH = "/tmp/kernel-metrics.sock"
 #############################################
 
 SERIALIZED_VALUE_PRECISION = 6
+
+#############################################
+# Kernel Settings
+#############################################
+
+CGROUP_ASSIGN_MAX_ITERATIONS = 100

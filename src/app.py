@@ -8,14 +8,12 @@ from matplotlib import colors
 cmap = plt.colormaps['gist_rainbow']
 
 def populate(app: App):
-
-    for i in range(100):
+    for i in range(1000):
         app.insert_particle(ParticleRaw(
-            #position=complex(i*100 + 10, 0),
-            position=random_position(0, 1000),
-            velocity=0,
+            position=random_position(0, 10000),
+            velocity=random_position(0,   100),
             mass=100_000,
-            radius=50,
+            radius=100,
             flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY,
         ), color=(*random_color(), 1.0))
 
@@ -44,8 +42,8 @@ def on_activate(app: App):
     app.bootstrap()
     
     if not app.client.is_initialized:
-        populate(app)
         app.client.coef_of_restitution = 0.1
+        populate(app)
         app.client.init_sim()
 
 def run():
