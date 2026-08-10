@@ -4,16 +4,16 @@ from orbitalengineer.ui.mainapp import App
 from orbitalengineer.helpers import create_primary, create_secondary, r_from_mass, random_color, random_position, rng
 
 import matplotlib.pyplot as plt
-from matplotlib import colors
 cmap = plt.colormaps['gist_rainbow']
 
 def populate(app: App):
     for i in range(1000):
+        mass = (1_000_000 * rng.random()) + 100_000
         app.insert_particle(ParticleRaw(
-            position=random_position(0, 10000),
-            velocity=random_position(0,   100),
-            mass=100_000,
-            radius=100,
+            position=random_position(0,  200_000),
+            velocity=random_position(0,     1000),
+            mass=mass,
+            radius=r_from_mass(mass),
             flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY,
         ), color=(*random_color(), 1.0))
 

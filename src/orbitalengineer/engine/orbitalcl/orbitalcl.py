@@ -7,6 +7,7 @@ import numpy as np
 import pyopencl as cl
 
 from orbitalengineer.engine import log_timing, logger, config
+from orbitalengineer.engine.exception import InitKernelException
 from orbitalengineer.engine.metric import MetricsProducer
 
 from orbitalengineer.engine.orbitalcl import flags
@@ -29,10 +30,10 @@ kernel_dir = Path(__file__).parent
 class SimController_CL:
     coef_of_restitution = config.COEF_OF_RESTITUTION
     dt_base = config.DEFAULT_DT_BASE
-    G = config.DEFAULT_G
+    G = config.GRAV_CONSTANT
     EPS_DIST:float = config.EPS_DIST
     EPS_TIME:float = config.EPS_TIME
-    N:int = 1024
+    N:int = 0
     
     shm:dict[str, shared_memory.SharedMemory] = dict()
     
@@ -67,6 +68,7 @@ class SimController_CL:
                 shm.unlink()
                 closed.append(name)
             except FileNotFoundError:
+                logger.warning("Could not properly close shared memory: file(s) not found.")
                 ...
         logger.info("Closed shared memory: %s", ','.join(closed))
 
@@ -91,7 +93,6 @@ class SimController_CL:
         self.cgroup = self._shared_memory('cgroup', self.N, np.uint32)
         self.cgroup[:] = np.arange(self.N, dtype=np.uint32)
 
-    @log_timing
     def _create_buffers(self):
         self.flags_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.flags)
         self.vel_cl = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=self.velocity)
@@ -109,7 +110,6 @@ class SimController_CL:
             properties = cl.command_queue_properties.PROFILING_ENABLE
         self.q = cl.CommandQueue(self.ctx, properties=properties)
     
-    @log_timing
     def _generate_headers(self):
         build_dir = Path(".opencl_build")
         build_dir.mkdir(exist_ok=True)
@@ -124,6 +124,7 @@ class SimController_CL:
             'EPS_DIST':            f'{self.EPS_DIST}f',
             'EPS_TIME':            f'{self.EPS_TIME}f',
         }
+        logger.info("Using build constants: %s", [ f'{k}={v}' for k,v in defs.items() ])
         return [ f'-D{k}={v}' for k,v in defs.items() ]
     
     @log_timing
@@ -131,7 +132,7 @@ class SimController_CL:
         if self.device is None:
             #from warnings import warn
             #warn("Cannot initialize kernels until CL device is selected.", stacklevel=2)
-            raise Exception("Cannot initialize kernels until CL device is selected.")
+            raise InitKernelException()
         build_dir = self._generate_headers()                
         
         build_options = [
@@ -150,9 +151,7 @@ class SimController_CL:
             self._merge = MergePipeline(self.N, self.ctx, self.q, self.tr, build_options)
             self._cgroup = CGroupPipeline(self.N, self.ctx, self.q, self.tr, build_options)
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
-            import sys
-            print(e, file=sys.stderr)
-            raise SystemExit
+            logger.error(str(e))
             return False
         return True
     
@@ -174,7 +173,8 @@ class SimController_CL:
         self._create_buffers()
         self._interaction(self.dt_base, self.flags_cl, self.pos_cl, self.vel_cl, self.radius_cl, self.mass_cl)
         if config.NUDGE_ON_START_ENABLE:
-            self.nudge()
+            for i in range(10):
+                self.nudge()
         self.is_initialized = True
         return True
     
@@ -208,15 +208,12 @@ class SimController_CL:
         
         if vector_name == "mass":
             self.radius[ids] = np.vectorize(r_from_mass)(self.mass[ids])
-            cl.enqueue_copy(self.q, self.radius_cl, self.radius)
+            cl.enqueue_copy(self.q, self.radius_cl, self.radius) 
         
         return True
     
     def _has_queue(self) -> bool:
-        if not hasattr(self, 'q'):
-            logger.warning("No queue found.")
-            return False
-        return True
+        return hasattr(self, 'q')
 
     def sync(self):
         if not self._has_queue():
@@ -273,8 +270,8 @@ class SimController_CL:
             self.step_count += 1
             count += 1
         
-        if count >= 100 and dt_step > config.EPS_TIME:
-            logger.warning(f"Over-iterated step. Remaining {dt_step=}, {initial_dt_step=}")
+        if count >= config.MAX_SUB_STEPS and dt_step > config.EPS_TIME:
+            logger.warning(f"Over-iterated step. {dt_step=}, {initial_dt_step=}")
         
         return count, dt_step
     

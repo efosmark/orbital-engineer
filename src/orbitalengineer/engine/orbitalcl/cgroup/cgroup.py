@@ -1,19 +1,18 @@
 import numpy as np
 import pyopencl as cl
-from orbitalengineer.engine.config import CGROUP_ASSIGN_MAX_ITERATIONS
+from orbitalengineer.engine import logger, config
 from orbitalengineer.engine.orbitalcl.dimension import CLPipelineStep
 
 
 class CGroupAssignException(Exception):
-    def __init__(self, num_iterations:int, num_bodies:int):
-        self.num_iterations = num_iterations
-        self.max_iterations = CGROUP_ASSIGN_MAX_ITERATIONS
+    def __init__(self, num_bodies:int):
+        self.max_iterations = config.CGROUP_ASSIGN_MAX_ITERATIONS
         self.num_bodies = num_bodies
         
         super().__init__("\n".join([
             "Kernel cgroup_assign required too many iterations to complete.",
             "num_iterations={}, max_iterations={}, num_bodies={} ".format(
-                self.num_iterations, self.max_iterations, self.num_bodies
+                self.max_iterations, self.num_bodies
             ),
             "This can be configured via the CGROUP_ASSIGN_MAX_ITERATIONS setting."
         ]))
@@ -43,8 +42,18 @@ class CGroupPipeline(CLPipelineStep):
         self.has_updates = np.zeros(self.N, dtype=np.uint32)
         self.has_updates_cl = self._create_buffer(self.has_updates)
         
-        self.edge_dist = np.zeros(self.N * self.N, dtype=np.float32)
-        self.edge_dist_cl = self._create_buffer(self.edge_dist)
+        
+        def _bytesize(np_array:np.typing.NDArray):
+            return int(np_array.dtype.itemsize * sum(np_array.shape))
+        
+        total_memory = sum([
+            _bytesize(self.num_contacts_by_lane),
+            _bytesize(self.contacts_by_lane),
+            _bytesize(self.num_contacts),
+            _bytesize(self.contacts_reduced),
+            _bytesize(self.has_updates),
+        ])
+        logger.info("%s initialized, using %.2fMiB of memory", self.__class__.__name__, total_memory/1e6)
      
     def _print_collisions_per_body(self):
         """Debug printing of the collision matrix."""
@@ -109,7 +118,7 @@ class CGroupPipeline(CLPipelineStep):
         if all_colliding_ids.size == 0: return
         all_colliding_ids_cl = self._create_buffer(all_colliding_ids)
         
-        local_size = int(np.max(self.num_contacts))
+        local_size = int(np.max(self.num_contacts)) + 1
         
         cgroups_B = np.arange(self.N, dtype=np.uint32)
         cgroups_B_cl = self._create_buffer(cgroups_B)
@@ -125,31 +134,37 @@ class CGroupPipeline(CLPipelineStep):
             self.has_updates[:] = 0
             cl.enqueue_copy(self.queue, self.has_updates_cl, self.has_updates).wait()
             
-            self.tr.add("cgroup_assign",
-                self._cgroup_assign(
-                    self.queue,
-                    (all_colliding_ids.size * local_size, ),  # global work size
-                    (local_size, ),                           # local work size
-                    
-                    # Args
-                    np.uint32(self.N),
-                    all_colliding_ids_cl,
-                    self.num_contacts_cl,
-                    self.contacts_reduced_cl,
-                    cgroups,
-                    cgroups_B_cl,
-                    self.has_updates_cl
+            global_size = all_colliding_ids.size * local_size
+            try:
+                self.tr.add("cgroup_assign",
+                    self._cgroup_assign(
+                        self.queue,
+                        (global_size, ),  # global work size
+                        (local_size, ),                           # local work size
+                        
+                        # Args
+                        np.uint32(self.N),
+                        all_colliding_ids_cl,
+                        self.num_contacts_cl,
+                        self.contacts_reduced_cl,
+                        cgroups,
+                        cgroups_B_cl,
+                        self.has_updates_cl
+                    )
                 )
-            )
+            except cl.LogicError as e:
+                logger.error("cgroup_assign failed: %s", e)
+                logger.error("global_size=%s local_size=%s", global_size, local_size)
+                print(all_colliding_ids)
+                break
 
             cl.enqueue_copy(self.queue, self.has_updates, self.has_updates_cl).wait()
             updated = self.has_updates.any()
             num_iterations += 1
             
-            cl.enqueue_copy(self.queue, cgroups, cgroups_B_cl).wait()
-                        
-            if num_iterations >= self.N or num_iterations >= CGROUP_ASSIGN_MAX_ITERATIONS:
-                raise CGroupAssignException(num_iterations, self.N)
+            cl.enqueue_copy(self.queue, cgroups, cgroups_B_cl).wait()    
+            if num_iterations >= self.N or num_iterations >= config.CGROUP_ASSIGN_MAX_ITERATIONS:
+                raise CGroupAssignException(self.N)
     
     def __call__(self, flags: cl.Buffer, position: cl.Buffer, radius: cl.Buffer, time_of_interaction: cl.Buffer, cgroups_buffer: cl.Buffer):
         self.find_contacting_bodies(flags, position, radius, time_of_interaction)        

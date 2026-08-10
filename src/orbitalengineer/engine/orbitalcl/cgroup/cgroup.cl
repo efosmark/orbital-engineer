@@ -8,13 +8,13 @@ __kernel void find_contacting_bodies(
     __global const float2* restrict position,
     __global const float*  restrict radius,
     __global const float2* restrict time_of_interaction,
-    __global       uint*   restrict num_contacts_per_lane, // (N * lane_count)
-    __global       uint*   restrict contacts_per_lane      // (N * N)
+    __global       uint*   restrict num_contacts_by_lane,
+    __global       uint*   restrict contacts_by_lane
 ) {
     GRID_STRIDE_INIT();
     if (i >= N) return;
 
-    uint lane_width = (uint) ceil(N/ (Lx * 1.0));
+    uint lane_width = (uint) ceil(N / (Lx * 1.0));
     uint lane_offset = lane * lane_width;
     uint num_contacts = 0;
 
@@ -29,20 +29,20 @@ __kernel void find_contacting_bodies(
 
         if ((flags[j]&REMOVED) || edge_dist > fmin(radius_i, radius[j]) * 0.1) continue; 
 
-        contacts_per_lane[row_start + lane_offset + num_contacts] = j;
+        contacts_by_lane[row_start + lane_offset + num_contacts] = j;
         num_contacts++;
     );
-    num_contacts_per_lane[(Lx * i) + lane] = num_contacts;
+    num_contacts_by_lane[(Lx * i) + lane] = num_contacts;
 }
 
 
 __kernel void find_contacting_bodies_reduce(
              const uint  N,
              const uint  Lx,
-    __global const uint* restrict num_contacts_per_lane, // (N * Lx,  )
-    __global const uint* restrict contacts,              // (N * N,   )
-    __global       uint* restrict num_contacts,          // (N,       )
-    __global       uint* restrict contacts_reduced       // (N * N,   )
+    __global const uint* restrict num_contacts_by_lane,
+    __global const uint* restrict contacts_by_lane,
+    __global       uint* restrict num_contacts,
+    __global       uint* restrict contacts_reduced
 ) {
     uint i = get_global_id(0);
     if (i >= N) return;
@@ -52,9 +52,11 @@ __kernel void find_contacting_bodies_reduce(
     uint n_contact = 0;
     for(uint lane = 0; lane < Lx; lane++) {
         uint lane_offset = lane * lane_width;
-        for (uint k = 0; k < num_contacts_per_lane[(Lx * i) + lane]; k++) {
-            if (k > 1) printf("k=%u, i=%u", k, i);
-            contacts_reduced[row_start + n_contact] = contacts[row_start + lane_offset + k];
+        uint lane_start = row_start + lane_offset;
+
+        // `k` rarely goes above 1 when N < 1e3
+        for (uint k = 0; k < num_contacts_by_lane[(Lx * i) + lane]; k++) {
+            contacts_reduced[row_start + n_contact] = contacts_by_lane[lane_start + k];
             n_contact++;
         }
     }

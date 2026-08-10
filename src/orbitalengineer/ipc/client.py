@@ -23,7 +23,7 @@ class ClientSocketConnection:
     accum:float = 0
     N:int = 0
     
-    G:float = config.DEFAULT_G
+    G:float = config.GRAV_CONSTANT
     dt_base:float = config.DEFAULT_DT_BASE
     coef_of_restitution:float = config.COEF_OF_RESTITUTION
     EPS_DIST:float = config.EPS_DIST
