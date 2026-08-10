@@ -35,9 +35,13 @@ class OrbitalControlServer:
             self.orbital.reset()
         self.enabled = True
         self.orbital.set_cl_device(self.device.platform_id, self.device.device_id)
-        self.orbital.init_sim(particles)
-        self.clock.reset()
-        logger.info("Initialized.")
+        if self.orbital.init_sim(particles):
+            self.clock.reset()
+            logger.info("Initialized.")
+            return True
+        else:
+            logger.error("Failed to initialize.")
+            return False
 
     def start(self):
         self.tick_ctl = TickController(self.orbital, self.clock)
@@ -91,6 +95,7 @@ class OrbitalControlServer:
             mass=self._get_shared_memory_info('mass'),
             radius=self._get_shared_memory_info('radius'),
             force=self._get_shared_memory_info('force'),
+            cgroup=self._get_shared_memory_info('cgroup'),
         )
 
     def _get_status_response(self):
@@ -128,7 +133,10 @@ class OrbitalControlServer:
         if message_type == message.MessageType.INIT_REQ:
             req = message.InitRequest.from_dict(payload)
             self.device = req.device
-            self.initialize(req.particles)
+            result = self.initialize(req.particles)
+            if not result:
+                transport.send_message(conn, message.MessageType.ERROR, message.ErrorResponse(False, "Unable to initialize."))
+                return
             transport.send_message(conn, message.MessageType.INIT_RESP, self._get_init_response())
         
         elif message_type == message.MessageType.SYNC_REQ:

@@ -23,7 +23,7 @@ class ClientSocketConnection:
     accum:float = 0
     N:int = 0
     
-    G:float = config.DEFAULT_G
+    G:float = config.GRAV_CONSTANT
     dt_base:float = config.DEFAULT_DT_BASE
     coef_of_restitution:float = config.COEF_OF_RESTITUTION
     EPS_DIST:float = config.EPS_DIST
@@ -35,6 +35,7 @@ class ClientSocketConnection:
     mass:NDArray[np.float32]
     radius:NDArray[np.float32]
     force:NDArray[np.complex64]
+    cgroup:NDArray[np.uint32]
     
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

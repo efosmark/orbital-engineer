@@ -1,80 +1,6 @@
 #include "kernel/stride.clh"
 #include "flags.clh"
 
-
-/**
- * Each node compares itself to every other node. If it finds that it is overlapping,
- * choose whichever has the lowest index as the group ID.
- * 
- * Flags used:
- *  - REMOVED            -- Skip the node from being processed.
- *  - MERGE_AS_PRIMARY   -- Ensure the node can be the group leader.
- *  - MERGE_AS_SECONDARY -- Ensure the node can be absorbed by a merge operation.
- */
-__kernel void collide_merge_group_assign(
-               const uint    N,
-    __global   const uint*   restrict flags,
-    __global   const float2* restrict position,
-    __global   const float*  restrict radius,
-    __global         uint*   restrict merge_group
-) {
-    GRID_STRIDE_INIT();
-    if ((flags[i]&REMOVED)) return;
-    
-    uint min_index = i;
-
-    GRID_STRIDE_IJ(
-        float edge_dist = fast_length(position[j] - position[i]) - radius[i] - radius[j];
-        if ((flags[j]&REMOVED) || edge_dist > EPS_DIST) {
-            continue;
-        } else if ((flags[j]&MERGE_AS_PRIMARY) && (flags[i]&MERGE_AS_SECONDARY) && j < i) {
-            min_index = j;
-        }
-    );
-
-    uint wg_min_index = work_group_reduce_min(min_index);
-    if (lane == 0) {
-        merge_group[i] = wg_min_index;
-    }
-}
-
-
-/**
- * Look at every node and scan the other members of the group to find the node with the lowest index.
- * This is to consolidate situations where 'A' is touching 'B', 'B' is touching 'C', but 'A' is not
- * touching 'C'.
- */
-__kernel void collide_merge_group_reduce(
-             const uint    N,
-    __global const uint*   restrict flags,
-    __global       uint*   restrict merge_group,
-    __global       uint*   restrict has_updates
-) {
-    uint i = get_global_id(0);
-
-    // Get own merge_group ID. If it's itself, then we're done!
-    if (i >= N || (flags[i]&REMOVED) || i == merge_group[i])
-        return;
-
-    uint workgroup_id = get_group_id(0);
-    uint lane = get_local_id(0);
-    if (lane == 0) has_updates[workgroup_id] = false;
-
-    // Walk up however many we can
-    // We want the smallest group ID for the simultaneous collisions
-    uint j = merge_group[i];
-    bool updated = false;
-    while (j != merge_group[j] && merge_group[j] < j && (flags[merge_group[j]]&MERGE_AS_PRIMARY) && (flags[j]&MERGE_AS_SECONDARY) ) {
-        j = merge_group[j];
-        updated = true;
-    }
-    
-    merge_group[i] = j;
-    bool wg_has_updated = work_group_any(updated);
-    if (lane == 0) has_updates[workgroup_id] = wg_has_updated;
-}
-
-
 /**
  * Find the center-of-mass for each merge_group and apply them to the group leader.
  * All subordinate nodes gain the 'REMOVED' flag and have their mass set to 0.
@@ -100,10 +26,26 @@ __kernel void compute_merging_collision(
     __global       float*  restrict radius_out
 ) {
     GRID_STRIDE_INIT();
-    if ((flags[i]&REMOVED) || merge_group[i] != i) {
+
+    if (flags[i]&REMOVED) {
+        return;
+    }
+
+    if ((merge_group[i] != i) && (flags[i]&MERGE_AS_SECONDARY) && (flags[merge_group[i]]&MERGE_AS_PRIMARY)) {
         if (lane == 0) {
             mass_out[i] = (flags[i]&FIXED_MASS) ? mass[i] : 0;
             flags_out[i] = flags[i]|REMOVED;
+        }
+        return;
+    }
+
+    if ((flags[i]&MERGE_AS_PRIMARY) == 0) {
+        if (lane == 0) {
+            flags_out[i] = flags[i];
+            mass_out[i] = mass[i];
+            velocity_out[i] = velocity[i];
+            position_out[i] = position[i];
+            radius_out[i] = radius[i];
         }
         return;
     }
@@ -114,7 +56,7 @@ __kernel void compute_merging_collision(
     bool is_merging = false;
 
     GRID_STRIDE_IJ(
-        if (merge_group[j] != i || (flags[j]&REMOVED)) continue;
+        if (merge_group[j] != i || (flags[j]&REMOVED) || !(flags[i]&MERGE_AS_SECONDARY)) continue;
         total_mass += mass[j];
         total_mv += (mass[j] * velocity[j]);
         total_mr += (mass[j] * position[j]);

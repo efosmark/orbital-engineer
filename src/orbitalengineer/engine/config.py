@@ -14,17 +14,17 @@ DV_MAX = 1e10
 # Simulation Settings
 #############################################
 
-COEF_OF_RESTITUTION = 0.90
-DEFAULT_G = 1.0
+COEF_OF_RESTITUTION = 0.5
+GRAV_CONSTANT = 9.8
 
 #############################################
 # Tick-rate Settings
 #############################################
 
-DEFAULT_DT_BASE =  1/30.0
+DEFAULT_DT_BASE =  1/20.0
 DEFAULT_SPEED = 1.0
 MAX_STEPS_PER_TICK = int(1.0/np.sqrt(DEFAULT_DT_BASE))
-MAX_SUB_STEPS = 5
+MAX_SUB_STEPS = 10
 
 #############################################
 # Features
@@ -46,3 +46,9 @@ METRIC_SOCKET_PATH = "/tmp/kernel-metrics.sock"
 #############################################
 
 SERIALIZED_VALUE_PRECISION = 6
+
+#############################################
+# Kernel Settings
+#############################################
+
+CGROUP_ASSIGN_MAX_ITERATIONS = 200

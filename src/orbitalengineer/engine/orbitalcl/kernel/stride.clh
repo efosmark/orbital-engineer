@@ -1,9 +1,18 @@
-#define GRID_STRIDE_INIT() uint i = get_group_id(0); if (i >= N) return; uint lane = get_local_id(0); uint Lx = get_local_size(0);
+/*
+i     = 0..N
+lane  = 0..Lx
+Lx    = 64, 128, or 256
+*/
+
+
+#define GRID_STRIDE_INIT()                    \
+    uint i = get_group_id(0);                 \
+    uint lane = get_local_id(0);              \
+    uint Lx = get_local_size(0);
 
 
 #define GRID_STRIDE_IJ( ...)                  \
     do {                                      \
-        if (i >= N) return;                   \
         uint row_start = i * N;               \
         for (uint j = lane; j < N; j += Lx) { \
             if (j == i) continue;             \

@@ -4,11 +4,11 @@ import numpy as np
 from orbitalengineer.engine import config
 from orbitalengineer.engine.particle import Particle, ParticleRaw
 
-seed = 0xf00d1e1
+seed = 0xf00d11
 rng = np.random.default_rng(seed)
 
 def r_from_mass(m: np.float64) -> np.float64:
-    r = np.cbrt(m / np.pi)
+    r = np.sqrt(m / np.pi)
     if r <= 0:
         return np.float64(1.0)
     return r
@@ -80,7 +80,7 @@ def create_secondary(
     dist = abs(position)
     velocity = vis_viva(
         position=position,
-        mu=(config.DEFAULT_G * (primary_body.get_mass() + mass)),
+        mu=(config.GRAV_CONSTANT * (primary_body.get_mass() + mass)),
         a=dist if ecc is None else dist * ecc,
         prograde=prograde
     )
