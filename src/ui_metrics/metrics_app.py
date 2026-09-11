@@ -17,7 +17,7 @@ class MetricsApp(Gtk.Application):
     
     def __init__(self):
         super().__init__(application_id=ui_metrics_config.APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        self.durations = defaultdict(lambda:deque(maxlen=200))
+        self.durations = defaultdict(lambda:deque(maxlen=2000))
         self.plot_win = None
         self._refresh_source_id = 0
         self._max_metrics_per_poll = ui_metrics_config.MAX_METRICS_PER_POLL
@@ -42,7 +42,7 @@ class MetricsApp(Gtk.Application):
             try:
                 metric = json.loads(data)
             except json.JSONDecodeError:
-                print("bad metric:", data)
+                print("bad metric")
                 continue
 
             tick_id = metric.get("value")
