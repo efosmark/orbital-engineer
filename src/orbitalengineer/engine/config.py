@@ -4,18 +4,18 @@ import numpy as np
 # Simulation Bounds
 #############################################
 
-EPS_DIST = 1e-3
-EPS_TIME = 1e-2
+EPS_DIST = 1.0
+EPS_TIME = 1e-3
 
-DV_MIN = 1e-10
 DV_MAX = 1e10
 
 #############################################
 # Simulation Settings
 #############################################
 
-COEF_OF_RESTITUTION = 0.5
-GRAV_CONSTANT = 9.8
+COEF_OF_RESTITUTION = 0.999
+GRAV_CONSTANT = 1.0
+MAX_NUM_CONTACTS_PER_BODY = 8
 
 #############################################
 # Tick-rate Settings
@@ -24,7 +24,7 @@ GRAV_CONSTANT = 9.8
 DEFAULT_DT_BASE =  1/20.0
 DEFAULT_SPEED = 1.0
 MAX_STEPS_PER_TICK = int(1.0/np.sqrt(DEFAULT_DT_BASE))
-MAX_SUB_STEPS = 10
+MAX_SUB_STEPS = 60
 
 #############################################
 # Features
@@ -38,7 +38,7 @@ NUDGE_ON_START_ENABLE = True
 # IPC Settings
 #############################################
 
-EMIT_METRICS = True
+ENABLE_PROFILING = True
 METRIC_SOCKET_PATH = "/tmp/kernel-metrics.sock"
 
 #############################################
@@ -52,3 +52,4 @@ SERIALIZED_VALUE_PRECISION = 6
 #############################################
 
 CGROUP_ASSIGN_MAX_ITERATIONS = 200
+USE_FAST_RELAXED_MATH = True

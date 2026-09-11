@@ -1,3 +1,5 @@
+import math
+
 from orbitalengineer import flags
 from orbitalengineer.engine.particle import Particle, ParticleRaw
 from orbitalengineer.ui.mainapp import App
@@ -7,14 +9,23 @@ import matplotlib.pyplot as plt
 cmap = plt.colormaps['gist_rainbow']
 
 def populate(app: App):
-    for i in range(1000):
-        mass = (1_000_000 * rng.random()) + 100_000
+    # app.insert_particle(ParticleRaw(
+    #     position=0,
+    #     velocity=0,
+    #     mass=100_000,
+    #     radius=1,
+    #     flags=flags.MERGE_AS_PRIMARY|flags.FIXED_RADIUS,
+    # ), color=(*random_color(), 1.0))
+
+    for i in range(512):
+        mass = (1_000 * rng.random())
+        #mass = (200_000 * rng.random()) + 100_000
         app.insert_particle(ParticleRaw(
-            position=random_position(0,  200_000),
-            velocity=random_position(0,     1000),
+            position=random_position(0, 850),
+            velocity=random_position(0,   10),
             mass=mass,
-            radius=r_from_mass(mass),
-            flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY,
+            radius=math.cbrt(mass/math.pi),
+            flags=flags.BOUNCE,
         ), color=(*random_color(), 1.0))
 
     # N = 1024
@@ -41,10 +52,10 @@ def on_activate(app: App):
     app.view.show_focus_info = True
     app.bootstrap()
     
-    if not app.client.is_initialized:
-        app.client.coef_of_restitution = 0.1
-        populate(app)
-        app.client.init_sim()
+    populate(app)
+    
+    #if not app.client.is_initialized:
+    app.client.init_sim()
 
 def run():
     app = App(0, 0)
