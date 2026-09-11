@@ -2,73 +2,11 @@
 #include "flags.clh"
 
 
-__kernel void find_contacting_bodies(
-             const uint    N,
-    __global const uint*   restrict flags,
-    __global const float2* restrict position,
-    __global const float*  restrict radius,
-    __global const float2* restrict time_of_interaction,
-    __global       uint*   restrict num_contacts_by_lane,
-    __global       uint*   restrict contacts_by_lane
-) {
-    GRID_STRIDE_INIT();
-    if (i >= N) return;
-
-    uint lane_width = (uint) ceil(N / (Lx * 1.0));
-    uint lane_offset = lane * lane_width;
-    uint num_contacts = 0;
-
-    float2 position_i = position[i];
-    float radius_i = radius[i];
-
-    GRID_STRIDE_IJ(
-        float2 ttc_ij = time_of_interaction[row_start + j];
-        float ttc_min = fmin(fabs(ttc_ij.x), fabs(ttc_ij.y));
-
-        float edge_dist = fast_distance(position_i, position[j]) - radius_i - radius[j];
-
-        if ((flags[j]&REMOVED) || edge_dist > fmin(radius_i, radius[j]) * 0.1) continue; 
-
-        contacts_by_lane[row_start + lane_offset + num_contacts] = j;
-        num_contacts++;
-    );
-    num_contacts_by_lane[(Lx * i) + lane] = num_contacts;
-}
-
-
-__kernel void find_contacting_bodies_reduce(
-             const uint  N,
-             const uint  Lx,
-    __global const uint* restrict num_contacts_by_lane,
-    __global const uint* restrict contacts_by_lane,
-    __global       uint* restrict num_contacts,
-    __global       uint* restrict contacts_reduced
-) {
-    uint i = get_global_id(0);
-    if (i >= N) return;
-
-    uint row_start = i * N;
-    uint lane_width = (uint) ceil(N / (Lx * 1.0));
-    uint n_contact = 0;
-    for(uint lane = 0; lane < Lx; lane++) {
-        uint lane_offset = lane * lane_width;
-        uint lane_start = row_start + lane_offset;
-
-        // `k` rarely goes above 1 when N < 1e3
-        for (uint k = 0; k < num_contacts_by_lane[(Lx * i) + lane]; k++) {
-            contacts_reduced[row_start + n_contact] = contacts_by_lane[lane_start + k];
-            n_contact++;
-        }
-    }
-    num_contacts[i] = n_contact;
-}
-
-
 __kernel void cgroup_assign(
              const uint  N,
-    __global const uint* restrict ids_reduced,      // (num_ids, )
-    __global const uint* restrict num_contacts,     // (num_ids, )
-    __global const uint* restrict contacts_reduced, // (N * N)
+    __global const uint* restrict ids,      // (num_ids, )
+    __global const uint* restrict n_direct_contacts,     // (num_ids, )
+    __global const uint* restrict direct_contacts, // (N * N)
     __global const uint* restrict cgroup_src,       
     __global       uint* restrict cgroup_dest,      
     __global       uint* restrict has_updates       
@@ -77,26 +15,27 @@ __kernel void cgroup_assign(
     uint lid = get_local_id(0);
     uint Lx = get_local_size(0);
 
-    uint i = ids_reduced[gid];
+    uint i = ids[gid];
     bool updated = false;
     uint min_contact = i;
 
     // Ensure this lane is in-bounds
-    if (lid < num_contacts[i]) {
+    if (lid < n_direct_contacts[i]) {
 
         // Our current min ID based on our collision neighbors
         min_contact = cgroup_src[i];
 
         // Get the individual collision
-        uint j = contacts_reduced[(N * i) + lid];
+        uint j = direct_contacts[(N * i) + lid];
 
         // Look up its current min ID based on _its_ collision neighbors
         uint j_min_contact = cgroup_src[j];
 
         // Check whether it is smaller than our current min ID
-        if (j_min_contact < min_contact) {
+        while (j_min_contact < min_contact) {
             min_contact = j_min_contact;
             updated = true;
+            j_min_contact = cgroup_src[j_min_contact];
         }
     }
 
@@ -107,3 +46,51 @@ __kernel void cgroup_assign(
         has_updates[i] = wg_has_updated;
     }
 }
+
+
+__kernel void organize_cgroup_state_vectors(
+             const uint    N,
+    __global const uint*   restrict flags,
+    __global const float2* restrict position,
+    __global const float2* restrict velocity,
+    __global const float*  restrict mass,
+    __global const uint*   restrict cgroup,
+    __global       float2* restrict p_com_by_id,
+    __global       float2* restrict v_com_by_id,
+    __global       float*  restrict m_com_by_id
+) {
+    uint i = get_global_id(0);
+    bool i_enabled = (flags[i]&REMOVED) || (flags[i]&BOUNCE_AS_PRIMARY) == 0;
+    if (!i_enabled) return;
+
+    uint idx = (cgroup[i] * N) + i;
+    
+    p_com_by_id[idx] = position[i];
+    v_com_by_id[idx] = velocity[i];
+    m_com_by_id[idx] = mass[i];
+}
+
+
+
+// __kernel void combine_cgroup_state_vectors(
+//              const uint    N,
+//     __global const uint*   restrict cgroup,
+//     __global const float2* restrict p_com_by_id,
+//     __global const float2* restrict v_com_by_id,
+//     __global const float*  restrict m_com_by_id,
+//     __global       float2* restrict p_com,
+//     __global       float2* restrict v_com,
+//     __global       float*  restrict m_com
+// ) {
+//     uint i = get_group_id(0);
+//     bool i_enabled = (flags[i]&REMOVED) || (flags[i]&BOUNCE_AS_PRIMARY) == 0;
+//     if (!i_enabled) return;
+
+
+
+//     uint idx = (cgroup[i] * N) + i;
+    
+//     p_com[i] = p_com_by_id[i];
+//     v_com[i] = v_com_by_id[i];
+//     m_com[i] = m_com_by_id[i];
+// }

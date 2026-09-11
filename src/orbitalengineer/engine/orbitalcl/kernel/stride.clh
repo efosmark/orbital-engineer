@@ -11,6 +11,13 @@ Lx    = 64, 128, or 256
     uint Lx = get_local_size(0);
 
 
+#define GRID_STRIDE_INIT_ID_LIST()            \
+    uint g0 = get_group_id(0);                \
+    uint lane = get_local_id(0);              \
+    uint Lx = get_local_size(0);              \
+    uint i = ids[g0];
+
+
 #define GRID_STRIDE_IJ( ...)                  \
     do {                                      \
         uint row_start = i * N;               \

@@ -1,9 +1,6 @@
 #include "kernel/stride.clh"
 #include "flags.clh"
 
-#ifndef G
-#define G 1.0
-#endif
 
 inline float2 compute_gravitation(
     const float2 position_i,
@@ -14,7 +11,7 @@ inline float2 compute_gravitation(
     // Compute force (Newton's theory of universal gravitation)
     float2 dr = position_j - position_i;
     float dist = fast_length(dr);
-    float2 mu = (float)(G) * mass_i * mass_j;
+    float2 mu = (float)(GRAV_CONSTANT) * mass_i * mass_j;
     return (mu / (dist*dist*dist)) * dr;
 }
 
@@ -26,24 +23,36 @@ __kernel void compute_velocity(
     __global const float*  restrict mass,
     __global const float*  restrict radius,
     __global       float2* restrict velocity,
+    __global       float2* restrict velocity_intermediate,
     __global       float2* restrict force
 ) {
     GRID_STRIDE_INIT();
-    if ((flags[i]&FIXED_VELOCITY) || (flags[i]&REMOVED)) return;
 
-    float2 A = (float2)(0.0f, 0.0f);
+    if ((flags[i]&REMOVED) || (flags[i]&FIXED_VELOCITY)) {
+        if (lane == 0) velocity_intermediate[i] = velocity[i];
+        return;
+    }
+
+    float2 dV_accum = (float2)(0.0f, 0.0f);
     float inv_mass_i = 1.0f / mass[i];
 
     GRID_STRIDE_IJ(
         if ((flags[j]&REMOVED)) continue;
-        float2 f = compute_gravitation(position[i], position[j], mass[i], mass[j]);
-        force[IDX] = f;
-        float repel = (flags[i]&REPEL_ON_OVERLAP) ? -100.0f : 0;
-        float edge_dist = fast_length(position[j] - position[i]) - radius[i] - radius[j];
-        float2 accel = f * inv_mass_i * ((edge_dist < 0) ? repel : 1.0f);
-        A += accel;
+
+        force[IDX] = compute_gravitation(position[i], position[j], mass[i], mass[j]);
+
+        float2 dP = position[j] - position[i];
+        float center_dist = fast_length(dP);
+
+        float R = radius[i] + radius[j];
+        float edge_dist = center_dist - R;
+
+        float2 accel = force[IDX] * inv_mass_i * ((edge_dist < -EPS_DIST) ? -1.0f : 1.0f);
+        dV_accum += accel * dt;
     );
-  
-    float2 wg_A = FLOAT2_WG_REDUCE_ADD(A);
-    if (lane == 0) velocity[i] += wg_A * dt;
+
+    float2 wg_dV = FLOAT2_WG_REDUCE_ADD(dV_accum);
+    if (lane == 0) {
+        velocity_intermediate[i] = velocity[i] + ((fast_length(wg_dV) <= DV_MAX) ? wg_dV : 0.0f);
+    }
 }

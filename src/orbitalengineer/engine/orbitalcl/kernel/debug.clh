@@ -1,0 +1,16 @@
+#ifndef DEBUG_CLH_
+#define DEBUG_CLH_
+
+#ifndef DEBUG
+#define DEBUG false
+#endif
+
+#define DEBUG_PRINTF(fmt, ...)           \
+    do {                                 \
+        if (DEBUG) {                     \
+            printf(fmt, ##__VA_ARGS__);  \
+        }                                \
+    } while (0)
+
+
+#endif // DEBUG_CLH_

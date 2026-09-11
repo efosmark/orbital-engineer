@@ -1,0 +1,8 @@
+#pragma once
+
+#include "flags.clh"
+
+#define SET_RADIUS(flags, radius_dest, value)                              \
+    do {                                                                   \
+        radius_dest = (flags&FIXED_RADIUS) ? radius_dest : value;          \                         \
+    } while (0)

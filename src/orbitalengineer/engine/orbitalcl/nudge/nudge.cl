@@ -25,7 +25,7 @@ __kernel void apply_nudge(
         float inv_mass_sum = (inv_mass_i + inv_mass_j);
         float k = edge_dist / inv_mass_sum;
 
-        total_dP += r_norm * (k * inv_mass_i);    
+        total_dP += r_norm * (k * inv_mass_i);
     );
 
     float2 wg_dP = FLOAT2_WG_REDUCE_ADD(total_dP);

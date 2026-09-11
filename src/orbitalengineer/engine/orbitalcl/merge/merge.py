@@ -1,68 +1,61 @@
 import numpy as np
 import pyopencl as cl
-from orbitalengineer.engine.orbitalcl.dimension import CLPipelineStep
+from orbitalengineer.engine import config
+from orbitalengineer.engine.orbitalcl.contacting.contacting import FindContactingBodiesPipeline
+from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
+from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
+from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
 
 KERNEL_FILE_LOCATION = "merge/merge.cl"
 
-class MergePipeline(CLPipelineStep):
+class MergePipeline(PipelineComponent):
     debug_flag = "merge"
 
     def initialize(self):
-        self._compute_merging_collision = self._load_kernel("compute_merging_collision", KERNEL_FILE_LOCATION)
+        self._compute_merging_collision_direct = self._load_kernel("compute_merging_collision_direct", KERNEL_FILE_LOCATION)
     
-        self._mass_intermediate = np.zeros(self.N, dtype=np.float32)
-        self._mass_intermediate_cl = self._create_buffer(self._mass_intermediate)
+        self._mass_intermediate = self.alloc(self.N, dtype=np.float32)
+        self._radius_intermediate = self.alloc(self.N, dtype=np.float32)
+        self._velocity_intermediate = self.alloc(self.N, dtype=np.complex64)        
+        self._position_intermediate = self.alloc(self.N, dtype=np.complex64)        
+        self._flags_intermediate = self.alloc(self.N, dtype=np.uint32)        
         
-        self._radius_intermediate = np.zeros(self.N, dtype=np.float32)
-        self._radius_intermediate_cl = self._create_buffer(self._radius_intermediate)
-        
-        self._velocity_intermediate = np.zeros(self.N, dtype=np.complex64)
-        self._velocity_intermediate_cl = self._create_buffer(self._velocity_intermediate)
-        
-        self._position_intermediate = np.zeros(self.N, dtype=np.complex64)
-        self._position_intermediate_cl = self._create_buffer(self._position_intermediate)
-        
-        self._flags_intermediate = np.zeros(self.N, dtype=np.uint32)
-        self._flags_intermediate_cl = self._create_buffer(self._flags_intermediate)
-        
-        self._groups = np.arange(self.N, dtype=np.uint32)
-        self._groups_cl = self._create_buffer(self._groups)
+        self._groups = np.arange(self.N, dtype=np.uint32) 
         self._groups_prev = np.arange(self.N, dtype=np.uint32)
 
-
-    def compute_merging_collision(self, status: cl.Buffer, cgroup: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
-        return self.tr.add("collide_merge",
-            self._compute_merging_collision(
+    def compute_merging_collision_direct(self, state:PrimaryStateVectors, contacting:FindContactingBodiesPipeline, edge_distance:DistancePipeline):
+        return self._compute_merging_collision_direct(
                 self.queue,
-                (self.N * self.Lx, ),  # global work size
-                (self.Lx, ),           # local work size
+                (self.N * config.MAX_NUM_CONTACTS_PER_BODY, ),
+                (config.MAX_NUM_CONTACTS_PER_BODY, ),
                 
                 # Args
                 np.uint32(self.N),
-                status,
-                cgroup,
-                position,
-                velocity,
-                mass,
-                radius,
-                self._flags_intermediate_cl,
-                self._position_intermediate_cl,
-                self._velocity_intermediate_cl,
-                self._mass_intermediate_cl,
-                self._radius_intermediate_cl
-            ))
+                state.flags,
+                state.position,
+                state.velocity,
+                state.mass,
+                state.radius,
+                contacting.n_direct_contacts,
+                contacting.direct_contacts,
+                self._flags_intermediate,
+                self._position_intermediate,
+                self._velocity_intermediate,
+                self._mass_intermediate,
+                self._radius_intermediate
+            )
     
-    def __call__(self, flags: cl.Buffer, cgroup: cl.Buffer, position: cl.Buffer, velocity: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
-        self.compute_merging_collision(flags, cgroup, position, velocity, mass, radius)
-        cl.enqueue_copy(self.queue, flags,    self._flags_intermediate_cl)
-        cl.enqueue_copy(self.queue, position, self._position_intermediate_cl)
-        cl.enqueue_copy(self.queue, velocity, self._velocity_intermediate_cl)
-        cl.enqueue_copy(self.queue, mass,     self._mass_intermediate_cl)
-        cl.enqueue_copy(self.queue, radius,   self._radius_intermediate_cl)
+    def __call__(self, state:PrimaryStateVectors, contacting:FindContactingBodiesPipeline, edge_distance:DistancePipeline):
+        self.compute_merging_collision_direct(state, contacting, edge_distance)
+        cl.enqueue_copy(self.queue, state.flags,    self._flags_intermediate)
+        cl.enqueue_copy(self.queue, state.position, self._position_intermediate)
+        cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
+        cl.enqueue_copy(self.queue, state.mass,     self._mass_intermediate)
+        cl.enqueue_copy(self.queue, state.radius,   self._radius_intermediate)
 
     def find_merged_bodies(self):
         """Finds the merge events that happened since the last time called."""
-        cl.enqueue_copy(self.queue,  self._groups, self._groups_cl)
+        cl.enqueue_copy(self.queue,  self._groups, self._groups)
         diff = np.argwhere(self._groups != self._groups_prev)
         if len(diff) > 0: diff = diff[0]        
         merged_ids = np.column_stack((diff, self._groups[diff]))

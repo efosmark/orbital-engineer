@@ -1,31 +1,28 @@
 import numpy as np
 import pyopencl as cl
-from orbitalengineer.engine.orbitalcl.dimension import CLPipelineStep
+from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
+from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
 
 KERNEL_FILE_LOCATION = "nudge/nudge.cl"
 
-class NudgePipeline(CLPipelineStep):
+class NudgePipeline(PipelineComponent):
     
     def initialize(self):
         self._apply_nudge = self._load_kernel("apply_nudge", KERNEL_FILE_LOCATION)
-    
-        self._position_intermediate = np.zeros(self.N, dtype=np.complex64)
-        self._position_intermediate_cl = self._create_buffer(self._position_intermediate)
+        self._position_intermediate = self.alloc(self.N, dtype=np.complex64)
 
-    def __call__(self, flags: cl.Buffer, position: cl.Buffer, mass: cl.Buffer, radius: cl.Buffer):
-        self.tr.add("apply_nudge",
-            self._apply_nudge(
-                self.queue,
-                (self.N * self.Lx, ),  # global work size
-                (self.Lx, ),           # local work size
-                            
-                # Args
-                np.uint32(self.N),
-                flags,
-                position,
-                mass,
-                radius,
-                self._position_intermediate_cl,
-            )
+    def __call__(self, state:PrimaryStateVectors):
+        self._apply_nudge(
+            self.queue,
+            (self.N * self.Lx, ),  # global work size
+            (self.Lx, ),           # local work size
+            
+            # Args
+            np.uint32(self.N),
+            state.flags,
+            state.position,
+            state.mass,
+            state.radius,
+            self._position_intermediate,
         )
-        cl.enqueue_copy(self.queue, position, self._position_intermediate_cl)
+        cl.enqueue_copy(self.queue, state.position, self._position_intermediate)
