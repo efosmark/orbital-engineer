@@ -4,7 +4,7 @@ from orbitalengineer.ui import model, ui_config
 from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 from orbitalengineer.ui.canvas import pz
 from orbitalengineer.ui.mainwindow import MainWindow
-from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject
+from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject, GLib
 from orbitalengineer.ui.keyinput import KeyInput
 from orbitalengineer.ui.names import make_name
 
@@ -13,11 +13,9 @@ from orbitalengineer.engine.particle import Particle
 from orbitalengineer.ipc.client import ClientSocketConnection
 from orbitalengineer.helpers import seed
 
-
 class App(Gtk.Application):
     platform_id = GObject.Property(type=int, default=-1)
     device_id = GObject.Property(type=int, default=-1)
-    
     
     def __init__(self, platform_id=-1, device_id=-1):
         super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)        
@@ -27,6 +25,8 @@ class App(Gtk.Application):
         
         self.view.connect("notify::paused", self.on_paused_changed)
         self.view.connect("notify::speed", self.on_speed_changed)
+        self.view.connect("notify::show-grid", self.on_show_grid_changed)
+        self.view.connect("notify::max-speed", self.on_max_speed_changed)
         self.view.props.paused = True
         self.platform_id = platform_id
         self.device_id = device_id
@@ -35,16 +35,35 @@ class App(Gtk.Application):
     def bootstrap(self):
         self.client.connect()
         self.client.sync_full_state()
+        self.view.add_osd_message("Ready. Press [space] to start.", duration=10.0)
+
+    def on_max_speed_changed(self, model, param):
+        ...
+        #print("on_max_speed_changed", self.view.max_speed, self.view.speed)
+        #if self.view.max_speed < self.view.speed:
+        #    self.view.props.speed = self.view.max_speed
+
+    def on_show_grid_changed(self, model, param):
+        grid_state = "On" if self.view.show_grid else "Off"
+        self.view.add_osd_message(f"Grid: {grid_state}")
 
     def on_paused_changed(self, model, param):
-        if not self.client.is_initialized:
-            return
         self._toggle_paused()
+        if self.view.props.paused:
+            if self.client.tick_id > 0:
+                self.view.add_osd_message("Paused", duration=3.0)
+        else:
+            self.view.add_osd_message("Running")
     
     def on_speed_changed(self, model, param):
         if not self.client.is_initialized:
             return
         self.client.set_clock_speed(self.view.props.speed)
+        
+        f_cur_speed = f"{self.view.speed:.1f}"
+        f_max_speed = f"{self.client.max_speed:.1f}"
+        if f_cur_speed != f_max_speed:
+            self.view.add_osd_message(f"Speed: {f_cur_speed}x")
     
     def _toggle_paused(self):
         if self.view.props.paused:
@@ -104,6 +123,7 @@ class App(Gtk.Application):
             logger.warning(f"Unknown focus: {particle_id}")
             return
         self.view.secondary_body = particle_id
+        self.view.add_osd_message(f"Focus: {particle_id}", duration=0.5)
 
         # win = self.props.active_window
         # if not win:
@@ -118,6 +138,17 @@ class App(Gtk.Application):
         #    elif diameter * self.camera.zoom < 10:
         #        self.camera.zoom = 10 / diameter
 
+    def tick_once(self):
+        if not hasattr(self, '_last_tick'):
+            self._last_tick = None
+        if self._last_tick is None or self.client.tick_id > self._last_tick:
+            self._last_tick = self.client.tick_id
+            self.view.add_osd_message("Tick", duration=0.25)
+            GLib.idle_add(self.client.tick_once)
+
+    def substep_once(self):
+        self.view.add_osd_message("Sub-step", duration=0.25)
+        self.client.substep_once()
     
     def relative_zoom(self, factor):
         self.camera.zoom_at(0, 0, 0, 0, factor)

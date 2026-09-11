@@ -1,8 +1,12 @@
+from typing import cast
+
 import numpy as np
 
 from orbitalengineer import flags
 from orbitalengineer.ui import model
 from orbitalengineer.ui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
+from orbitalengineer.ui.canvas.render.cmap import MomentumColorizedRenderer
+from orbitalengineer.ui.canvas.render.osd import OSDRenderer
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.canvas.pz import Camera2D, Camera2DController
@@ -157,7 +161,8 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.scene_renderers = [
             #HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
             #ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
-            CGroupRenderer(self.view, self.camera, self.orbital, self.clock),
+            #CGroupRenderer(self.view, self.camera, self.orbital, self.clock),
+            MomentumColorizedRenderer(self.view, self.camera, self.orbital, self.clock),
             EllipseRenderer(self.view, self.camera, self.orbital, self.clock),
             ParticleRenderer(self.view, self.camera, self.orbital, self.clock),
             SelectionRenderer(self.view, self.camera, self.orbital, self.clock),
@@ -171,6 +176,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
             FocusInfoRenderer(self.view, self.camera, self.orbital, self.clock),
             HudClockRenderer(self.view, self.camera, self.orbital, self.clock),
             WarningRenderer(self.view, self.camera, self.orbital, self.clock),
+            OSDRenderer(self.view, self.camera, self.orbital, self.clock),
         ]
         
         click_controller = Gtk.GestureClick.new()
@@ -211,10 +217,12 @@ class OrbitalCanvas(Gtk.DrawingArea):
         now = self.clock.time()
         self.last_draw_time = now
 
-        fps = self.get_frame_clock()
-        if fps:
-            self.view.fps = fps
-        
+        frame_clock = self.get_frame_clock()
+        if frame_clock:
+            self.view.frame_clock = frame_clock
+            frame_clock = cast(Gdk.FrameClock, frame_clock)
+            self.view.fps = frame_clock.get_fps()
+                        
         width = self.get_allocated_width()
         height = self.get_allocated_height()
         

@@ -43,14 +43,14 @@ def mag_format(x, sig=1, eps=1e-12):
         return f"{mant:.{sig}f}{magnitudes[exp]}"
     return f"{mant:.{sig}f}e{exp:+}"
 
-def format_size(size_bytes):
+def format_size(size_bytes, precision=2):
     unit = 1000
     suffixes = [' ', 'k', 'M', 'G']
     for suffix in suffixes:
         if size_bytes < unit:
-            return f"{size_bytes:.1f} {suffix}"
+            return f"{size_bytes:.{precision}f} {suffix}"
         size_bytes /= unit
-    return f"{size_bytes:.2f} {suffixes[-1]}"
+    return f"{size_bytes:.{precision}f} {suffixes[-1]}"
 
 def positive_angle(angle_rad: float) -> float:
     tau = 2 * np.pi

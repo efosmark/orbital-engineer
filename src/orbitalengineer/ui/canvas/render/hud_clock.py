@@ -25,7 +25,7 @@ class HudClockRenderer(renderer.Renderer):
         speed = round(self.view.speed, 6)
         status = "  " if self.view.paused else "▶"
 
-        txt = f"[{status}]   T+{format_time(self.clock.time())}   ({speed}x)"
+        txt = f"[{status}]   T+{format_time(self.clock.time())}   ({speed:.2f}x)"
 
         te = cr.text_extents(txt)
         r_height = te.height + (Y_PADDING * 2)

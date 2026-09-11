@@ -160,9 +160,9 @@ class DebugInfoRenderer(renderer.Renderer):
             t_render_ms = statistics.mean([d[1] for d in render_durations]) * 1000.0
             display.append(DebugDisplayField("Render", t_render_ms, 2, 'ms', RENDER_MS_THRESHOLD))
         
-        frame_clock = cast(Gdk.FrameClock, self.view.fps)
+        frame_clock = cast(Gdk.FrameClock, self.view.frame_clock)
         fps = frame_clock.get_fps()
-        frame_no = self.view.fps.get_frame_counter()
+        frame_no = self.view.frame_clock.get_frame_counter()
         frame_interval_ms = (1/(fps or 1)) * 1000.0
         
         display.extend([

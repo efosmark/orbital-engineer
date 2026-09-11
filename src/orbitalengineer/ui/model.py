@@ -6,6 +6,19 @@ from orbitalengineer.engine import config
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, GObject, GLib
 import numpy as np
 
+
+CMAP_KE = 'Kinetic Energy'
+CMAP_MV = 'Momentum'
+CMAP_MASS = 'Mass'
+CMAP_DIST = 'Distance'
+CMAP_TYPES = [
+    None,
+    CMAP_KE,
+    CMAP_MV,
+    CMAP_MASS,
+    #CMAP_DIST
+]
+
 @dataclass
 class Pinpoint:
     position:np.complex64|complex
@@ -14,12 +27,20 @@ class Pinpoint:
     radius:float
     color:tuple[float,float,float] = (1.0, 1.0, 1.0)
 
+@dataclass
+class OSDMessage:
+    message:str
+    duration:float
+    category:str|None = None
+    start:float|None = None
+
 
 class ViewModel(GObject.GObject):
     props:Any
     
     paused = GObject.Property(type=bool, default=True)
     speed = GObject.Property(type=float, default=config.DEFAULT_SPEED)
+    max_speed = GObject.Property(type=float, default=config.DEFAULT_SPEED)
     
     secondary_body = GObject.Property(type=object, default=None)
     follow_tracked_body = GObject.Property(type=bool, default=True)
@@ -32,7 +53,11 @@ class ViewModel(GObject.GObject):
     show_debug_info = GObject.Property(type=bool, default=True)
     show_focus_info = GObject.Property(type=bool, default=True)
     
-    fps = GObject.Property(type=object)
+    cmap = GObject.Property(type=object, default=None)
+    cmap_id = GObject.Property(type=int, default=0)
+    
+    frame_clock = GObject.Property(type=object)
+    fps = GObject.Property(type=float)
         
     pinpoint = GObject.Property(type=object)
     particle_colors = GObject.Property(type=object)
@@ -49,7 +74,7 @@ class ViewModel(GObject.GObject):
     width = GObject.Property(type=int, default=0)
     height = GObject.Property(type=int, default=0)
     
-    font_family = GObject.Property(type=str, default="Liberation Mono")
+    font_family = GObject.Property(type=str, default="monospace")
     font_size = GObject.Property(type=int, default=10)
     
     osd_message = GObject.Property(type=object)    
@@ -68,6 +93,21 @@ class ViewModel(GObject.GObject):
         self.props.hovered_over_particle = None
         self.props.osd_message = []
         self.props.durations = defaultdict(list)
+        self.props.fps = 1.0
+        self.props.cmap = None
+
+    def add_osd_message(self, message:str, duration:float=1, category:str|None=None):
+        # Remove any messages of the same category (e.g. allow overwriting same type)
+        self.osd_message = [m for m in self.osd_message if m.category != category]
+        self.osd_message.append(OSDMessage(message, duration, category))
+
+    def cycle_color_map(self, reverse:bool=False):
+        if not reverse:
+            self.cmap_id = (self.cmap_id + 1) % len(CMAP_TYPES)
+        else:
+            self.cmap_id = (self.cmap_id - 1) % len(CMAP_TYPES)
+        self.cmap = CMAP_TYPES[self.cmap_id]
+        self.add_osd_message(f"Color map: {self.cmap}", duration=2.0)
 
     def to_dict(self) -> dict:
         return {

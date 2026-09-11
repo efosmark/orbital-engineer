@@ -12,7 +12,7 @@ FONT_SIZE = 10
 class WarningRenderer(renderer.Renderer):
     
     def draw(self, cr, width:int, height:int):
-        step_overflow = (self.orbital.accum // self.orbital.dt_base)
+        step_overflow = (self.orbital.accum // self.orbital.cfg.DEFAULT_DT_BASE)
         if step_overflow <= 10: return
 
         cr.select_font_face("Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
@@ -27,12 +27,12 @@ class WarningRenderer(renderer.Renderer):
         cr.translate(width - r_width, height - r_height)
         cr.move_to(0, 0)
         
-        set_source_hex(cr, "#721010FF")
+        set_source_hex(cr, "#72101040")
         cr.rectangle(0, 0, r_width, r_height)
         cr.fill()
 
         cr.move_to(X_PADDING, Y_PADDING + te.height/1.25)
-        set_source_hex(cr, "#FFFFFF99")
+        set_source_hex(cr, "#FFFFFF40")
         cr.show_text(txt)
 
         cr.restore()

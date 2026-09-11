@@ -32,6 +32,8 @@ class KeyInput(GObject.GObject):
 
         if keyval == Gdk.KEY_Escape:
             self.on_escape()
+        elif keyval == Gdk.KEY_l:
+            self.app.view.cycle_color_map(self.props.ctrl_held)
         elif keyval in [self.TAB_PREV, self.TAB_NEXT] and self.app.view.secondary_body is not None:    
             direction = -1 if keyval == self.TAB_PREV else 1
             self.cycle_particles(direction)
@@ -52,13 +54,16 @@ class KeyInput(GObject.GObject):
         elif keyval == Gdk.KEY_f:
             self.toggle_screen_size()
         elif keyval == Gdk.KEY_period:
-            self.app.tick_once()
+            if self.props.ctrl_held:
+                self.app.substep_once()
+            else:
+                self.app.tick_once()
         return False
 
     def on_wasd(self, keyval):
         
         # Temporary test controls for apply_vector_offset
-        if self.props.ctrl_held:
+        if self.props.mod_held:
             if keyval == Gdk.KEY_w:
                 self.app.client.rel_mass(self.app.view.selected_particles, 1.1)
             elif keyval == Gdk.KEY_s:

@@ -38,6 +38,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         def on_tick(widget, frame_clock):
             self.ctl.sync()
+            self.view.max_speed = self.ctl.max_speed
             return True
         self.add_tick_callback(on_tick)
 
