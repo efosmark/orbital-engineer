@@ -6,5 +6,6 @@
         "**/.venv": true,
         "**/*.egg-info": true,
         "**/*.pyc": true
-    }
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:venv"
 }
