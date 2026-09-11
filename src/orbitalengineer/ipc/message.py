@@ -1,6 +1,7 @@
 from dataclasses import dataclass, fields
 from enum import IntEnum
 from typing import Literal, Self, Sequence, Protocol
+from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
 from orbitalengineer.ipc.clock import SimClock
 
 
@@ -84,7 +85,7 @@ class SharedMemoryInfo:
     name:str
     dtype:str
     size:int
-    shape:list[int]
+    shape:list[int]|tuple[int]
 
 
 @dataclass
@@ -95,7 +96,7 @@ class SharedMemoryResponse:
     mass: SharedMemoryInfo
     radius: SharedMemoryInfo
     force: SharedMemoryInfo
-    cgroup: SharedMemoryInfo
+    #cgroup: SharedMemoryInfo
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:
@@ -105,32 +106,17 @@ class SharedMemoryResponse:
         ])
         return cls(**d)
 
-
-@dataclass
-class ConfigResponse:
-    G: float
-    N: int
-    coef_of_restitution: float
-    dt_base: float
-    EPS_DIST: float
-    EPS_TIME: float
-
-    @classmethod
-    def from_dict(cls, d:dict) -> Self:
-        return cls(**d)
-
-
 @dataclass
 class InitResponse:
     initialized:bool
-    config: ConfigResponse
+    config: SimConfig
     memory: SharedMemoryResponse
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:
         return cls(
             initialized=d['initialized'],
-            config=ConfigResponse(**d['config']),
+            config=SimConfig(**d['config']),
             memory=SharedMemoryResponse.from_dict(d['memory'])
         )
 
@@ -138,30 +124,34 @@ class InitResponse:
 @dataclass
 class StatusResponse:
     initialized: bool
+    N: int
     tick_id: int
     accum: float
     clock: SimClock
+    max_speed: float
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:
         return cls(
             initialized=d['initialized'],
             tick_id=d['tick_id'],
+            N=d['N'],
             accum=d['accum'],
             clock=SimClock(**d['clock']),
+            max_speed=d['max_speed']
         )
 
 @dataclass
 class StateResponse:
     status: StatusResponse
-    config: ConfigResponse|None
+    config: SimConfig|None
     memory: SharedMemoryResponse|None
     
     @classmethod
     def from_dict(cls, d:dict) -> Self:
         return cls(
             status=StatusResponse.from_dict(d['status']),
-            config=ConfigResponse.from_dict(d['config']) if d['config'] is not None else None,
+            config=SimConfig.from_dict(d['config']) if d['config'] is not None else None,
             memory=SharedMemoryResponse.from_dict(d['memory']) if d['memory'] is not None else None
         )
 
@@ -179,6 +169,8 @@ class MessageType(IntEnum):
     STATE_REQ = 18
     STATE_RESP = 19
     DISCONNECT = 20
+    TICK_ONCE = 21
+    SUBSTEP_ONCE = 22
 
 mtype_to_cls:dict[MessageType, SupportsFromDict|None] = {
     MessageType.SUCCESS: None,

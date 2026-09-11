@@ -1,14 +1,15 @@
 import socket
 from multiprocessing import shared_memory
 from typing import Any, Sequence, cast
-from dataclasses import fields
+from dataclasses import asdict, fields
 
 import numpy as np
 from numpy.typing import NDArray
 
 from orbitalengineer import flags
-from orbitalengineer.engine import logger, config
+from orbitalengineer.engine import logger
 from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
+from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
 from orbitalengineer.engine.particle import Particle
 from orbitalengineer.ipc import message, transport
 from orbitalengineer.ipc.clock import SimClock
@@ -22,12 +23,9 @@ class ClientSocketConnection:
     tick_id:int = 0
     accum:float = 0
     N:int = 0
+    max_speed:float = 1.0
     
-    G:float = config.GRAV_CONSTANT
-    dt_base:float = config.DEFAULT_DT_BASE
-    coef_of_restitution:float = config.COEF_OF_RESTITUTION
-    EPS_DIST:float = config.EPS_DIST
-    EPS_TIME:float = config.EPS_TIME
+    cfg:SimConfig = SimConfig()
     
     flags:NDArray[np.uint32]
     position:NDArray[np.complex64]
@@ -35,7 +33,7 @@ class ClientSocketConnection:
     mass:NDArray[np.float32]
     radius:NDArray[np.float32]
     force:NDArray[np.complex64]
-    cgroup:NDArray[np.uint32]
+    #cgroup:NDArray[np.uint32]
     
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -75,13 +73,16 @@ class ClientSocketConnection:
         return indices[mask]
 
     def add_particle(self, position:complex, velocity:complex, mass:float, radius:float, flags:int=0):
-        self._uninitialized_bodies.append(message.ParticleInit(
-            flags=flags,
-            position=(position.real, position.imag),
-            velocity=(velocity.real, velocity.imag),
-            mass=mass,
-            radius=radius
-        ))
+        if self.is_initialized:
+            logger.warning("Cannot add_particle after initialization.")
+        else:
+            self._uninitialized_bodies.append(message.ParticleInit(
+                flags=flags,
+                position=(position.real, position.imag),
+                velocity=(velocity.real, velocity.imag),
+                mass=mass,
+                radius=radius
+            ))
         return len(self._uninitialized_bodies) - 1
 
     def get_particle(self, particle_id:int) -> Particle:
@@ -91,19 +92,16 @@ class ClientSocketConnection:
         for i in self.get_valid_indices():
             yield self.get_particle(int(i))
         
-    def _apply_config(self, config: message.ConfigResponse):
-        self.N = config.N
-        self.G = config.G
-        self.coef_of_restitution = config.coef_of_restitution
-        self.dt_base = config.dt_base
-        self.EPS_DIST = config.EPS_DIST
-        self.EPS_TIME = config.EPS_TIME
+    def _apply_config(self, config: SimConfig):
+        self.config = config
         logger.info("Config applied: %s", config)
 
     def _apply_status(self, status: message.StatusResponse):
         self.is_initialized = status.initialized
         self.tick_id = status.tick_id
         self.accum = status.accum
+        self.N = status.N
+        self.max_speed = status.max_speed
         self.clock.update(status.clock)
 
     def _connect_shared_memory(self, shared: message.SharedMemoryResponse):
@@ -160,11 +158,9 @@ class ClientSocketConnection:
 
     def set_device(self, platform_id:int, device_id:int):
         self.device = message.Device(platform_id, device_id)
-        self.platform_id = platform_id
-        self.device_id = device_id
 
     def init_sim(self):
-        logger.info("Initializing sim...")
+        logger.info("Initializing sim with %s particles...", len(self._uninitialized_bodies))
         result = self.send_message(
             message.MessageType.INIT_REQ,
             message.InitRequest(
@@ -233,19 +229,20 @@ class ClientSocketConnection:
             )
         )
 
+    def tick_once(self):
+        self.send_message(message.MessageType.TICK_ONCE)
+        self.sync()
+
+    def substep_once(self):
+        self.send_message(message.MessageType.SUBSTEP_ONCE)
+        self.sync()
+
     def to_dict(self) -> dict:
         self.sync()
         return {
-            # Simulation state
             "tick_id": int(self.tick_id),
-            "dt_base": float(self.dt_base),
             "N": int(self.N),
-            
-            # Constants
-            "G": float(self.G),
-            "coef_of_restitution": float(self.coef_of_restitution),
-            "EPS_DIST": float(self.EPS_DIST),
-            "EPS_TIME": float(self.EPS_TIME),
+            "cfg": asdict(self.cfg),
             
             # particle field vectors
             "flags":    [int(fl) for fl in self.flags],

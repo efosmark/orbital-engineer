@@ -13,10 +13,12 @@ class OrbitalControlServer:
     def __init__(self):
         self.orbital = orbitalcl.SimController_CL()
         self.clock = SimClock()
+        self.tick_ctl = TickController(self.orbital, self.clock)
         self.enabled = True
 
     def serve(self, host=SERVER_IPC_HOST, port=SERVER_IPC_PORT):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((host, port))
             s.listen(1)
             print(f"Orbital Server started. {host=} {port=}")
@@ -37,6 +39,7 @@ class OrbitalControlServer:
         self.orbital.set_cl_device(self.device.platform_id, self.device.device_id)
         if self.orbital.init_sim(particles):
             self.clock.reset()
+            self.tick_ctl.reset()
             logger.info("Initialized.")
             return True
         else:
@@ -44,30 +47,31 @@ class OrbitalControlServer:
             return False
 
     def start(self):
-        self.tick_ctl = TickController(self.orbital, self.clock)
         self.tick_ctl.start()
         self.clock.start()
-        logger.info("Started. tick_id=%.0f  time=%.2f", self.orbital.tick_id, self.clock.time())
+        logger.debug("Started. tick_id=%.0f  time=%.2f", self.orbital.pipeline_state.tick_id, self.clock.time())
 
     def pause(self):
-        if hasattr(self, 'tick_ctl'):
-            self.tick_ctl.stop()
+        self.tick_ctl.stop()
         self.clock.stop()
-        logger.info("Paused.  tick_id=%.0f  time=%.2f", self.orbital.tick_id, self.clock.time())
+        logger.debug("Paused.  tick_id=%.0f  time=%.2f", self.orbital.pipeline_state.tick_id, self.clock.time())
     
     def end(self):
-        logger.info("Ending simulation.")
+        logger.debug("Ending simulation.")
         self.pause()
-        self.orbital.disconnect()
+        self.orbital.shm.disconnect()
         self.orbital.is_initialized = False
         self.enabled = False
 
     def _get_shared_memory_info(self, field) -> message.SharedMemoryInfo:
+        vec = self.orbital.shm.vec.get(field)
+        if vec is None:
+            raise Exception(f"Shared memory {field} vector does not exist.")
         return message.SharedMemoryInfo(
             name=self.orbital.shm[field].name,
-            dtype=str(getattr(self.orbital, field).dtype),
-            size=self.orbital.shm[field].size,
-            shape=getattr(self.orbital, field).shape
+            dtype=str(vec.dtype),
+            size=vec.size,
+            shape=vec.shape
         )
 
     def _get_init_response(self):            
@@ -78,14 +82,7 @@ class OrbitalControlServer:
         )
 
     def _get_config_response(self):
-        return message.ConfigResponse(
-            G = self.orbital.G,
-            N = self.orbital.N,
-            coef_of_restitution=self.orbital.coef_of_restitution,
-            dt_base=self.orbital.dt_base,
-            EPS_DIST=self.orbital.EPS_DIST,
-            EPS_TIME=self.orbital.EPS_TIME
-        )
+        return self.orbital.cfg
 
     def _get_shared_memory_response(self):
         return message.SharedMemoryResponse(
@@ -95,15 +92,17 @@ class OrbitalControlServer:
             mass=self._get_shared_memory_info('mass'),
             radius=self._get_shared_memory_info('radius'),
             force=self._get_shared_memory_info('force'),
-            cgroup=self._get_shared_memory_info('cgroup'),
+            #cgroup=self._get_shared_memory_info('cgroup'),
         )
 
     def _get_status_response(self):
         return message.StatusResponse(
             initialized=self.orbital.is_initialized,
-            tick_id=self.orbital.tick_id,
-            accum=float(self.orbital.accum),
+            tick_id=self.orbital.pipeline_state.tick_id,
+            N=self.orbital.pipeline_state.N,
+            accum=float(self.tick_ctl.total_dt_lag) if hasattr(self, 'tick_ctl') else 0,
             clock=self.clock,
+            max_speed=self.tick_ctl.max_target_clock_speed()
         )
     
     def _get_state_response(self):
@@ -140,7 +139,7 @@ class OrbitalControlServer:
             transport.send_message(conn, message.MessageType.INIT_RESP, self._get_init_response())
         
         elif message_type == message.MessageType.SYNC_REQ:
-            self.orbital.sync()
+            self.orbital.state.sync()
             transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
 
         elif message_type == message.MessageType.STATUS_REQ:
@@ -148,7 +147,7 @@ class OrbitalControlServer:
         
         elif message_type == message.MessageType.SHIFT_VECTOR_REQ:
             req = message.ShiftVectorsRequest(**payload)
-            self.orbital.apply_vector_offset(req.vector_name, req.ids, req.op, req.offset)
+            self.orbital.state.apply_vector_offset(req.vector_name, req.ids, req.op, req.offset)
             self.orbital.nudge()
             transport.send_message(conn, message.MessageType.SUCCESS)
         
@@ -175,6 +174,18 @@ class OrbitalControlServer:
             logger.info("Client disconnected.")
             return False
         
+        elif message_type == message.MessageType.TICK_ONCE:
+            self.pause()
+            self.clock.increment_by(self.orbital.cfg.DEFAULT_DT_BASE)
+            self.orbital.tick(self.clock.time())
+            transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
+        
+        elif message_type == message.MessageType.SUBSTEP_ONCE:
+            self.pause()
+            dt = float(self.orbital.substep(self.orbital.cfg.DEFAULT_DT_BASE))
+            self.clock.increment_by(dt)
+            transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
+            
         else:
             logger.error("Unrecognized message_type %s", message_type)
 
