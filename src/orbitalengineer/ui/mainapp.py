@@ -35,35 +35,33 @@ class App(Gtk.Application):
     def bootstrap(self):
         self.client.connect()
         self.client.sync_full_state()
-        self.view.add_osd_message("Ready. Press [space] to start.", duration=10.0)
+        self.view.osd.add_message("Ready. Press [space] to start.", duration=10.0)
 
     def on_max_speed_changed(self, model, param):
-        ...
-        #print("on_max_speed_changed", self.view.max_speed, self.view.speed)
         #if self.view.max_speed < self.view.speed:
         #    self.view.props.speed = self.view.max_speed
+        ...
 
     def on_show_grid_changed(self, model, param):
         grid_state = "On" if self.view.show_grid else "Off"
-        self.view.add_osd_message(f"Grid: {grid_state}")
+        self.view.osd.add_message(f"Grid: {grid_state}")
 
     def on_paused_changed(self, model, param):
         self._toggle_paused()
         if self.view.props.paused:
             if self.client.tick_id > 0:
-                self.view.add_osd_message("Paused", duration=3.0)
+                self.view.osd.add_message("Paused", duration=3.0)
         else:
-            self.view.add_osd_message("Running")
+            self.view.osd.add_message("Running")
     
     def on_speed_changed(self, model, param):
-        if not self.client.is_initialized:
-            return
+        if not self.client.is_initialized: return
         self.client.set_clock_speed(self.view.props.speed)
         
         f_cur_speed = f"{self.view.speed:.1f}"
         f_max_speed = f"{self.client.max_speed:.1f}"
-        if f_cur_speed != f_max_speed:
-            self.view.add_osd_message(f"Speed: {f_cur_speed}x")
+        #if f_cur_speed != f_max_speed:
+        self.view.osd.add_message(f"Speed: {f_cur_speed}x", desc=f"Max Speed: {f_max_speed}x")
     
     def _toggle_paused(self):
         if self.view.props.paused:
@@ -123,7 +121,7 @@ class App(Gtk.Application):
             logger.warning(f"Unknown focus: {particle_id}")
             return
         self.view.secondary_body = particle_id
-        self.view.add_osd_message(f"Focus: {particle_id}", duration=0.5)
+        self.view.osd.add_message(f"Focus: {particle_id}", duration=0.5)
 
         # win = self.props.active_window
         # if not win:
@@ -143,11 +141,11 @@ class App(Gtk.Application):
             self._last_tick = None
         if self._last_tick is None or self.client.tick_id > self._last_tick:
             self._last_tick = self.client.tick_id
-            self.view.add_osd_message("Tick", duration=0.25)
+            self.view.osd.add_message("Tick", duration=0.25)
             GLib.idle_add(self.client.tick_once)
 
     def substep_once(self):
-        self.view.add_osd_message("Sub-step", duration=0.25)
+        self.view.osd.add_message("Sub-step", duration=0.25)
         self.client.substep_once()
     
     def relative_zoom(self, factor):
