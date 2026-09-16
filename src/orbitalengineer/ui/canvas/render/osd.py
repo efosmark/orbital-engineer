@@ -26,7 +26,7 @@ DESC_BG_COLOR = (0.0, 0.0, 0.0)
 class OSDRenderer(renderer.Renderer):
 
     def draw(self, cr, width:int, height:int):
-        osd = self.view.osd
+        osd = self.app.osd
         
         m = osd.get_message()
         if m is None:
@@ -84,7 +84,7 @@ class OSDRenderer(renderer.Renderer):
         cr.set_source(lg_background)
         cr.fill()
     
-    def _draw_border(self, cr, y_start, y_end, width, lg_stop_offset):
+    def _draw_border(self, cr:cairo.Context, y_start, y_end, width, lg_stop_offset):
         lg_border = cairo.LinearGradient(0, y_start, width, y_end)
         lg_border.add_color_stop_rgba(0.01, 0.0, 0.0, 0.0, 0.0)
         lg_border.add_color_stop_rgba(0.05 + lg_stop_offset, *BORDER_COLOR, 0.0)
@@ -93,6 +93,8 @@ class OSDRenderer(renderer.Renderer):
         lg_border.add_color_stop_rgba(0.99, 0.0, 0.0, 0.0, 0.0)
         
         cr.set_source(lg_border)
+        cr.set_line_width(1.0)
+        cr.set_hairline(True)
         cr.move_to(0, y_start)
         cr.line_to(width, y_start)
         cr.stroke()

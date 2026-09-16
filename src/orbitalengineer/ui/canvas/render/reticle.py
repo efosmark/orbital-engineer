@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import cairo
+from orbitalengineer.ui import ui_config
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.fmt import positive_angle
 
@@ -79,13 +80,13 @@ class ReticleRenderer(renderer.Renderer):
         cr.restore()
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if not self.view.secondary_body:
+        if not self.app.secondary_body:
             return
         
-        body = self.orbital.get_particle(self.view.secondary_body)
+        body = self.orbital.get_particle(self.app.secondary_body)
 
-        cr.select_font_face(self.view.font_family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(self.view.font_size/self.camera.zoom)
+        cr.select_font_face(ui_config.DEFAULT_FONT_FAMILY, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(ui_config.DEFAULT_FONT_SIZE/self.camera.zoom)
 
         cr.set_line_width(1/self.camera.zoom)
         cr.set_source_rgba(*DEFAULT_RETICLE_COLOR)

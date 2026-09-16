@@ -117,11 +117,11 @@ def create_panel(cr, title:str|None, lines:list[str], fixed_width:None|int=None)
 class FocusInfoRenderer(renderer.Renderer):
     
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if not self.view.show_focus_info: return
-        if self.view.hovered_over_particle is not None:
-            b = self.view.hovered_over_particle
-        elif self.view.secondary_body is not None:
-            b = self.orbital.get_particle(self.view.secondary_body)
+        if not self.app.show_focus_info: return
+        if self.app.hovered_over_particle is not None:
+            b = self.app.hovered_over_particle
+        elif self.app.secondary_body is not None:
+            b = self.orbital.get_particle(self.app.secondary_body)
         else:
             return
         
@@ -142,7 +142,7 @@ class FocusInfoRenderer(renderer.Renderer):
         
         cr.translate(20, 20)
         
-        name = self.view.particle_names.get(b.idx, f"{b.idx}")
+        name = self.app.particle_names.get(b.idx, f"{b.idx}")
         w, h = create_panel(cr, f"{name}-{b.idx}", [
             f"{label:<14} {value:>14}"
             for label, value in disp

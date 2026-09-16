@@ -19,10 +19,10 @@ class ForceVectorRenderer(renderer.Renderer):
         return -((self.orbital.tick_id*dash_speed) % sum(DASHES))/self.camera.zoom
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if not self.view.show_force_vectors or self.view.secondary_body is None:
+        if not self.app.show_force_vectors or self.app.secondary_body is None:
             return
         
-        sb = self.orbital.get_particle(self.view.secondary_body)
+        sb = self.orbital.get_particle(self.app.secondary_body)
         sb_pos = sb.get_position()
         
         forces = []

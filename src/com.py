@@ -45,9 +45,9 @@ def populate(app: App):
     ), color=(1, 1, 1, 1))
 
 def on_activate(app: App):
-    app.view.show_focused_history = True
-    app.view.show_debug_info = False
-    app.view.show_focus_info = True
+    app.model.show_focused_history = True
+    app.model.show_debug_info = False
+    app.model.show_focus_info = True
     app.bootstrap()
     
     populate(app)

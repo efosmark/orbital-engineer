@@ -1,17 +1,16 @@
-import json
-
 from orbitalengineer.ui import model, ui_config
+from orbitalengineer.ui.audio.synth import ToneSynthController
+from orbitalengineer.ui.client_sync import ClientSyncController
 from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 from orbitalengineer.ui.canvas import pz
 from orbitalengineer.ui.mainwindow import MainWindow
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject, GLib
 from orbitalengineer.ui.keyinput import KeyInput
-from orbitalengineer.ui.names import make_name
 
 from orbitalengineer.engine import logger
 from orbitalengineer.engine.particle import Particle
 from orbitalengineer.ipc.client import ClientSocketConnection
-from orbitalengineer.helpers import seed
+
 
 class App(Gtk.Application):
     platform_id = GObject.Property(type=int, default=-1)
@@ -19,15 +18,19 @@ class App(Gtk.Application):
     
     def __init__(self, platform_id=-1, device_id=-1):
         super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)        
-        self.view = model.ViewModel()
+
+        self.model = model.AppModel()
         self.client = ClientSocketConnection()
-        self.camera = pz.Camera2D()
+        self.sync_ctl = ClientSyncController(self.client, self.model.engine)
         
-        self.view.connect("notify::paused", self.on_paused_changed)
-        self.view.connect("notify::speed", self.on_speed_changed)
-        self.view.connect("notify::show-grid", self.on_show_grid_changed)
-        self.view.connect("notify::max-speed", self.on_max_speed_changed)
-        self.view.props.paused = True
+        self.camera = pz.Camera2D()
+        self.synth = ToneSynthController()
+        
+        self.model.engine.connect("notify::paused", self.on_paused_changed)
+        self.model.engine.connect("notify::clock-speed", self.on_speed_changed)
+        self.connect("notify::show-grid", self.on_show_grid_changed)
+        self.model.engine.connect("notify::max-speed", self.on_max_speed_changed)
+        self.model.engine.paused = True
         self.platform_id = platform_id
         self.device_id = device_id
         self.client.set_device(platform_id, device_id)
@@ -35,7 +38,7 @@ class App(Gtk.Application):
     def bootstrap(self):
         self.client.connect()
         self.client.sync_full_state()
-        self.view.osd.add_message("Ready. Press [space] to start.", duration=10.0)
+        self.model.osd.add_message("Ready.", duration=10.0, desc="Press [space] to start.")
 
     def on_max_speed_changed(self, model, param):
         #if self.view.max_speed < self.view.speed:
@@ -43,28 +46,25 @@ class App(Gtk.Application):
         ...
 
     def on_show_grid_changed(self, model, param):
-        grid_state = "On" if self.view.show_grid else "Off"
-        self.view.osd.add_message(f"Grid: {grid_state}")
+        grid_state = "On" if self.model.show_grid else "Off"
+        self.model.osd.add_message(f"Grid: {grid_state}")
 
     def on_paused_changed(self, model, param):
         self._toggle_paused()
-        if self.view.props.paused:
-            if self.client.tick_id > 0:
-                self.view.osd.add_message("Paused", duration=3.0)
+        if self.model.engine.paused:
+            if self.model.engine.tick_id > 0:
+                self.model.osd.add_message("Paused", duration=3.0)
         else:
-            self.view.osd.add_message("Running")
+            self.model.osd.add_message("Running")
     
     def on_speed_changed(self, model, param):
-        if not self.client.is_initialized: return
-        self.client.set_clock_speed(self.view.props.speed)
-        
-        f_cur_speed = f"{self.view.speed:.1f}"
-        f_max_speed = f"{self.client.max_speed:.1f}"
-        #if f_cur_speed != f_max_speed:
-        self.view.osd.add_message(f"Speed: {f_cur_speed}x", desc=f"Max Speed: {f_max_speed}x")
+        speed = self.model.engine.clock_speed
+        precision = 1 if speed >= 0.1 else 2
+        f_cur_speed = f"{speed:.{precision}f}"
+        self.model.osd.add_message(f"Speed: {f_cur_speed}x")
     
     def _toggle_paused(self):
-        if self.view.props.paused:
+        if self.model.engine.paused:
             self.client.stop()
         else:
             self.client.start()
@@ -77,8 +77,8 @@ class App(Gtk.Application):
             radius=particle.get_radius(),
             flags=particle.get_flags()
         )
-        self.view.particle_colors[idx] = random_color() if color is None else color
-        self.view.particle_names[idx] = make_name(seed + idx)
+        self.model.particle_colors[idx] = random_color() if color is None else color
+        self.model.particle_names[idx] = f"body-{idx}"
         return idx
     
     def init_mainwindow(self) -> MainWindow:
@@ -86,13 +86,14 @@ class App(Gtk.Application):
             application=self,
             title=ui_config.DEFAULT_WINDOW_TITLE,
             camera=self.camera,
-            view=self.view,
+            view=self.model,
             ctl=self.client,
             clock=self.client.clock,
+            synth=self.synth
         )
         self.key_input = KeyInput(self, win)
         win.present()
-        if self.view.start_maximized:
+        if self.model.start_maximized:
             win.maximize()
         return win
     
@@ -120,8 +121,8 @@ class App(Gtk.Application):
         if b is None:
             logger.warning(f"Unknown focus: {particle_id}")
             return
-        self.view.secondary_body = particle_id
-        self.view.osd.add_message(f"Focus: {particle_id}", duration=0.5)
+        self.model.secondary_body = particle_id
+        self.model.osd.add_message(f"Focus: {particle_id}", duration=0.5)
 
         # win = self.props.active_window
         # if not win:
@@ -141,11 +142,11 @@ class App(Gtk.Application):
             self._last_tick = None
         if self._last_tick is None or self.client.tick_id > self._last_tick:
             self._last_tick = self.client.tick_id
-            self.view.osd.add_message("Tick", duration=0.25)
+            self.model.osd.add_message("Tick", duration=0.25)
             GLib.idle_add(self.client.tick_once)
 
     def substep_once(self):
-        self.view.osd.add_message("Sub-step", duration=0.25)
+        self.model.osd.add_message("Sub-step", duration=0.25)
         self.client.substep_once()
     
     def relative_zoom(self, factor):
@@ -162,12 +163,12 @@ class App(Gtk.Application):
     #         radius=size * self.camera.zoom
     #     ))
 
-    def to_dict(self) -> dict:
-        return {
-            "camera": self.camera.to_dict(),
-            "orbital": self.client.to_dict(),
-            "view": self.view.to_dict(),
-        }
+    # def to_dict(self) -> dict:
+    #     return {
+    #         "camera": self.camera.to_dict(),
+    #         "orbital": self.client.to_dict(),
+    #         "view": self.view.to_dict(),
+    #     }
     
     # def load_from_file(self):
     #     if self.resume_from_file is False: return
@@ -192,7 +193,7 @@ class App(Gtk.Application):
     #     self.view.load_from_dict(obj["view"])
     #     self.orbital.load_from_dict(obj)
     
-    def save_scenario(self):
-        if self.client.is_initialized:
-            logger.info(f"Saving to {ui_config.DEFAULT_SCENARIO_FILE}")
-            json.dump(self.to_dict(), open(ui_config.DEFAULT_SCENARIO_FILE, "w"))
+    # def save_scenario(self):
+    #     if self.client.is_initialized:
+    #         logger.info(f"Saving to {ui_config.DEFAULT_SCENARIO_FILE}")
+    #         json.dump(self.to_dict(), open(ui_config.DEFAULT_SCENARIO_FILE, "w"))

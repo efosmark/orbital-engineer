@@ -7,13 +7,13 @@ class CGroupRenderer(renderer.Renderer):
 
     def draw(self, cr:cairo.Context, width:int, height:int):
         if not hasattr(self, '_colors'):
-            self._colors = dict(self.view.props.particle_colors)
+            self._colors = dict(self.app.props.particle_colors)
         
         for b in self.orbital:
             cgroup = self.orbital.cgroup[b.idx]
             if cgroup not in self._colors:
                 self._colors[cgroup] = random_color()
-            self.view.props.particle_colors[b.idx] = self._colors[cgroup]
+            self.app.props.particle_colors[b.idx] = self._colors[cgroup]
 
 
 class CGroupConnectionRenderer(renderer.Renderer):

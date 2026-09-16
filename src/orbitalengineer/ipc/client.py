@@ -7,7 +7,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from orbitalengineer import flags
-from orbitalengineer.engine import logger
+from orbitalengineer.engine import config, logger
+from orbitalengineer.engine.orbitalcl.device import GPUStatus
 from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
 from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
 from orbitalengineer.engine.particle import Particle
@@ -23,9 +24,13 @@ class ClientSocketConnection:
     tick_id:int = 0
     accum:float = 0
     N:int = 0
-    max_speed:float = 1.0
+    max_speed:float|None = None
+    curr_tick_at:float = 0
+    next_tick_at:float = 0
+    dt_step:float = config.DEFAULT_DT_BASE
     
     cfg:SimConfig = SimConfig()
+    gpu_status:GPUStatus|None
     
     flags:NDArray[np.uint32]
     position:NDArray[np.complex64]
@@ -102,6 +107,9 @@ class ClientSocketConnection:
         self.accum = status.accum
         self.N = status.N
         self.max_speed = status.max_speed
+        self.curr_tick_at = status.curr_tick_at
+        self.next_tick_at = status.next_tick_at
+        self.gpu_status = status.gpu_status
         self.clock.update(status.clock)
 
     def _connect_shared_memory(self, shared: message.SharedMemoryResponse):

@@ -1,15 +1,16 @@
 from typing import Any, cast
 
 from orbitalengineer.ui import canvas, ui_config
+from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib
-from orbitalengineer.ui.model import ViewModel
+from orbitalengineer.ui.model import AppModel
 from orbitalengineer.ipc.clock import SimClock
 from orbitalengineer.ipc.client import ClientSocketConnection
 
 
 class MainWindow(Gtk.ApplicationWindow):
 
-    def __init__(self, application, title, camera, view: ViewModel, ctl:ClientSocketConnection, clock:SimClock):
+    def __init__(self, application, title, camera, view: AppModel, ctl:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
         Gtk.ApplicationWindow.__init__(self, application=application, title=title)
         self.ctl = ctl
         self.clock = clock
@@ -17,8 +18,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self._tick_audio_ready = False
         
         self.view = view
+        self.synth = synth
         
-        self.canvas = canvas.OrbitalCanvas(camera, view, self.ctl, self.clock)
+        self.canvas = canvas.OrbitalCanvas(camera, view, self.ctl, self.clock, self.synth)
         self.canvas.set_hexpand(True)
         self.canvas.set_vexpand(True)
         self.canvas.set_halign(Gtk.Align.FILL)
@@ -36,11 +38,6 @@ class MainWindow(Gtk.ApplicationWindow):
         header.pack_end(menu_button)
         self._init_menu_actions()
 
-        def on_tick(widget, frame_clock):
-            self.ctl.sync()
-            self.view.max_speed = self.ctl.max_speed
-            return True
-        self.add_tick_callback(on_tick)
 
     def _init_menu_actions(self):
         app = cast(Any, self.get_application())
@@ -58,30 +55,30 @@ class MainWindow(Gtk.ApplicationWindow):
             name = action.get_name()
             state = value.get_boolean()
             if name == "show_grid":
-                app.view.show_grid = state
+                app.model.show_grid = state
             #elif name == "show_history":
                 #self.view.show_focused_history = state
-            #    app.view.show_all_history = state
+            #    app.model.show_all_history = state
             elif name == "show_force_vectors":
-                app.view.show_force_vectors = state
+                app.model.show_force_vectors = state
             elif name == "show_orbital_ellipse":
-                app.view.show_orbital_ellipse = state
+                app.model.show_orbital_ellipse = state
             elif name == "track_focused":
-                app.view.follow_tracked_body = state
+                app.model.follow_tracked_body = state
             elif name == "show_magnifier":
-                app.view.show_magnifier = state
+                app.model.show_magnifier = state
             elif name == "show_force_vectors":
-                app.view.show_force_vectors = state
+                app.model.show_force_vectors = state
             elif name == "show_debug_info":
-                app.view.show_debug_info = state
+                app.model.show_debug_info = state
 
-        add_toggle_action("show_grid",            app.view.show_grid,            on_toggle_changed)
-        add_toggle_action("show_force_vectors",   app.view.show_force_vectors,   on_toggle_changed)
-        add_toggle_action("show_history",         app.view.show_focused_history, on_toggle_changed)
-        add_toggle_action("show_orbital_ellipse", app.view.show_orbital_ellipse, on_toggle_changed)
-        add_toggle_action("track_focused",        app.view.follow_tracked_body,  on_toggle_changed)
-        add_toggle_action("show_magnifier",       app.view.show_magnifier,       on_toggle_changed)
-        add_toggle_action("show_debug_info",      app.view.show_debug_info,      on_toggle_changed)
+        add_toggle_action("show_grid",            app.model.show_grid,            on_toggle_changed)
+        add_toggle_action("show_force_vectors",   app.model.show_force_vectors,   on_toggle_changed)
+        add_toggle_action("show_history",         app.model.show_focused_history, on_toggle_changed)
+        add_toggle_action("show_orbital_ellipse", app.model.show_orbital_ellipse, on_toggle_changed)
+        add_toggle_action("track_focused",        app.model.follow_tracked_body,  on_toggle_changed)
+        add_toggle_action("show_magnifier",       app.model.show_magnifier,       on_toggle_changed)
+        add_toggle_action("show_debug_info",      app.model.show_debug_info,      on_toggle_changed)
 
         # Quit on the app as well
         act_quit = Gio.SimpleAction.new("quit", None)

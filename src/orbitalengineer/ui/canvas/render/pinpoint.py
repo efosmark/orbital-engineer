@@ -6,12 +6,12 @@ from orbitalengineer.ui.canvas import renderer
 class PinpointRenderer(renderer.Renderer):
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if len(self.view.pinpoint) == 0:
+        if len(self.app.pinpoint) == 0:
             return
                 
         now = self.orbital.clock.time()
         existing_pinpoint = []
-        for p in self.view.pinpoint:
+        for p in self.app.pinpoint:
             if 0 < p.until < now:
                 continue
             
@@ -25,4 +25,4 @@ class PinpointRenderer(renderer.Renderer):
             cr.fill()
             existing_pinpoint.append(p)
         
-        self.view.pinpoint = existing_pinpoint
+        self.app.pinpoint = existing_pinpoint

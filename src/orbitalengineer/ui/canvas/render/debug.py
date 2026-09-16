@@ -10,7 +10,7 @@ from orbitalengineer.ui.gtk4 import Gdk
 
 X_PADDING = 5
 X_SPACING = 30
-X_MARGIN = 5
+X_MARGIN = 35
 
 Y_PADDING = 10
 Y_SPACING = 0
@@ -79,54 +79,6 @@ def color_from_threshold(threshold):
 def get_color(value, tmap):
     return color_from_threshold(get_threshold(value, tmap))
 
-def read_int(p: Path):
-    try:
-        return int(p.read_text().strip())
-    except Exception:
-        return None
-
-def amd_paths(card=0):
-    base = Path(f"/sys/class/drm/card{card}/device")
-    # utilization
-    util = base / "gpu_busy_percent"
-    # hwmon temps/power
-    hwmons = sorted((base / "hwmon").glob("hwmon*"))
-    return util, hwmons
-
-def detect_amd_card() -> int|None:
-    # Pick the first DRM card that exposes AMD utilization telemetry.
-    for card_path in sorted(Path("/sys/class/drm").glob("card[0-9]*")):
-        util = card_path / "device" / "gpu_busy_percent"
-        if util.exists():
-            try:
-                return int(card_path.name.removeprefix("card"))
-            except ValueError:
-                return None
-    return None
-
-def read_amd_metrics(card=0):
-    util_p, hwmons = amd_paths(card)
-    util = read_int(util_p)  # percent
-    temps = {}
-    power_w = None
-    if hwmons:
-        h = hwmons[0]
-        # map temp*_label -> temp*_input
-        for lbl in h.glob("temp*_label"):
-            name = lbl.read_text().strip()
-            idx = lbl.name.split('_')[0]  # e.g., temp1
-            val = read_int(h / f"{idx}_input")
-            if val is not None:
-                temps[name] = val / 1000.0
-        pw = read_int(h / "power1_average")
-        if pw is not None:
-            power_w = pw / 1e6
-    
-    avg_temp = None
-    if temps:
-        avg_temp = sum(temps.values()) / len(temps)
-    return {"util_percent": util, "temp_c": avg_temp, "power_w": power_w}
-
 Color_T = tuple[float,float,float]
 
 @dataclass
@@ -142,7 +94,7 @@ class DebugInfoRenderer(renderer.Renderer):
 
     def _get_labels(self):
         try:
-            num_bodies = self.orbital.N
+            num_bodies = self.app.engine.N
         except AttributeError:
             num_bodies = 0
                 
@@ -155,14 +107,14 @@ class DebugInfoRenderer(renderer.Renderer):
             DebugDisplayField("Zoom",   zoom, 1),
         ])
 
-        render_durations = self.view.durations['render'][-10:]
+        render_durations = self.app.durations['render'][-10:]
         if len(render_durations) > 0:
             t_render_ms = statistics.mean([d[1] for d in render_durations]) * 1000.0
             display.append(DebugDisplayField("Render", t_render_ms, 2, 'ms', RENDER_MS_THRESHOLD))
         
-        frame_clock = cast(Gdk.FrameClock, self.view.frame_clock)
+        frame_clock = cast(Gdk.FrameClock, self.app.frame_clock)
         fps = frame_clock.get_fps()
-        frame_no = self.view.frame_clock.get_frame_counter()
+        frame_no = self.app.frame_clock.get_frame_counter()
         frame_interval_ms = (1/(fps or 1)) * 1000.0
         
         display.extend([
@@ -181,7 +133,7 @@ class DebugInfoRenderer(renderer.Renderer):
         except AttributeError:
             pass
         
-        tick_durations = self.view.durations['tick'][-10:]
+        tick_durations = self.app.durations['tick'][-10:]
         if len(tick_durations) > 0:
             t_tick = statistics.mean([d[1] for d in tick_durations])
             t_tick_ms = t_tick * 1000.0
@@ -192,33 +144,11 @@ class DebugInfoRenderer(renderer.Renderer):
                 DebugDisplayField("Interval", t_tick_ms, 1, 'ms')
             ])
 
-        metrics_card = getattr(self.orbital, "drm_card_index", None)
-        if metrics_card is None:
-            metrics_card = detect_amd_card()
-
-        metrics = read_amd_metrics(metrics_card or 0)
-        gpu_utilization = metrics["util_percent"]
-        gpu_temp = metrics["temp_c"]
-        gpu_power = metrics["power_w"]
-        opencl_device_name = getattr(self.orbital, "opencl_device_name", "")
-        gpu_card_label = f"card{metrics_card}" if metrics_card is not None else "unknown"
-        if opencl_device_name:
-            gpu_card_label = f"{gpu_card_label} ({opencl_device_name})"
-        
-        if any(v is not None for v in (gpu_utilization, gpu_temp, gpu_power)):
-            display.extend([
-                None,
-                DebugDisplayField('GPU Card', gpu_card_label),
-                DebugDisplayField('GPU Util', gpu_utilization or 0, 1, '%', GPU_ACTIVITIY_THRESHOLD),
-                DebugDisplayField('GPU Temp', gpu_temp or 0, 1, '°C', GPU_TEMP_THRESHOLD),
-                DebugDisplayField('GPU Power', gpu_power or 0, 1, 'W')
-            ])
-        
         return display
     
     
     def draw(self, cr, width:int, height:int):
-        if not self.view.show_debug_info:
+        if not self.app.show_debug_info:
             return
         
         cr.select_font_face("Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)

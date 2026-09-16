@@ -12,7 +12,7 @@ class HistoryRenderer(renderer.Renderer):
         cr.save()
 
         particle = self.orbital.get_particle(sb_id)
-        r,g,b,a = self.view.particle_colors[sb_id]
+        r,g,b,a = self.app.particle_colors[sb_id]
         #cr.set_line_join(cairo.LineJoin.MITER)        
         
         num_positions = float(len(self.history_positions[sb_id]))
@@ -42,8 +42,8 @@ class HistoryRenderer(renderer.Renderer):
 
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if self.view.show_all_history:
+        if self.app.show_all_history:
             for b in self.orbital:
                 self.draw_history(cr, b.idx)
-        elif self.view.show_focused_history and self.view.secondary_body is not None:
-            self.draw_history(cr, self.view.secondary_body)
+        elif self.app.show_focused_history and self.app.secondary_body is not None:
+            self.draw_history(cr, self.app.secondary_body)

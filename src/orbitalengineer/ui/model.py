@@ -1,11 +1,12 @@
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass
 import time
-from typing import Any, Protocol, cast
+from typing import Any
 
-from orbitalengineer.engine import config
-from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene, GObject, GLib
 import numpy as np
+
+from orbitalengineer.ui.client_sync import EngineModel
+from orbitalengineer.ui.gtk4 import GObject
 
 
 CMAP_KE = 'Kinetic Energy'
@@ -75,12 +76,11 @@ class OnScreenDisplayModel(GObject.GObject):
         return self._current_message
 
 
-class ViewModel(GObject.GObject):
+class AppModel(GObject.GObject):
     props:Any
     
-    paused = GObject.Property(type=bool, default=True)
-    speed = GObject.Property(type=float, default=config.DEFAULT_SPEED)
-    max_speed = GObject.Property(type=float, default=config.DEFAULT_SPEED)
+    osd:OnScreenDisplayModel
+    engine:EngineModel
     
     secondary_body = GObject.Property(type=object, default=None)
     follow_tracked_body = GObject.Property(type=bool, default=True)
@@ -99,7 +99,6 @@ class ViewModel(GObject.GObject):
     frame_clock = GObject.Property(type=object)
     fps = GObject.Property(type=float)
         
-    pinpoint = GObject.Property(type=object)
     particle_colors = GObject.Property(type=object)
     particle_names = GObject.Property(type=object)
     
@@ -110,13 +109,7 @@ class ViewModel(GObject.GObject):
     
     start_maximized = GObject.Property(type=bool, default=False)
     camera_drag_enable = GObject.Property(type=bool, default=True)
-    
-    width = GObject.Property(type=int, default=0)
-    height = GObject.Property(type=int, default=0)
-    
-    font_family = GObject.Property(type=str, default="monospace")
-    font_size = GObject.Property(type=int, default=10)
-    
+        
     selected_particles = GObject.Property(type=object)
     drag_start = GObject.Property(type=object)
     drag_end = GObject.Property(type=object)
@@ -125,8 +118,8 @@ class ViewModel(GObject.GObject):
     def __init__(self):
         super().__init__()
         self.osd = OnScreenDisplayModel()
+        self.engine = EngineModel()
         
-        self.props.pinpoint = []
         self.props.particle_colors = {}
         self.props.particle_names = {}
         self.props.hover_position = (0, 0)

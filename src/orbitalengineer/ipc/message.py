@@ -1,14 +1,13 @@
 from dataclasses import dataclass, fields
 from enum import IntEnum
 from typing import Literal, Self, Sequence, Protocol
+from orbitalengineer.engine.orbitalcl.device import GPUStatus
 from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
 from orbitalengineer.ipc.clock import SimClock
-
 
 class SupportsFromDict(Protocol):
     @classmethod
     def from_dict(cls, d:dict) -> Self:...
-
 
 @dataclass
 class ErrorResponse:
@@ -18,7 +17,6 @@ class ErrorResponse:
     @classmethod
     def from_dict(cls, d:dict) -> Self:
         return cls(**d)
-
 
 @dataclass
 class ParticleInit:
@@ -31,7 +29,6 @@ class ParticleInit:
     @classmethod
     def from_dict(cls, d:dict) -> Self:
         return cls(**d)
-
 
 @dataclass
 class Device:
@@ -57,7 +54,6 @@ class InitRequest:
             ]
         )   
 
-
 @dataclass
 class ClockUpdateRequest:
     speed: float|None = None
@@ -66,7 +62,6 @@ class ClockUpdateRequest:
     @classmethod
     def from_dict(cls, d:dict) -> Self:
         return cls(**d)
-
 
 @dataclass
 class ShiftVectorsRequest:
@@ -128,7 +123,11 @@ class StatusResponse:
     tick_id: int
     accum: float
     clock: SimClock
-    max_speed: float
+    max_speed: float|None
+    curr_tick_at: float
+    next_tick_at: float
+    dt_step: float
+    gpu_status: GPUStatus|None
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:
@@ -138,7 +137,11 @@ class StatusResponse:
             N=d['N'],
             accum=d['accum'],
             clock=SimClock(**d['clock']),
-            max_speed=d['max_speed']
+            max_speed=d['max_speed'],
+            curr_tick_at=d['curr_tick_at'],
+            next_tick_at=d['next_tick_at'],
+            dt_step=d['dt_step'],
+            gpu_status=GPUStatus(**d['gpu_status']) if d['gpu_status'] is not None else None
         )
 
 @dataclass

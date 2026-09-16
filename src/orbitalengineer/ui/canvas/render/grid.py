@@ -1,5 +1,6 @@
 import math
 import cairo
+from orbitalengineer.ui import ui_config
 from orbitalengineer.ui.gtk4 import Gtk, Graphene, Gdk
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.fmt import mag_format
@@ -135,11 +136,11 @@ class GridRenderer(renderer.Renderer):
         # return (*super().get_cache_key(width, height), int(x1), int(y1))
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if not self.view.show_grid:
+        if not self.app.show_grid:
             return
         
-        cr.select_font_face(self.view.font_family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(self.view.font_size)
+        cr.select_font_face(ui_config.DEFAULT_FONT_FAMILY, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(ui_config.DEFAULT_FONT_SIZE)
         
         cr.set_hairline(True)
         cr.set_antialias(cairo.ANTIALIAS_FAST)
@@ -171,8 +172,8 @@ class GridRenderer(renderer.Renderer):
         x_lines(cr, height, x1, x2, spacing, scale)
         y_lines(cr, width, y1, y2, spacing, scale)
         
-        if self.view.secondary_body:
-            b = self.orbital.get_particle(self.view.secondary_body)
+        if self.app.secondary_body:
+            b = self.orbital.get_particle(self.app.secondary_body)
             pos = b.get_position()
         
             draw_x_label(cr, x1, pos.real-x1, height, scale, True)

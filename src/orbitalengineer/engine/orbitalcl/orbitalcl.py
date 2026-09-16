@@ -153,6 +153,7 @@ class SimController_CL:
         return dt
     
     def single_step(self, dt_step):
+        logger.debug("single_step(dt_step=%.4f)", dt_step)
         count = 0
         while dt_step > config.EPS_TIME and count < config.MAX_SUB_STEPS:
             dt = self.substep(dt_step)
@@ -164,20 +165,22 @@ class SimController_CL:
     def tick(self, dt_step:float):
         if not self.is_initialized:
            logger.warning("tick() was called before simulation initialization.")
-           return 0
+           return 0, 0
+        logger.debug("tick(dt_step=%.4f)", dt_step)
 
         try:
             count, dt_unprocessed = self.single_step(dt_step)
+            logger.debug("%.0f, %.3f = single_step(%.4f)", count, dt_unprocessed, dt_step)
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
             import sys
             print(e, file=sys.stderr)
             raise e
-            return False
 
-        self.emit_metrics(float(dt_step))
-        self.pipeline_state.tick_id += 1
-        self.pipeline_state.step_id = 0
-        return dt_unprocessed
+        if count > 0:
+            self.emit_metrics(float(dt_step))
+            self.pipeline_state.tick_id += 1
+            self.pipeline_state.step_id = 0
+        return count, dt_unprocessed
     
     def emit_metrics(self, dt_step_size:float):
         if not self.cfg.ENABLE_PROFILING:

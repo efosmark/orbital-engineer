@@ -31,7 +31,7 @@ def on_activate(app: App):
         flags=flags.BOUNCE
     ), color=(*random_color(), 1.0))
 
-    app.view.speed = 10.0
+    app.model.speed = 10.0
     app.client.coef_of_restitution = 0.99999
 
 def run():

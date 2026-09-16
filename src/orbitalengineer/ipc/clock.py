@@ -40,6 +40,10 @@ class SimClock:
         self.duration += dt
         return self.duration
 
+    def decrement_by(self, dt:float) -> float:
+        self.duration -= dt
+        return self.duration
+
     @classmethod
     def from_dict(cls, input:dict) -> Self:
         r = cls()

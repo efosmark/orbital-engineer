@@ -1,3 +1,4 @@
+import atexit
 import struct
 
 import numpy as np
@@ -25,6 +26,12 @@ class ToneSynthController:
         self.appsrc.set_property("caps", Gst.Caps.from_string(ui_config.GST_CAPS))
         self.appsrc.connect("need-data", self.need_data)
         self.pipeline.set_state(Gst.State.PLAYING)
+        
+        atexit.register(self.shutdown)
+
+    def shutdown(self):
+        self.pipeline.set_state(Gst.State.PAUSED)
+        self.pipeline.abort_state()
 
     def need_data(self, src, length):
         buffer = np.zeros(ui_config.BUFFER_SAMPLES, dtype=np.float64)
@@ -35,7 +42,7 @@ class ToneSynthController:
         # Scale the data for int16
         data = np.clip(np.int16(np.multiply(buffer, SAMPLE_MAX)), SAMPLE_MIN, SAMPLE_MAX)
         
-        print(data)    
+        #print(data)    
         # Pack the sample data
         data = struct.pack("<" + "h" * len(data), *data) # type:ignore
         buf = Gst.Buffer.new_allocate(None, len(data), None)

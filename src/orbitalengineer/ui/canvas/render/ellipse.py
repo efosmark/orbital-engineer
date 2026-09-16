@@ -125,12 +125,12 @@ class EllipseRenderer(renderer.Renderer):
         cr.restore()
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if not self.view.show_orbital_ellipse: return
-        if self.view.secondary_body is not None:
-            self.draw_ellipse_for_body(cr, self.view.secondary_body)
+        if not self.app.show_orbital_ellipse: return
+        if self.app.secondary_body is not None:
+            self.draw_ellipse_for_body(cr, self.app.secondary_body)
         
-        b = self.view.hovered_over_particle
-        if b is not None and b.idx != self.view.secondary_body:
+        b = self.app.hovered_over_particle
+        if b is not None and b.idx != self.app.secondary_body:
             self.draw_ellipse_for_body(cr, b.idx, True)
         
         # TESTING -- showing all secondary bodies orbiting focus

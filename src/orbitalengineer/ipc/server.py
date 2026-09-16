@@ -96,13 +96,21 @@ class OrbitalControlServer:
         )
 
     def _get_status_response(self):
+        gpu_status = None
+        if hasattr(self.orbital, 'device'):
+            gpu_status = self.orbital.device.gpu_status()
+        
         return message.StatusResponse(
             initialized=self.orbital.is_initialized,
             tick_id=self.orbital.pipeline_state.tick_id,
             N=self.orbital.pipeline_state.N,
             accum=float(self.tick_ctl.total_dt_lag) if hasattr(self, 'tick_ctl') else 0,
             clock=self.clock,
-            max_speed=self.tick_ctl.max_target_clock_speed()
+            max_speed=None,
+            curr_tick_at=self.tick_ctl.curr_tick_at,
+            next_tick_at=self.tick_ctl.next_tick_at,
+            dt_step=self.tick_ctl.dt_step,
+            gpu_status=gpu_status
         )
     
     def _get_state_response(self):
