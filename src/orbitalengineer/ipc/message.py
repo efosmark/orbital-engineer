@@ -74,14 +74,12 @@ class ShiftVectorsRequest:
     def from_dict(cls, d:dict) -> Self:
         return cls(**d)
 
-
 @dataclass
 class SharedMemoryInfo:
     name:str
     dtype:str
     size:int
     shape:list[int]|tuple[int]
-
 
 @dataclass
 class SharedMemoryResponse:
@@ -114,7 +112,6 @@ class InitResponse:
             config=SimConfig(**d['config']),
             memory=SharedMemoryResponse.from_dict(d['memory'])
         )
-
 
 @dataclass
 class StatusResponse:
@@ -174,6 +171,7 @@ class MessageType(IntEnum):
     DISCONNECT = 20
     TICK_ONCE = 21
     SUBSTEP_ONCE = 22
+    RESET = 23
 
 mtype_to_cls:dict[MessageType, SupportsFromDict|None] = {
     MessageType.SUCCESS: None,

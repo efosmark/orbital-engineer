@@ -3,7 +3,7 @@ from typing import cast
 import numpy as np
 
 from orbitalengineer import flags
-from orbitalengineer.ui import model
+from orbitalengineer.ui.model import main
 from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
 from orbitalengineer.ui.canvas.render.cmap import MomentumColorizedRenderer
@@ -30,14 +30,15 @@ from orbitalengineer.ipc.client import ClientSocketConnection
 from orbitalengineer.ipc.clock import SimClock
 
 HOVER_MARGIN = 15
+DRAG_MARGIN = 50
 
 class MoveParticleController:
 
-    def __init__(self, canvas, camera, orbital:ClientSocketConnection, view_model):
+    def __init__(self, canvas, camera, orbital:ClientSocketConnection, view_model:main.AppModel):
         self.canvas = canvas
         self.camera = camera
         self.orbital = orbital
-        self.view = view_model
+        self.app = view_model
             
         self._prev_dx = 0
         self._prev_dy = 0
@@ -51,15 +52,15 @@ class MoveParticleController:
         canvas.add_controller(drag)
 
     def _get_selection_box(self):
-        x_start = min(self.view.drag_start[0], self.view.drag_end[0])
-        x_end = max(self.view.drag_start[0], self.view.drag_end[0])
-        y_start = min(self.view.drag_start[1], self.view.drag_end[1])
-        y_end = max(self.view.drag_start[1], self.view.drag_end[1])
+        x_start = min(self.app.drag_start[0], self.app.drag_end[0])
+        x_end = max(self.app.drag_start[0], self.app.drag_end[0])
+        y_start = min(self.app.drag_start[1], self.app.drag_end[1])
+        y_end = max(self.app.drag_start[1], self.app.drag_end[1])
         return (x_start, x_end, y_start, y_end)
 
     def _update_selection(self):
         x_start, x_end, y_start, y_end = self._get_selection_box()
-        self.view.selected_particles = np.where(
+        self.app.selected_particles = np.where(
              (self.orbital.position.real <= x_end)
             &(self.orbital.position.real >  x_start)
             &(self.orbital.position.imag <= y_end)
@@ -77,109 +78,104 @@ class MoveParticleController:
             return
 
         x, y = self.camera.screen_to_world(start_x, start_y, self.canvas.get_width(), self.canvas.get_height())
-        self.view.drag_start = (x, y)
+        self.app.drag_start = (x, y)
 
         bodies = self.orbital.find_bodies_at(x, y, margin=5/self.camera.zoom)
         if len(bodies) == 0:
-            self.view.selected_particles = None
+            self.app.selected_particles = None
             return
         
-        self.view.props.dragging_particle = bodies[0]
+        self.app.dragging_particle = bodies[0]
 
     def on_drag_update(self, gesture, dx, dy):
-        if not self.view.drag_start: return
+        if not self.app.drag_start: return
 
         offset_x = (dx - self._prev_dx) / self.camera.zoom
         offset_y = (dy - self._prev_dy) / self.camera.zoom
 
-        if offset_x > 15 or offset_y > 15:
-            self.view.props.paused = True
+        if offset_x > DRAG_MARGIN or offset_y > DRAG_MARGIN:
+            self.app.engine.paused = True
         
-        self.view.drag_end = (self.view.drag_start[0]+offset_x, self.view.drag_start[1]+offset_y)
+        self.app.drag_end = (self.app.drag_start[0]+offset_x, self.app.drag_start[1]+offset_y)
         
-        self.view.props.paused = True
-        if self.view.props.dragging_particle is None:
+        if self.app.dragging_particle is None:
             self._update_selection()
         else:
             self._prev_dx = dx
             self._prev_dy = dy
             offset = complex(offset_x, offset_y)
-            self.orbital.rel_move(self.view.selected_particles, offset)
+            self.orbital.rel_move(self.app.selected_particles, offset)
         
     def on_drag_end(self, gesture, start_x, start_y):
-        self.view.props.dragging_particle = None
-        self.view.props.drag_start = None
-        self.view.props.drag_end = None
+        self.app.dragging_particle = None
+        self.app.drag_start = None
+        self.app.drag_end = None
         self._prev_dx = 0
         self._prev_dy = 0
 
 class MouseController:
     
-    def __init__(self, canvas, camera, orbital, view_model):
+    def __init__(self, canvas, camera, orbital, view_model:main.AppModel):
         self.canvas = canvas
         self.camera = camera
         self.orbital = orbital
-        self.view = view_model        
+        self.app = view_model        
         
         motion = Gtk.EventControllerMotion.new()
         motion.connect("motion", self.on_motion)
         canvas.add_controller(motion)
-
  
     def on_motion(self, _ctrl, x, y):
-        self.view.hover_position = (x, y)
-        x, y = self.camera.screen_to_world(x, y, self.view.width, self.view.height)
+        self.app.hover_position = (x, y)
+        x, y = self.camera.screen_to_world(x, y, self.app.width, self.app.height)
         bodies = self.orbital.find_bodies_at(
             x, y,
             margin=HOVER_MARGIN/self.camera.zoom
         )
         if len(bodies) == 0:
-            self.view.hovered_over_particle = None
+            self.app.hovered_over_particle = None
             return
-        self.view.hovered_over_particle = self.orbital.get_particle(bodies[0])
+        self.app.hovered_over_particle = self.orbital.get_particle(bodies[0])
 
 
 class OrbitalCanvas(Gtk.DrawingArea):
-    hud_renderers:list[renderer.Renderer]
 
-    def __init__(self, camera:Camera2D, view: model.AppModel, orbital:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
+    def __init__(self, camera:Camera2D, app: main.AppModel, orbital:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
         super().__init__()
-        
         self.camera = camera
-        
-        self.view = view
+        self.app = app
         self.clock = clock
         self.synth = synth
         self.orbital = orbital
-        self.camera_ctl = Camera2DController(self, self.camera, self.view)
-        self.mouse_controller = MouseController(self, self.camera, self.orbital, self.view)
-        self.move_particle_ctl = MoveParticleController(self, self.camera, self.orbital, self.view)
+        self.camera_ctl = Camera2DController(self, self.camera, self.app)
+        self.mouse_controller = MouseController(self, self.camera, self.orbital, self.app)
+        self.move_particle_ctl = MoveParticleController(self, self.camera, self.orbital, self.app)
         
         self.hud_renderers = [
-            BackgroundRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            GridRenderer(self.view, self.camera, self.orbital, self.clock, self.synth)
+            BackgroundRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            GridRenderer(self.app, self.camera, self.orbital, self.clock, self.synth)
         ]
         
         self.scene_renderers = [
             #HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
             #ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
             #CGroupRenderer(self.view, self.camera, self.orbital, self.clock),
-            MomentumColorizedRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            EllipseRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            ParticleRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            SelectionRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            ReticleRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
+            MomentumColorizedRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            EllipseRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            ParticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            SelectionRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            ReticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             #PinpointRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
             #CGroupConnectionRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
         ]
         
         self.hud_fg_renderers = [
-            DebugInfoRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            FocusInfoRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            HudClockRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            GPUStatusRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            WarningRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            OSDRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
+            DebugInfoRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            FocusInfoRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            HudClockRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            GPUStatusRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            WarningRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            OSDRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
         ]
         
         click_controller = Gtk.GestureClick.new()
@@ -187,8 +183,8 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.add_controller(click_controller)
         
         def on_resize(self, width, height):
-            self.view.width = width
-            self.view.height = height
+            self.app.width = width
+            self.app.height = height
         self.connect("resize", on_resize)
 
         def on_tick(widget, frame_clock):
@@ -207,7 +203,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
         
         x, y = self.camera.screen_to_world(x, y, self.get_width(), self.get_height())
         bodies = self.orbital.find_bodies_at(x, y, margin=HOVER_MARGIN/self.camera.zoom)
-        self.view.props.secondary_body = bodies[0] if len(bodies) > 0 else None
+        self.app.secondary_body = bodies[0] if len(bodies) > 0 else None
     
     def zoom_in(self):
         self.camera.zoom_at(0, 0, 0, 0, 0.9)
@@ -221,16 +217,16 @@ class OrbitalCanvas(Gtk.DrawingArea):
 
         frame_clock = self.get_frame_clock()
         if frame_clock:
-            self.view.frame_clock = frame_clock
+            self.app.frame_clock = frame_clock
             frame_clock = cast(Gdk.FrameClock, frame_clock)
-            self.view.fps = frame_clock.get_fps()
+            self.app.fps = frame_clock.get_fps()
                         
         width = self.get_allocated_width()
         height = self.get_allocated_height()
         
         try:
-            if self.view.secondary_body is not None and self.view.follow_tracked_body:
-                f = self.orbital.get_particle(self.view.secondary_body)
+            if self.app.secondary_body is not None and self.app.follow_tracked_body:
+                f = self.orbital.get_particle(self.app.secondary_body)
                 fpos = f.get_position()
                 self.camera.offset = [fpos.real, fpos.imag]
 
@@ -267,6 +263,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
                     self.hud_fg_renderers.remove(r)
                     raise e
                 cr.restore()
+
         except Exception as e:
             #print("EXCEPTION", e.wit)
             #raise SystemExit

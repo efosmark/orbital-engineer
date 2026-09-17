@@ -1,5 +1,5 @@
 import cairo
-from orbitalengineer.ui import model
+from orbitalengineer.ui.model import main
 from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.canvas import pz
 from orbitalengineer.ui.gtk4 import GObject, Graphene
@@ -8,11 +8,11 @@ from orbitalengineer.ipc.clock import SimClock
 from orbitalengineer.ipc.client import ClientSocketConnection
 
 class Renderer(GObject.GObject):
-    app:model.AppModel = GObject.Property(type=object) # type:ignore
+    app:main.AppModel = GObject.Property(type=object) # type:ignore
     camera = GObject.Property(type=object)
     orbital:ClientSocketConnection = GObject.Property(type=object) # type:ignore
     
-    def __init__(self, view:model.AppModel, camera:pz.Camera2D, orbital:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
+    def __init__(self, view:main.AppModel, camera:pz.Camera2D, orbital:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
         super().__init__()
         self.app = view
         self.camera = camera

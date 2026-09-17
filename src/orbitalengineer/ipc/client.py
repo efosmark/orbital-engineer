@@ -46,9 +46,16 @@ class ClientSocketConnection:
         self._prev = None
         self._uninitialized_bodies:list[message.ParticleInit] = []
 
-    def connect(self, host=SERVER_IPC_HOST, port=SERVER_IPC_PORT):
+    def connect(self, host=SERVER_IPC_HOST, port=SERVER_IPC_PORT, reset:bool=True):
+        self._host = host
+        self._port = port
         self.s.connect((host, port))
         logger.info("Connected to %s %s", host, port)
+        if reset:
+            self.send_message(message.MessageType.RESET)
+
+    def reconnect(self):
+        self.connect(host=self._host, port=self._port, reset=False)
     
     #def disconnect(self):
     #    return self.send_message(message.MessageType.DISCONNECT)

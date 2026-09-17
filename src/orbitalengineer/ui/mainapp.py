@@ -1,6 +1,7 @@
-from orbitalengineer.ui import model, ui_config
+from orbitalengineer.ui import ui_config
 from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.client_sync import ClientSyncController
+from orbitalengineer.ui.model import main
 from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 from orbitalengineer.ui.canvas import pz
 from orbitalengineer.ui.mainwindow import MainWindow
@@ -19,7 +20,7 @@ class App(Gtk.Application):
     def __init__(self, platform_id=-1, device_id=-1):
         super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)        
 
-        self.model = model.AppModel()
+        self.model = main.AppModel()
         self.client = ClientSocketConnection()
         self.sync_ctl = ClientSyncController(self.client, self.model.engine)
         
@@ -28,17 +29,21 @@ class App(Gtk.Application):
         
         self.model.engine.connect("notify::paused", self.on_paused_changed)
         self.model.engine.connect("notify::clock-speed", self.on_speed_changed)
-        self.connect("notify::show-grid", self.on_show_grid_changed)
         self.model.engine.connect("notify::max-speed", self.on_max_speed_changed)
+        self.model.connect("notify::show-grid", self.on_show_grid_changed)
+        self.model.cmap.connect('notify::cmap', self.on_color_map_changed)
         self.model.engine.paused = True
         self.platform_id = platform_id
         self.device_id = device_id
         self.client.set_device(platform_id, device_id)
 
-    def bootstrap(self):
-        self.client.connect()
+    def bootstrap(self, reset:bool=True):
+        self.client.connect(reset=reset)
         self.client.sync_full_state()
         self.model.osd.add_message("Ready.", duration=10.0, desc="Press [space] to start.")
+
+    def on_color_map_changed(self, model, param):
+        self.model.osd.add_message(f"Color Map: {self.model.cmap.cmap}")
 
     def on_max_speed_changed(self, model, param):
         #if self.view.max_speed < self.view.speed:
@@ -93,8 +98,6 @@ class App(Gtk.Application):
         )
         self.key_input = KeyInput(self, win)
         win.present()
-        if self.model.start_maximized:
-            win.maximize()
         return win
     
     def select_device(self):

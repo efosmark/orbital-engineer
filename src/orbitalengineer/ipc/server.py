@@ -32,7 +32,7 @@ class OrbitalControlServer:
 
     def initialize(self, particles):
         if self.orbital.is_initialized:
-            logger.warning("Already initialized. Re-initializing...")
+            logger.warning("Already initialized. Re-initializing with %s bodies...", len(particles))
             self.end()
             self.orbital.reset()
         self.enabled = True
@@ -137,14 +137,21 @@ class OrbitalControlServer:
         #self.pause()
 
     def _handle_request(self, conn:socket.socket, message_type:message.MessageType, payload):
+        
+        
         if message_type == message.MessageType.INIT_REQ:
             req = message.InitRequest.from_dict(payload)
             self.device = req.device
+            print({len(req.particles)})
             result = self.initialize(req.particles)
             if not result:
                 transport.send_message(conn, message.MessageType.ERROR, message.ErrorResponse(False, "Unable to initialize."))
                 return
             transport.send_message(conn, message.MessageType.INIT_RESP, self._get_init_response())
+
+        elif message_type == message.MessageType.RESET:
+            self.orbital.reset()
+            transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
         
         elif message_type == message.MessageType.SYNC_REQ:
             self.orbital.state.sync()

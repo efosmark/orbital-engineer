@@ -32,15 +32,15 @@ class SimController_CL:
     cfg:SimConfig
     
     def __init__(self):
-        self.cfg = SimConfig()
-        self.pipeline_state = SimState()
-        self.tr = EventTracer(self)
         self.metrics = MetricsProducer(config.METRIC_SOCKET_PATH)
-        self.shm = NamedSharedMemory()
+        self.tr = EventTracer(self)
         self.reset()
 
     def reset(self):
         self.is_initialized = False
+        self.cfg = SimConfig()
+        self.pipeline_state = SimState()
+        self.shm = NamedSharedMemory()
 
     def _init_queue(self):
         properties = cast(cl.command_queue_properties, 0)
@@ -101,6 +101,8 @@ class SimController_CL:
     @log_timing
     def init_sim(self, particles:Sequence[message.ParticleInit]):
         self.pipeline_state.N = len(particles)
+        self.pipeline_state.tick_id = 0
+        self.pipeline_state.step_id = 0
         self._init_queue()
         self.state = PrimaryStateVectors(self.shm, self.pipeline_state, self.ctx, self.q, self.tr)
         self.state.populate(particles)

@@ -3,7 +3,7 @@ from typing import cast
 import cairo
 
 from orbitalengineer.ui.canvas import renderer
-from orbitalengineer.ui.model import OSDMessage
+from orbitalengineer.ui.model.osd import OSDMessage
 
 SLIDE_IN_TIME = 0.1
 SLIDE_OUT_TIME = 0.25

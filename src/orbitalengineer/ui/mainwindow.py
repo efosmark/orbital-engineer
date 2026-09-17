@@ -3,7 +3,7 @@ from typing import Any, cast
 from orbitalengineer.ui import canvas, ui_config
 from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib
-from orbitalengineer.ui.model import AppModel
+from orbitalengineer.ui.model.main import AppModel
 from orbitalengineer.ipc.clock import SimClock
 from orbitalengineer.ipc.client import ClientSocketConnection
 

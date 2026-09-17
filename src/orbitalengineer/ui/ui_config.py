@@ -1,9 +1,9 @@
 
 APP_ID = "com.qmew.OrbitalEngineer"
 
-WINDOW_DEFAULT_SIZE = (700, 500)
+WINDOW_DEFAULT_SIZE = (1000, 800)
 
-DEFAULT_WINDOW_TITLE = "Orbital Engineer - dialog"
+DEFAULT_WINDOW_TITLE = "Orbital Engineer"
 
 DEFAULT_SCENARIO_FILE = "/tmp/scenario.json"
 

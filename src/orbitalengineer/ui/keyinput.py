@@ -1,6 +1,6 @@
 import cmath
 from typing import Any, cast
-from orbitalengineer.ui import model
+from orbitalengineer.ui.model import main
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, GObject
 
 
@@ -18,7 +18,7 @@ class KeyInput(GObject.GObject):
     def __init__(self, app, win:Gtk.ApplicationWindow):
         super().__init__()
         self.mainapp = app
-        self.app = cast(model.AppModel, self.mainapp.model)
+        self.app = cast(main.AppModel, self.mainapp.model)
         self.props.pressed_keys = set()
 
         controller = Gtk.EventControllerKey.new()
@@ -35,7 +35,7 @@ class KeyInput(GObject.GObject):
         if keyval == Gdk.KEY_Escape:
             self.on_escape()
         elif keyval == Gdk.KEY_l:
-            self.app.cycle_color_map(self.props.ctrl_held)
+            self.app.cmap.cycle(self.props.ctrl_held)
         elif keyval in [self.TAB_PREV, self.TAB_NEXT] and self.app.secondary_body is not None:    
             direction = -1 if keyval == self.TAB_PREV else 1
             self.cycle_particles(direction)
