@@ -1,5 +1,8 @@
 from typing import Any
 
+import numpy as np
+from numpy.typing import NDArray
+
 from orbitalengineer.engine import config
 from orbitalengineer.ipc.client import ClientSocketConnection
 from orbitalengineer.ui.gtk4 import GObject, GLib
@@ -37,6 +40,13 @@ class EngineModel(GObject.GObject):
     max_speed = GObject.Property(type=object)
     curr_tick_at = GObject.Property(type=float, default=0.0)
     next_tick_at = GObject.Property(type=float, default=0.0)
+
+    flags:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
+    position:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
+    velocity:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
+    mass:NDArray[np.float32] = GObject.Property(type=object) #type:ignore
+    radius:NDArray[np.float32] = GObject.Property(type=object) #type:ignore
+    force:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
 
     def increase_speed(self):
         idx = SPEED_SCALE.index(self.clock_speed) + 1
@@ -81,6 +91,14 @@ class ClientSyncController(GObject.GObject):
         self.model.next_tick_at = self.client.next_tick_at
         self.model.valid_indices = self.client.get_valid_indices()
         self.model.notify('valid-indices')
+        
+        self.model.flags = self.client.flags
+        self.model.position = self.client.position
+        self.model.velocity = self.client.velocity
+        self.model.mass = self.client.mass
+        self.model.radius = self.client.radius
+        self.model.force = self.client.force
+        
         
         return True
     

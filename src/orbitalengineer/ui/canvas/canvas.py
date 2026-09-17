@@ -6,7 +6,6 @@ from orbitalengineer import flags
 from orbitalengineer.ui.model import main
 from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
-from orbitalengineer.ui.canvas.render.cmap import MomentumColorizedRenderer
 from orbitalengineer.ui.canvas.render.gpu_status import GPUStatusRenderer
 from orbitalengineer.ui.canvas.render.osd import OSDRenderer
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene
@@ -160,7 +159,6 @@ class OrbitalCanvas(Gtk.DrawingArea):
             #HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
             #ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
             #CGroupRenderer(self.view, self.camera, self.orbital, self.clock),
-            MomentumColorizedRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             EllipseRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             ParticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             SelectionRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),

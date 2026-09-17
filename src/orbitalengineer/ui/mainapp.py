@@ -1,6 +1,7 @@
 from orbitalengineer.ui import ui_config
 from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.client_sync import ClientSyncController
+from orbitalengineer.ui.controller.cmap_ctl import ColorizedMapController
 from orbitalengineer.ui.model import main
 from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 from orbitalengineer.ui.canvas import pz
@@ -23,6 +24,7 @@ class App(Gtk.Application):
         self.model = main.AppModel()
         self.client = ClientSocketConnection()
         self.sync_ctl = ClientSyncController(self.client, self.model.engine)
+        self.cmap_ctl = ColorizedMapController(self.model)
         
         self.camera = pz.Camera2D()
         self.synth = ToneSynthController()
@@ -31,7 +33,9 @@ class App(Gtk.Application):
         self.model.engine.connect("notify::clock-speed", self.on_speed_changed)
         self.model.engine.connect("notify::max-speed", self.on_max_speed_changed)
         self.model.connect("notify::show-grid", self.on_show_grid_changed)
-        self.model.cmap.connect('notify::cmap', self.on_color_map_changed)
+        self.model.cmap.connect('notify::option', self.on_color_map_changed)
+        self.model.cmap.connect('notify::gamma', self.on_color_map_changed)
+        self.model.cmap.connect('notify::colormap', self.on_color_map_changed)
         self.model.engine.paused = True
         self.platform_id = platform_id
         self.device_id = device_id
@@ -43,7 +47,17 @@ class App(Gtk.Application):
         self.model.osd.add_message("Ready.", duration=10.0, desc="Press [space] to start.")
 
     def on_color_map_changed(self, model, param):
-        self.model.osd.add_message(f"Color Map: {self.model.cmap.cmap}")
+        mapping_type = self.model.cmap.option
+        colormap = self.model.cmap.colormap
+        
+        desc = None
+        if mapping_type is not None:
+            desc = f"Color map: {colormap}    Gamma: {self.model.cmap.gamma:.2f}"
+        
+        self.model.osd.add_message(f"Showing: {mapping_type.name if mapping_type else 'Normal'}", desc=desc)
+    
+    #def on_color_map_gamma_changed(self, model, param):
+    #    self.model.osd.add_message(f"Gamma: {self.model.cmap.gamma:.2f}")
 
     def on_max_speed_changed(self, model, param):
         #if self.view.max_speed < self.view.speed:

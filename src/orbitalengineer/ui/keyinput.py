@@ -44,13 +44,25 @@ class KeyInput(GObject.GObject):
         elif keyval in self.WASD_KEYS:
             self.on_wasd(keyval)
         elif keyval == Gdk.KEY_Left:
-            self.app.engine.decrease_speed()
+            if self.ctrl_held:
+                self.app.cmap.prev_colormap()
+            else:
+                self.app.engine.decrease_speed()
         elif keyval == Gdk.KEY_Right:
-            self.app.engine.increase_speed()
+            if self.ctrl_held:
+                self.app.cmap.next_colormap()
+            else:
+                self.app.engine.increase_speed()
         elif keyval == Gdk.KEY_Down:
-            self.mainapp.relative_zoom(0.9)
+            if self.ctrl_held:
+                self.app.cmap.decrease_gamma()
+            else:
+                self.mainapp.relative_zoom(0.9)
         elif keyval == Gdk.KEY_Up:
-            self.mainapp.relative_zoom(1 / 0.9)
+            if self.ctrl_held:
+                self.app.cmap.increase_gamma()
+            else:
+                self.mainapp.relative_zoom(1 / 0.9)
         elif keyval == Gdk.KEY_space:
             self.app.engine.paused = not self.app.engine.paused
         elif keyval == Gdk.KEY_f:

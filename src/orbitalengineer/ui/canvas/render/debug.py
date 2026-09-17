@@ -2,7 +2,6 @@ import math
 import statistics
 from dataclasses import dataclass
 from typing import cast
-from pathlib import Path
 import cairo
 
 from orbitalengineer.ui.canvas import renderer
@@ -22,7 +21,6 @@ TEXT_COLOR = (0.7, 0.7, 0.7)
 CRITICAL_TEXT_COLOR = (0.8, 0.2, 0.2)
 WARNING_TEXT_COLOR = (0.8, 0.7, 0.2)
 BORDER_COLOR = (0.1, 0.1, 0.1)
-
 
 NOMINAL = 0
 WARNING = 1
@@ -46,21 +44,6 @@ FRAME_RATE_THRESHOLD:ThresholdProfile_T = [
     (0,    CRITICAL),
     (10,   WARNING),
     (15,   NOMINAL)
-]
-
-GPU_TEMP_THRESHOLD:ThresholdProfile_T = [
-    (75,   WARNING),
-    (90,   CRITICAL)
-]
-
-GPU_ACTIVITIY_THRESHOLD:ThresholdProfile_T = [
-    (85,   WARNING),
-    (95,   CRITICAL)
-]
-
-GPU_POWER_THRESHOLD:ThresholdProfile_T = [
-    (40,   WARNING),
-    (50,   CRITICAL)
 ]
 
 def get_threshold(value, tmap:list[tuple[float,int]]):
@@ -88,7 +71,6 @@ class DebugDisplayField:
     precision:int = 0
     unit:str|None = None
     threhold_profile:ThresholdProfile_T|None = None
-
 
 class DebugInfoRenderer(renderer.Renderer):
 
@@ -123,7 +105,6 @@ class DebugInfoRenderer(renderer.Renderer):
             DebugDisplayField("Rate",     fps, 1, "/s", FRAME_RATE_THRESHOLD),
             DebugDisplayField("Interval", frame_interval_ms, 1, 'ms')
         ])
-
 
         try:
             display.extend([
