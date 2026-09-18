@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from orbitalengineer.ui.gtk4 import GObject
 
-COLORMAPS:list[str] = ['hot', 'afmhot', 'plasma', 'gnuplot2', 'viridis', 'cividis', 'gist_rainbow']
+COLORMAPS:list[str] = ['afmhot', 'plasma', 'gnuplot2', 'viridis', 'magma', 'gist_rainbow']
 
 @dataclass
 class CMapOption:
