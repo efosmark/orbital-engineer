@@ -13,7 +13,7 @@ DV_MAX = 1e10
 # Simulation Settings
 #############################################
 
-COEF_OF_RESTITUTION = 0.99
+COEF_OF_RESTITUTION = 0.98
 GRAV_CONSTANT = 1.0
 MAX_NUM_CONTACTS_PER_BODY = 8
 

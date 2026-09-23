@@ -30,9 +30,7 @@ class LedgerController(PipelineComponent):
         ledger_entry_count = self.get_host_vector(self.ledger_entry_count, sync=True)[0]
         
         num_entries = ledger_entry_count - self.last_ledger_entry_committed
-        
-        if num_entries == 0:
-            return
+        if num_entries == 0: return
         
         evt = self._commit_ledger(
                 self.queue,

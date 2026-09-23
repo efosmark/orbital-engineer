@@ -146,7 +146,4 @@ class BouncePipeline(PipelineComponent):
 
     def __call__(self, state:PrimaryStateVectors, interact:InteractionPipeline, contacting: FindContactingBodiesPipeline, cgroup:CGroupPipeline, distance: DistancePipeline, velocity_along_normal: VelocityAlongNormalPipeline, ledger:LedgerController):
         cl.enqueue_copy(self.queue, self._velocity_intermediate, np.zeros(self.N, dtype=np.complex64))
-        self.collide_bounce_single(state, interact, ledger)
-        #self.collide_bounce_simple(state, interact, distance, velocity_along_normal)
-        #self.compute_impulse(flags, position, velocity, mass, contacting, cgroup)
-        
+        self.collide_bounce_single(state, interact, ledger)        

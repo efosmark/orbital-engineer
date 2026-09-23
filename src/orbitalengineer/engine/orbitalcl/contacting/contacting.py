@@ -1,7 +1,7 @@
 import pyopencl as cl
 import numpy as np
-from orbitalengineer.engine import config, logger
 from orbitalengineer import flags
+from orbitalengineer.engine.config import MAX_NUM_CONTACTS_PER_BODY
 from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
 from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
 from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
@@ -13,10 +13,6 @@ class FindContactingBodiesPipeline(PipelineComponent):
 
     def initialize(self):
         self._find_contacting_bodies = self._load_kernel("find_contacting_bodies", KERNEL_FILE_LOCATION)
-        self._find_contacting_bodies_reduce = self._load_kernel("find_contacting_bodies_reduce", KERNEL_FILE_LOCATION)
-        
-        self._num_contacts_by_lane = self.alloc(self.N * self.N, dtype=np.uint32)
-        self._contacts_by_lane = self.alloc(self.N * self.N, dtype=np.uint32)        
         self.n_direct_contacts = self.alloc(self.N, dtype=np.uint32)
         self.direct_contacts = self.alloc(self.N * self.N, dtype=np.uint32)
         
@@ -64,52 +60,9 @@ class FindContactingBodiesPipeline(PipelineComponent):
             np.uint32(self.N),
             state.flags,
             distance.is_touching,
-            self._num_contacts_by_lane,
-            self._contacts_by_lane
-        )
-
-        self._find_contacting_bodies_reduce(
-            self.queue,
-            (self.N, ),  # global work size
-            None,        # local work size
-            
-            # Args
-            np.uint32(self.N),
-            np.uint32(self.Lx),
-            state.flags,
-            self._num_contacts_by_lane,
-            self._contacts_by_lane,
             self.n_direct_contacts,
             self.direct_contacts
         )
-    
-    def find_contacting_bodies_on_host(self, state:PrimaryStateVectors, distance:DistancePipeline):
-        """SLOW. Useful for testing and that's about it."""
-
-        with self.tr("find_contacting_bodies_on_host"):
-            state.sync()
-
-            n_direct_contacts = self.get_host_vector(self.n_direct_contacts, sync=True)
-            direct_contacts = self.get_host_vector(self.direct_contacts, sync=True)
-            is_touching = distance.get_host_vector(distance.is_touching, sync=True)
-        
-            ix, jx = np.triu_indices(self.N, k=1)
-            
-            for n in range(ix.size):
-                i, j = ix[n], jx[n]    
-                if is_touching[(self.N * i) + j]:
-                    if n_direct_contacts[i] >= config.MAX_NUM_CONTACTS_PER_BODY or n_direct_contacts[j] >= config.MAX_NUM_CONTACTS_PER_BODY:
-                        break
-                    
-                    direct_contacts[n_direct_contacts[i]] = j
-                    direct_contacts[n_direct_contacts[j]] = i
-                    
-                    n_direct_contacts[i] += 1
-                    n_direct_contacts[j] += 1
-
-            self.sync_to_device(self.n_direct_contacts).wait()
-            self.sync_to_device(self.direct_contacts).wait()
-
 
     def __call__(self, state:PrimaryStateVectors, distance:DistancePipeline):
         self.find_contacting_bodies(state, distance)
