@@ -1,5 +1,4 @@
 from multiprocessing import shared_memory
-from pathlib import Path
 from numpy.typing import NDArray
 import numpy as np
 
@@ -16,7 +15,7 @@ class NamedSharedMemory:
     def __getitem__(self, key) -> shared_memory.SharedMemory:
         return self.shm[key]
 
-    def create_shared_memory(self, field_name:str, size:int, dtype:type) -> NDArray:
+    def create_shared_memory(self, field_name:str, size:int, dtype:type|np.dtype) -> NDArray:
         t = np.dtype(dtype)
         logger.info("shm: %s size=%s dtype=%s", field_name, size, t)
         self.shm[field_name] = shared_memory.SharedMemory(create=True, size=t.itemsize * size)

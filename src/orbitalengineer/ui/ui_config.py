@@ -1,7 +1,7 @@
 
 APP_ID = "com.qmew.OrbitalEngineer"
 
-WINDOW_DEFAULT_SIZE = (1000, 800)
+WINDOW_DEFAULT_SIZE = (1000, 500)
 
 DEFAULT_WINDOW_TITLE = "Orbital Engineer"
 

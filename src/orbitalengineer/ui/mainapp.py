@@ -1,7 +1,9 @@
+from orbitalengineer import flags
 from orbitalengineer.ui import ui_config
 from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.client_sync import ClientSyncController
 from orbitalengineer.ui.controller.cmap_ctl import ColorizedMapController
+from orbitalengineer.ui.controller.ledger_ctl import LedgerMonitor
 from orbitalengineer.ui.model import main
 from orbitalengineer.ui.select_device_window import SelectDeviceWindow
 from orbitalengineer.ui.canvas import pz
@@ -18,6 +20,9 @@ class App(Gtk.Application):
     platform_id = GObject.Property(type=int, default=-1)
     device_id = GObject.Property(type=int, default=-1)
     
+    bouncing = GObject.Signal(name='bouncing', arg_types=(object,),)
+    merging = GObject.Signal(name='merging', arg_types=(object,),)
+    
     def __init__(self, platform_id=-1, device_id=-1):
         super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)        
 
@@ -25,6 +30,9 @@ class App(Gtk.Application):
         self.client = ClientSocketConnection()
         self.sync_ctl = ClientSyncController(self.client, self.model.engine)
         self.cmap_ctl = ColorizedMapController(self.model)
+
+        self.ledger_ctl = LedgerMonitor(self.model, self.model.ledger)
+        self.ledger_ctl.connect('new-entry', self.on_ledger_entry_added)
         
         self.camera = pz.Camera2D()
         self.synth = ToneSynthController()
@@ -41,10 +49,18 @@ class App(Gtk.Application):
         self.device_id = device_id
         self.client.set_device(platform_id, device_id)
 
+    def on_ledger_entry_added(self, m, le):
+        if le.action&flags.BOUNCE:
+            self.emit('bouncing', le)
+        elif (le.action&flags.MERGE_AS_PRIMARY) or (le.action&flags.MERGE_AS_SECONDARY):
+            self.emit('merging', le)
+
     def bootstrap(self, reset:bool=True):
         self.client.connect(reset=reset)
         self.client.sync_full_state()
-        self.model.osd.add_message("Ready.", duration=10.0, desc="Press [space] to start.")
+
+    def show_message(self, message:str, duration:float=1, desc:str|None=None):
+        self.model.osd.add_message(message, duration=duration, desc=desc)
 
     def on_color_map_changed(self, model, param):
         mapping_type = self.model.cmap.option
@@ -55,9 +71,6 @@ class App(Gtk.Application):
             desc = f"Color map: {colormap}    Gamma: {self.model.cmap.gamma:.2f}"
         
         self.model.osd.add_message(f"Showing: {mapping_type.name if mapping_type else 'Normal'}", desc=desc)
-    
-    #def on_color_map_gamma_changed(self, model, param):
-    #    self.model.osd.add_message(f"Gamma: {self.model.cmap.gamma:.2f}")
 
     def on_max_speed_changed(self, model, param):
         #if self.view.max_speed < self.view.speed:
@@ -141,19 +154,6 @@ class App(Gtk.Application):
         self.model.secondary_body = particle_id
         self.model.osd.add_message(f"Focus: {particle_id}", duration=0.5)
 
-        # win = self.props.active_window
-        # if not win:
-        #     available_size = 300
-        # else:
-        #     available_size = min(win.get_allocated_height(), win.get_allocated_width()) * 0.25
-        # radius = b.get_radius()
-        # diameter = 3 * radius
-        #if self.view.follow_tracked_body:
-        #    if diameter * self.camera.zoom > available_size:
-        #        self.camera.zoom = available_size / diameter
-        #    elif diameter * self.camera.zoom < 10:
-        #        self.camera.zoom = 10 / diameter
-
     def tick_once(self):
         if not hasattr(self, '_last_tick'):
             self._last_tick = None
@@ -168,17 +168,6 @@ class App(Gtk.Application):
     
     def relative_zoom(self, factor):
         self.camera.zoom_at(0, 0, 0, 0, factor)
-
-    # def on_collision(self, event:BouncingCollisionEvent):
-    #     r1 = self.client.get_particle(event.i).get_radius()
-    #     r2 = self.client.get_particle(event.j).get_radius()
-    #     size = min(r1, r2)/2.0
-    #     self.view.pinpoint.append(model.Pinpoint(
-    #         position=event.collision_point,
-    #         start=self.clock.time(),
-    #         until=self.clock.time() + 0.1,
-    #         radius=size * self.camera.zoom
-    #     ))
 
     # def to_dict(self) -> dict:
     #     return {

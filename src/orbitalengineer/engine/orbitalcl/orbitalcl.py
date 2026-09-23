@@ -1,12 +1,14 @@
 from typing import Sequence, cast
 from pathlib import Path
 import pyopencl as cl
+import numpy as np
 
 from orbitalengineer.engine import log_timing, logger, config
 from orbitalengineer.engine.exception import InitKernelException
 from orbitalengineer.engine.metric import MetricsProducer
 
 from orbitalengineer.engine.orbitalcl import flags
+from orbitalengineer.engine.orbitalcl.ledger.ledger import LedgerController
 from orbitalengineer.engine.orbitalcl.named_shared_memory import NamedSharedMemory
 from orbitalengineer.engine.orbitalcl.cgroup.cgroup import CGroupPipeline
 from orbitalengineer.engine.orbitalcl.contacting.contacting import FindContactingBodiesPipeline
@@ -76,6 +78,7 @@ class SimController_CL:
         
         args = [self.shm, self.pipeline_state, self.ctx, self.q, self.tr, build_options]        
         try:
+            self._ledger = LedgerController(*args)
             self._velocity = VelocityPipeline(*args)
             self._position = PositionPipeline(*args)
             self._bounce = BouncePipeline(*args)
@@ -145,13 +148,14 @@ class SimController_CL:
            self._contacting(self.state, self._edge_distance)
         
         if config.COLLISION_MERGE_ENABLE:
-           self._merge(self.state, self._contacting, self._edge_distance)
+           self._merge(self.state, self._contacting, self._edge_distance, self._ledger)
         
         if config.COLLISION_BOUNCE_ENABLE:
             self._velocity_along_normal(self.state)
-            self._bounce(self.state, self._interaction, self._contacting, self._cgroup, self._edge_distance, self._velocity_along_normal)
+            self._bounce(self.state, self._interaction, self._contacting, self._cgroup, self._edge_distance, self._velocity_along_normal, self._ledger)
 
         self.compute_interaction_dt(dt)
+        self._ledger.commit(self.pipeline_state.tick_id, self.pipeline_state.step_id) #.wait()
         return dt
     
     def single_step(self, dt_step):
@@ -179,6 +183,7 @@ class SimController_CL:
             raise e
 
         if count > 0:
+            #self._ledger.read_ledger()
             self.emit_metrics(float(dt_step))
             self.pipeline_state.tick_id += 1
             self.pipeline_state.step_id = 0
@@ -194,6 +199,7 @@ class SimController_CL:
             { "name":t["name"], "duration_ms":round(t["duration_ns"]/1e6, 6)}
             for t in timeline
         ], dt_step=round(float(dt_step_size), 6))
+
 
     # def to_dict(self) -> dict:
     #     self.sync()

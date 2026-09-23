@@ -13,6 +13,7 @@ class SimConfig:
     MAX_NUM_CONTACTS_PER_BODY:int = config.MAX_NUM_CONTACTS_PER_BODY
     ENABLE_PROFILING:bool = config.ENABLE_PROFILING
     TARGET_TICKS_PER_SECOND:int = config.TARGET_TICKS_PER_SECOND
+    LEDGER_SIZE:int = config.LEDGER_SIZE
 
     def as_build_contants(self):
         defs = dict()

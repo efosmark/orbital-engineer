@@ -6,6 +6,7 @@ from orbitalengineer.engine.orbitalcl.contacting.contacting import FindContactin
 from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
 from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
 from orbitalengineer.engine.orbitalcl.interaction.interaction import InteractionPipeline
+from orbitalengineer.engine.orbitalcl.ledger.ledger import LedgerController
 from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
 from orbitalengineer.engine.orbitalcl.velocity_along_normal.velocity_along_normal import VelocityAlongNormalPipeline
 
@@ -101,7 +102,7 @@ class BouncePipeline(PipelineComponent):
         )
         cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
 
-    def collide_bounce_single(self,  state:PrimaryStateVectors, interact:InteractionPipeline):
+    def collide_bounce_single(self,  state:PrimaryStateVectors, interact:InteractionPipeline, ledger:LedgerController):
         self._collide_bounce_single(
             self.queue,
             state.grid_stride_global_size,
@@ -115,7 +116,9 @@ class BouncePipeline(PipelineComponent):
             state.mass,
             state.radius,
             interact.dt_until_collision,
-            self._velocity_intermediate
+            self._velocity_intermediate,
+            ledger.ledger_entry_count,
+            ledger.ledger
         )
         cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
 
@@ -141,9 +144,9 @@ class BouncePipeline(PipelineComponent):
         cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
 
 
-    def __call__(self, state:PrimaryStateVectors, interact:InteractionPipeline, contacting: FindContactingBodiesPipeline, cgroup:CGroupPipeline, distance: DistancePipeline, velocity_along_normal: VelocityAlongNormalPipeline):
+    def __call__(self, state:PrimaryStateVectors, interact:InteractionPipeline, contacting: FindContactingBodiesPipeline, cgroup:CGroupPipeline, distance: DistancePipeline, velocity_along_normal: VelocityAlongNormalPipeline, ledger:LedgerController):
         cl.enqueue_copy(self.queue, self._velocity_intermediate, np.zeros(self.N, dtype=np.complex64))
-        self.collide_bounce_single(state, interact)
+        self.collide_bounce_single(state, interact, ledger)
         #self.collide_bounce_simple(state, interact, distance, velocity_along_normal)
         #self.compute_impulse(flags, position, velocity, mass, contacting, cgroup)
         

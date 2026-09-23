@@ -8,5 +8,5 @@ __kernel void compute_position(
 ) {
     uint i = get_global_id(0);
     if ((flags[i]&REMOVED)) return;
-    position[i] += velocity[i] * dt;
+    position[i] += (flags[i]&FIXED_POSITION) ? 0.0f : velocity[i] * dt;
 }

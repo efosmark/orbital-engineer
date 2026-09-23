@@ -28,7 +28,6 @@ class OrbitalKernel(cl.Kernel):
         allow_empty_ndrange: bool = False,
         global_offset: tuple[int, ...] | None = None,
     ) -> cl.Event:
-        #print(self.function_name, flush=True)
         return self.tr.add(
             self.function_name,
             super().__call__(
@@ -41,20 +40,19 @@ class OrbitalKernel(cl.Kernel):
                 allow_empty_ndrange=allow_empty_ndrange,
                 global_offset=global_offset
             )
-        ).wait()
+        ) #.wait()
 
 class PipelineComponent:
     Lx:int = 256
     debug_flag:str = '_'
     
-    
-    pipeline_run_id:int = 0
     dependencies:list['PipelineComponent']|None = None 
     
     def __init__(self, shm:NamedSharedMemory, pipeline_state:SimState, ctx:cl.Context, queue:cl.CommandQueue, tr:EventTracer, build_options:Sequence|None=None):
         self.N = pipeline_state.N
         if self.N < self.Lx: self.Lx = self.N
         
+        self.pipeline_state = pipeline_state
         self.shm = shm
         self.default_build_options = build_options or ['-cl-std=CL2.0']
         self.ctx = ctx
@@ -64,7 +62,7 @@ class PipelineComponent:
         self._check_debug_flag()
         self.initialize()
         
-    def alloc(self, size:int, dtype:type, fill:Sequence|None=None, shared_name:None|str=None) -> cl.Buffer:
+    def alloc(self, size:int, dtype:type|np.dtype, fill:Sequence|None=None, shared_name:None|str=None) -> cl.Buffer:
         if shared_name is not None:
             vec = self.shm.create_shared_memory(shared_name, size, dtype)
         elif fill is not None:
@@ -86,19 +84,6 @@ class PipelineComponent:
     
     def sync_to_device(self, buffer: cl.Buffer) -> cl.Event:
         return cl.enqueue_copy(self.queue, buffer, self.get_host_vector(buffer))
-    
-    # def add_dependency(self, dep: 'CLPipelineStep'):
-    #     if self.dependencies is None:
-    #         self.dependencies = []
-    #     if dep not in self.dependencies:
-    #         self.dependencies.append(dep)
-    
-    # def _run_dependencies(self):
-    #     if self.dependencies is None:
-    #         return
-    #     for dep in self.dependencies:
-    #         if dep.pipeline_run_id < self.pipeline_run_id:
-    #             dep.run_pipeline_step(self.pipeline_run_id)
     
     def _check_debug_flag(self):
         debug_flags = os.environ.get("DEBUG", "").lower()

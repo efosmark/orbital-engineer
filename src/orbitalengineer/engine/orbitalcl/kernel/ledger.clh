@@ -1,0 +1,71 @@
+#ifndef LEDGER_CLH_
+#define LEDGER_CLH_
+
+// NOTE: This needs to match with the dataclass on the Python side.
+//       Be sure to update in both places.
+typedef struct {
+    uint id;
+    uint i;
+    uint j;
+    uint action;
+    uint tick_id;
+    uint step_id;
+} LedgerEntry;
+
+
+/**
+ *  SUB-GROUP-level ledger entry allocation.
+ *
+ *  1. Assign an offset to each work-item based on the number of events.
+ *     Just one per work-item max right now. Uses *_scan_exclusive_add.
+ *  2. Single atomic operation increment the base global count.
+ *     One atomic operation per sub-group.
+ *  3. Apply that base to the offset for each work-item so they have unique slots.
+ * 
+ */
+inline void write_ledger(
+    bool should_emit,
+    uint i,
+    uint j,
+    uint action,
+    __global atomic_uint* global_count,
+    __global LedgerEntry* ledger
+) {
+    uint emit = should_emit ? 1 : 0;
+
+    // Where am I among the emitting lanes?
+    uint offset = sub_group_scan_exclusive_add(emit);
+
+    // How many events did this subgroup produce?
+    uint count = sub_group_reduce_add(emit);
+
+    // One atomic allocation for the entire subgroup.
+    uint base = 0;
+    if (get_sub_group_local_id() == 0 && count)
+        base = atomic_fetch_add(global_count, count);
+    base = sub_group_broadcast(base, 0);
+
+    // Every emitting lane now has a unique global destination.
+    if (emit) {
+        uint id = base + offset;
+        uint ledger_index = id % LEDGER_SIZE;
+        LedgerEntry* evt = &ledger[ledger_index];
+        evt->id = id;
+        evt->i = i;
+        evt->j = j;
+        evt->action = action;
+        evt->tick_id = 0;
+        evt->step_id = 0;
+        #ifdef DEBUG_LEDGER
+        printf("ledger[%u] = LedgerEvent(%u, %u, %u, %u)", ledger_index, evt.id, evt.i, evt.j, evt.action);
+        #endif
+    }
+}
+
+#define WRITE_LEDGER(SHOULD_EMIT, I, J, ACTION_FLAGS)                      \
+    do {                                                                   \
+        uint action = (ACTION_FLAGS);                                      \
+        write_ledger(SHOULD_EMIT, I, J, action, global_count, ledger);     \
+    } while (0)
+
+#endif // LEDGER_CLH_

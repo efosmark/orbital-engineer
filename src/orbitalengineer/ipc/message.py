@@ -1,6 +1,8 @@
 from dataclasses import dataclass, fields
 from enum import IntEnum
-from typing import Literal, Self, Sequence, Protocol
+from typing import Any, Literal, Self, Sequence, Protocol
+import numpy as np
+
 from orbitalengineer.engine.orbitalcl.device import GPUStatus
 from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
 from orbitalengineer.ipc.clock import SimClock
@@ -77,9 +79,16 @@ class ShiftVectorsRequest:
 @dataclass
 class SharedMemoryInfo:
     name:str
-    dtype:str
+    dtype:str|list[tuple]
     size:int
     shape:list[int]|tuple[int]
+    
+    @classmethod
+    def from_dict(cls, d:dict) -> Self:
+        # Numpy requires list[tuple], but serialization turns them into lists of lists
+        if not isinstance(d['dtype'], str):
+            d['dtype'] = [(k,v) for k,v in d['dtype']]
+        return cls(**d)
 
 @dataclass
 class SharedMemoryResponse:
@@ -89,12 +98,13 @@ class SharedMemoryResponse:
     mass: SharedMemoryInfo
     radius: SharedMemoryInfo
     force: SharedMemoryInfo
+    ledger: SharedMemoryInfo
     #cgroup: SharedMemoryInfo
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:
         d = dict([
-            (f.name, SharedMemoryInfo(**d[f.name]))
+            (f.name, SharedMemoryInfo.from_dict(d[f.name]))
             for f in fields(cls)
         ])
         return cls(**d)

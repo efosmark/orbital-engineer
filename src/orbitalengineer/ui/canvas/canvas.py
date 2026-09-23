@@ -3,6 +3,7 @@ from typing import cast
 import numpy as np
 
 from orbitalengineer import flags
+from orbitalengineer.ui.canvas.render.event_ledger import EventLedgerRenderer
 from orbitalengineer.ui.model import main
 from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
@@ -152,19 +153,18 @@ class OrbitalCanvas(Gtk.DrawingArea):
         
         self.hud_renderers = [
             BackgroundRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            GridRenderer(self.app, self.camera, self.orbital, self.clock, self.synth)
+            GridRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            EventLedgerRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
         ]
         
         self.scene_renderers = [
             #HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
             #ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
-            #CGroupRenderer(self.view, self.camera, self.orbital, self.clock),
             EllipseRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             ParticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             SelectionRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             ReticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             #PinpointRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            #CGroupConnectionRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
         ]
         
         self.hud_fg_renderers = [

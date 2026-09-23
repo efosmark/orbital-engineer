@@ -47,6 +47,7 @@ class EngineModel(GObject.GObject):
     mass:NDArray[np.float32] = GObject.Property(type=object) #type:ignore
     radius:NDArray[np.float32] = GObject.Property(type=object) #type:ignore
     force:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
+    ledger:NDArray = GObject.Property(type=object) #type:ignore
 
     def increase_speed(self):
         idx = SPEED_SCALE.index(self.clock_speed) + 1
@@ -98,12 +99,10 @@ class ClientSyncController(GObject.GObject):
         self.model.mass = self.client.mass
         self.model.radius = self.client.radius
         self.model.force = self.client.force
-        
-        
+        self.model.ledger = self.client.ledger
         return True
     
     def on_clock_speed_changed(self, model, param):
-        print('on_clock_speed_changed', self.model.clock_speed)
         if not self.model.is_initialized: return
         self.client.set_clock_speed(self.model.clock_speed)
         #return True

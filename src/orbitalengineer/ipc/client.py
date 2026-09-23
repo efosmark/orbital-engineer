@@ -38,6 +38,7 @@ class ClientSocketConnection:
     mass:NDArray[np.float32]
     radius:NDArray[np.float32]
     force:NDArray[np.complex64]
+    ledger:NDArray
     #cgroup:NDArray[np.uint32]
     
     def __init__(self):
@@ -124,8 +125,11 @@ class ClientSocketConnection:
             shm_state = cast(message.SharedMemoryInfo, getattr(shared, f.name))
             shm = shared_memory.SharedMemory(name=shm_state.name, size=shm_state.size, track=False)            
             self._shared[f.name] = shm
-            setattr(self, f.name, np.ndarray(shm_state.shape, dtype=shm_state.dtype, buffer=shm.buf))
-            logger.info("Connected memory %s %s %s %s %s", f.name, shm_state.name, shm_state.size, shm_state.dtype, shm_state.shape)
+            
+            dtype = np.dtype(shm_state.dtype, align=True)
+
+            setattr(self, f.name, np.ndarray(shm_state.shape, dtype=dtype, buffer=shm.buf))
+            logger.info("Connected memory %s %s %s %s %s", f.name, shm_state.name, shm_state.size, dtype, shm_state.shape)
 
     def sync_full_state(self):
         return self.send_message(transport.MessageType.STATE_REQ)
@@ -219,8 +223,7 @@ class ClientSocketConnection:
         )
 
     def rel_velocity(self, ids:Sequence[int], offset:complex):
-        if not self.is_initialized:
-            return False
+        if not self.is_initialized: return False
         self.send_message(
             message.MessageType.SHIFT_VECTOR_REQ,
             message.ShiftVectorsRequest(
@@ -232,8 +235,7 @@ class ClientSocketConnection:
         )
 
     def rel_mass(self, ids:Sequence[int], offset:float):
-        if not self.is_initialized:
-            return False
+        if not self.is_initialized: return False
         self.send_message(
             message.MessageType.SHIFT_VECTOR_REQ,
             message.ShiftVectorsRequest(

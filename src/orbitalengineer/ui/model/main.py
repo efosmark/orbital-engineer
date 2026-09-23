@@ -6,6 +6,7 @@ import numpy as np
 
 from orbitalengineer.ui.client_sync import EngineModel
 from orbitalengineer.ui.gtk4 import GObject
+from orbitalengineer.ui.model.ledger import LedgerModel
 from orbitalengineer.ui.model.osd import OnScreenDisplayModel
 from orbitalengineer.ui.model.cmap import ColorMapModel
 
@@ -25,6 +26,7 @@ class AppModel(GObject.GObject):
     osd:OnScreenDisplayModel
     engine:EngineModel
     cmap:ColorMapModel
+    ledger:LedgerModel
     
     secondary_body = GObject.Property(type=object, default=None)
     follow_tracked_body = GObject.Property(type=bool, default=True)
@@ -62,6 +64,7 @@ class AppModel(GObject.GObject):
         self.engine = EngineModel()
         self.osd = OnScreenDisplayModel()
         self.cmap = ColorMapModel()
+        self.ledger = LedgerModel()
         
         self.props.particle_colors = {}
         self.props.particle_names = {}

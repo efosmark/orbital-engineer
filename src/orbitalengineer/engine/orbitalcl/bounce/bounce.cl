@@ -1,6 +1,7 @@
 #include "kernel/stride.clh"
 #include "flags.clh"
 #include "kernel/complex.clh" // needed for creal, cmul, cconj
+#include "kernel/ledger.clh"
 
 inline float relative_speed_along_normal(
     const uint i,
@@ -240,7 +241,9 @@ __kernel void compute_bouncing_collision_single(
     __global const float*  restrict mass,
     __global const float*  restrict radius,
     __global const float2* restrict time_until_contact,
-    __global       float2* restrict velocity_intermediate
+    __global       float2* restrict velocity_intermediate,
+    __global       atomic_uint* global_count,
+    __global LedgerEntry*  restrict ledger
 ) {
     GRID_STRIDE_INIT();
 
@@ -252,6 +255,7 @@ __kernel void compute_bouncing_collision_single(
     }
 
     float scalar_impulse_magnitude_max = 0.0f;
+    uint j_max = i;
     float2 r_norm_max = (float2)(0.0f, 0.0f);
     float inv_mass_i = 1.0f / mass[i];
 
@@ -294,6 +298,7 @@ __kernel void compute_bouncing_collision_single(
         if (scalar_impulse_magnitude <= scalar_impulse_magnitude_max) {
             scalar_impulse_magnitude_max = scalar_impulse_magnitude;
             r_norm_max = r_norm;
+            j_max = j;
         }
     );
   
@@ -321,6 +326,8 @@ __kernel void compute_bouncing_collision_single(
     //if (i > 0 && src_lane != 0) {
     //    printf("i=%u  src_lane=%u", i, src_lane);
     //}
+
+    WRITE_LEDGER((i != j_max && lane == src_lane), i, j_max, BOUNCE);
     
     if (lane == src_lane) {
         //if (i == 2) printf("(%u) |si|_wg=%.2f  lane=%u  src_lane=%u", i, wg_scalar_impulse_magnitude_max, lane, src_lane);
@@ -375,7 +382,6 @@ __kernel void compute_bouncing_collision_simple(
 
         if (edge_dist[IDX] > EPS_DIST) continue;
         if (v_along_norm[IDX] >= 0) continue;
-
 
         float inv_mass_sum = (inv_mass_i + (1.0f / mass[j]));
         float scalar_impulse_magnitude = ((1.0f + COEF_OF_RESTITUTION) * v_along_norm[IDX]) / inv_mass_sum;

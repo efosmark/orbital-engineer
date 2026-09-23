@@ -67,9 +67,10 @@ class OrbitalControlServer:
         vec = self.orbital.shm.vec.get(field)
         if vec is None:
             raise Exception(f"Shared memory {field} vector does not exist.")
+        
         return message.SharedMemoryInfo(
             name=self.orbital.shm[field].name,
-            dtype=str(vec.dtype),
+            dtype=vec.dtype.name if vec.dtype.isbuiltin else vec.dtype.descr,
             size=vec.size,
             shape=vec.shape
         )
@@ -92,6 +93,7 @@ class OrbitalControlServer:
             mass=self._get_shared_memory_info('mass'),
             radius=self._get_shared_memory_info('radius'),
             force=self._get_shared_memory_info('force'),
+            ledger=self._get_shared_memory_info('ledger'),
             #cgroup=self._get_shared_memory_info('cgroup'),
         )
 
@@ -137,8 +139,6 @@ class OrbitalControlServer:
         #self.pause()
 
     def _handle_request(self, conn:socket.socket, message_type:message.MessageType, payload):
-        
-        
         if message_type == message.MessageType.INIT_REQ:
             req = message.InitRequest.from_dict(payload)
             self.device = req.device
@@ -155,6 +155,7 @@ class OrbitalControlServer:
         
         elif message_type == message.MessageType.SYNC_REQ:
             self.orbital.state.sync()
+            self.orbital._ledger.sync()
             transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
 
         elif message_type == message.MessageType.STATUS_REQ:
