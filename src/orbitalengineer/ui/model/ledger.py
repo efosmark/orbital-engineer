@@ -3,6 +3,8 @@ import time
 from typing import Any
 from orbitalengineer.ui.gtk4 import GObject
 
+import numpy as np
+
 DISPLAY_DURATION = 15.0
 
 @dataclass
@@ -15,6 +17,8 @@ class LedgerEntry:
     tick_id:int = 0
     step_id:int = 0
     
+    base:np.dtype|None=None
+    
     @classmethod
     def from_dtype(cls, ledger_dtype):
         return cls(
@@ -24,6 +28,7 @@ class LedgerEntry:
             action=ledger_dtype['action'],
             tick_id=ledger_dtype['tick_id'],
             step_id=ledger_dtype['step_id'],
+            base=ledger_dtype
         )
         
     def __str__(self):

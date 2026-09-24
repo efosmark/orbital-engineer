@@ -53,6 +53,8 @@ class App(Gtk.Application):
         if le.action&flags.BOUNCE:
             self.emit('bouncing', le)
         elif (le.action&flags.MERGE_AS_PRIMARY) or (le.action&flags.MERGE_AS_SECONDARY):
+            if le.i == self.model.secondary_body and (le.action&flags.REMOVED):
+                self.shift_focus(le.j)
             self.emit('merging', le)
 
     def bootstrap(self, reset:bool=True):
