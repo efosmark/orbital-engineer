@@ -6,6 +6,10 @@ from numpy.typing import NDArray
 import pyopencl as cl
 from pyopencl import typing
 
+mf = cl.mem_flags
+
+DEFAULT_MEM_FLAGS = mf.READ_WRITE|mf.COPY_HOST_PTR
+
 from orbitalengineer.engine.orbitalcl.named_shared_memory import NamedSharedMemory
 from orbitalengineer.engine.orbitalcl.sim_state import SimState
 from orbitalengineer.engine.orbitalcl.tracer import EventTracer
@@ -62,14 +66,14 @@ class PipelineComponent:
         self._check_debug_flag()
         self.initialize()
         
-    def alloc(self, size:int, dtype:type|np.dtype, fill:Sequence|None=None, shared_name:None|str=None) -> cl.Buffer:
+    def alloc(self, size:int, dtype:type|np.dtype, fill:Sequence|None=None, shared_name:None|str=None, mem_flags=DEFAULT_MEM_FLAGS) -> cl.Buffer:
         if shared_name is not None:
             vec = self.shm.create_shared_memory(shared_name, size, dtype)
         elif fill is not None:
             vec = np.array(fill, dtype=dtype)
         else:
             vec = np.zeros(size, dtype)
-        b = self._create_buffer(vec)
+        b = self._create_buffer(vec, mem_flags=mem_flags)
         self._host_vector[b] = vec
         return b
     
@@ -80,10 +84,10 @@ class PipelineComponent:
         return vec
     
     def sync_to_host(self, buffer: cl.Buffer) -> cl.Event:
-        return cl.enqueue_copy(self.queue, self.get_host_vector(buffer), buffer)
+        return self.tr.add('sync_to_host', cl.enqueue_copy(self.queue, self.get_host_vector(buffer), buffer))
     
     def sync_to_device(self, buffer: cl.Buffer) -> cl.Event:
-        return cl.enqueue_copy(self.queue, buffer, self.get_host_vector(buffer))
+        return self.tr.add('sync_to_device', cl.enqueue_copy(self.queue, buffer, self.get_host_vector(buffer)))
     
     def _check_debug_flag(self):
         debug_flags = os.environ.get("DEBUG", "").lower()
@@ -93,9 +97,8 @@ class PipelineComponent:
                 f"-DDEBUG=true"
             ]
     
-    def _create_buffer(self, hostbuf) -> cl.Buffer:
-        mf = cl.mem_flags
-        return cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=hostbuf)
+    def _create_buffer(self, hostbuf, mem_flags=DEFAULT_MEM_FLAGS) -> cl.Buffer:
+        return cl.Buffer(self.ctx, mem_flags, hostbuf=hostbuf)
     
     def _get_kernel_src(self, kernel_file: str):
         with open(Path(__file__).parent / kernel_file, 'r') as f:

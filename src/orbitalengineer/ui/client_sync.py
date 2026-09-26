@@ -48,6 +48,9 @@ class EngineModel(GObject.GObject):
     radius:NDArray[np.float32] = GObject.Property(type=object) #type:ignore
     force:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
     ledger:NDArray = GObject.Property(type=object) #type:ignore
+    cgroup:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
+    n_direct_contacts:NDArray = GObject.Property(type=object) #type:ignore
+    direct_contacts:NDArray = GObject.Property(type=object) #type:ignore
 
     def increase_speed(self):
         idx = SPEED_SCALE.index(self.clock_speed) + 1
@@ -100,6 +103,9 @@ class ClientSyncController(GObject.GObject):
         self.model.radius = self.client.radius
         self.model.force = self.client.force
         self.model.ledger = self.client.ledger
+        self.model.cgroup = self.client.cgroup
+        self.model.n_direct_contacts = self.client.n_direct_contacts
+        self.model.direct_contacts = self.client.direct_contacts
         return True
     
     def on_clock_speed_changed(self, model, param):

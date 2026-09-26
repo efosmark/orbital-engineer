@@ -3,7 +3,7 @@ from enum import IntEnum
 from typing import Any, Literal, Self, Sequence, Protocol
 import numpy as np
 
-from orbitalengineer.engine.orbitalcl.device import GPUStatus
+from orbitalengineer.engine.orbitalcl.device import DeviceStatus
 from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
 from orbitalengineer.ipc.clock import SimClock
 
@@ -99,7 +99,9 @@ class SharedMemoryResponse:
     radius: SharedMemoryInfo
     force: SharedMemoryInfo
     ledger: SharedMemoryInfo
-    #cgroup: SharedMemoryInfo
+    cgroup: SharedMemoryInfo
+    n_direct_contacts: SharedMemoryInfo
+    direct_contacts: SharedMemoryInfo
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:
@@ -124,6 +126,12 @@ class InitResponse:
         )
 
 @dataclass
+class HostStatus:
+    id: int
+    utilization: float|None
+    temperature: float|None = None
+
+@dataclass
 class StatusResponse:
     initialized: bool
     N: int
@@ -134,7 +142,8 @@ class StatusResponse:
     curr_tick_at: float
     next_tick_at: float
     dt_step: float
-    gpu_status: GPUStatus|None
+    device_status: DeviceStatus|None
+    host_status: HostStatus
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:
@@ -148,7 +157,8 @@ class StatusResponse:
             curr_tick_at=d['curr_tick_at'],
             next_tick_at=d['next_tick_at'],
             dt_step=d['dt_step'],
-            gpu_status=GPUStatus(**d['gpu_status']) if d['gpu_status'] is not None else None
+            device_status=DeviceStatus(**d['device_status']) if d['device_status'] is not None else None,
+            host_status=HostStatus(**d['host_status'])
         )
 
 @dataclass

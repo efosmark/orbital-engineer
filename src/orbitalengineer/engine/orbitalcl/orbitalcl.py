@@ -1,7 +1,7 @@
+import time
 from typing import Sequence, cast
 from pathlib import Path
 import pyopencl as cl
-import numpy as np
 
 from orbitalengineer.engine import log_timing, logger, config
 from orbitalengineer.engine.exception import InitKernelException
@@ -11,7 +11,6 @@ from orbitalengineer.engine.orbitalcl import flags
 from orbitalengineer.engine.orbitalcl.ledger.ledger import LedgerController
 from orbitalengineer.engine.orbitalcl.named_shared_memory import NamedSharedMemory
 from orbitalengineer.engine.orbitalcl.cgroup.cgroup import CGroupPipeline
-from orbitalengineer.engine.orbitalcl.contacting.contacting import FindContactingBodiesPipeline
 from orbitalengineer.engine.orbitalcl.device import CLDeviceManager
 from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
 from orbitalengineer.engine.orbitalcl.sim_state import SimState
@@ -32,6 +31,7 @@ kernel_dir = Path(__file__).parent
 
 class SimController_CL:
     cfg:SimConfig
+    last_tick_at:float|None = None
     
     def __init__(self):
         self.metrics = MetricsProducer(config.METRIC_SOCKET_PATH)
@@ -86,8 +86,7 @@ class SimController_CL:
             self._nudge = NudgePipeline(*args)
             self._merge = MergePipeline(*args)
             self._cgroup = CGroupPipeline(*args)
-            self._contacting = FindContactingBodiesPipeline(*args)
-            self._edge_distance = DistancePipeline(*args)
+            self._distance = DistancePipeline(*args)
             self._velocity_along_normal = VelocityAlongNormalPipeline(*args)
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
             logger.error(str(e))
@@ -127,7 +126,7 @@ class SimController_CL:
         return self._nudge(self.state)
     
     def kick(self, dt_step):
-        return self._velocity(dt_step, self.state, self._contacting)
+        return self._velocity(dt_step, self.state, self._distance)
     
     def drift(self, dt_step):
         return self._position(dt_step, self.state)
@@ -143,17 +142,16 @@ class SimController_CL:
         self.drift(dt)
         self.kick(dt / 2.0)
 
-        if config.COLLISION_MERGE_ENABLE or config.COLLISION_BOUNCE_ENABLE:
-           self._edge_distance(self.state)
-           self._contacting(self.state, self._edge_distance)
+        self._distance(self.state)
         
         if config.COLLISION_MERGE_ENABLE:
-           self._merge(self.state, self._contacting, self._edge_distance, self._ledger)
+           self._merge(self.state, self._distance, self._ledger)
         
         if config.COLLISION_BOUNCE_ENABLE:
             self._velocity_along_normal(self.state)
-            self._bounce(self.state, self._interaction, self._contacting, self._cgroup, self._edge_distance, self._velocity_along_normal, self._ledger)
+            self._bounce(self.state, self._interaction, self._cgroup, self._distance, self._velocity_along_normal, self._ledger)
 
+        self._cgroup(self._distance)
         self.compute_interaction_dt(dt)
         self._ledger.commit(self.pipeline_state.tick_id, self.pipeline_state.step_id) #.wait()
         return dt
@@ -169,6 +167,8 @@ class SimController_CL:
         return count, dt_step
 
     def tick(self, dt_step:float):
+        if self.last_tick_at is None:
+            self.last_tick_at = time.monotonic_ns()
         if not self.is_initialized:
            logger.warning("tick() was called before simulation initialization.")
            return 0, 0
@@ -183,22 +183,31 @@ class SimController_CL:
             raise e
 
         if count > 0:
-            #self._ledger.read_ledger()
             self.emit_metrics(float(dt_step))
             self.pipeline_state.tick_id += 1
             self.pipeline_state.step_id = 0
         return count, dt_unprocessed
     
     def emit_metrics(self, dt_step_size:float):
-        if not self.cfg.ENABLE_PROFILING:
-            return
-        self.q.finish()
-        timeline = self.tr.timeline()
-        self.tr.clear()
-        self.metrics.emit_metric("tick", self.pipeline_state.tick_id, timeline=[
-            { "name":t["name"], "duration_ms":round(t["duration_ns"]/1e6, 6)}
-            for t in timeline
-        ], dt_step=round(float(dt_step_size), 6))
+        with self.tr('(cpu) emit_metrics'):
+            if not self.cfg.ENABLE_PROFILING: return
+            self.q.finish()
+    
+            timeline = self.tr.timeline()
+            self.tr.clear()
+        
+            self.metrics.emit_metric("tick", self.pipeline_state.tick_id, timeline=[
+                { "name":t.name, "duration_ms":round(t.duration_ns/1e6, 6)}
+                for t in timeline
+            ], dt_step=round(float(dt_step_size), 6))
+
+    def sync(self):
+        self.state.sync()
+        self._ledger.sync_to_host(self._ledger.ledger)
+        self._cgroup.sync_to_host(self._cgroup.group)
+        self._distance.sync_to_host(self._distance.direct_contacts)
+        self._distance.sync_to_host(self._distance.n_direct_contacts)            
+        #self.q.finish()
 
 
     # def to_dict(self) -> dict:

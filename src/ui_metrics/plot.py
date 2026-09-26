@@ -52,12 +52,12 @@ class PlotWindow(Gtk.ApplicationWindow):
             1,
             3,
             height_ratios=[1.0],
-            width_ratios=[1.0, 1.0, 1.0],
+            width_ratios=[1.0, 1.0, 0.4],
         )
-        self.ax_avg = fig.add_subplot(gs[0, 0])
-        self.ax_count = fig.add_subplot(gs[0, 1], sharey=self.ax_avg)
-        self.ax_avg_individual = fig.add_subplot(gs[0, 2], sharey=self.ax_avg)
-        fig.subplots_adjust(left=0.26, right=0.98, bottom=0.10, top=0.9, hspace=0.18, wspace=0.10)
+        self.ax_avg_individual = fig.add_subplot(gs[0, 0])
+        self.ax_avg = fig.add_subplot(gs[0, 1], sharey=self.ax_avg_individual)
+        self.ax_count = fig.add_subplot(gs[0, 2], sharey=self.ax_avg_individual)
+        fig.subplots_adjust(left=0.26, right=0.98, bottom=0.1, top=0.9, hspace=0.1, wspace=0.10)
         self.canvas = FigureCanvas(fig)
         self.canvas.set_hexpand(True)
         self.canvas.set_vexpand(True)
@@ -123,16 +123,22 @@ class PlotWindow(Gtk.ApplicationWindow):
                 avg_values_individual.append(sum(raw_y_ms) / len(raw_y_ms))
 
         if avg_names:
+            rows = sorted(
+                zip(avg_names, avg_values, avg_counts, avg_values_individual),
+                key=lambda row: row[3],
+                reverse=True,
+            )
+            avg_names, avg_values, avg_counts, avg_values_individual = map(list, zip(*rows))
             bar_colors = [self.prop_to_color[name] for name in avg_names]
             y_pos = list(range(len(avg_names)))
             duration_bars = self.ax_avg.barh(y_pos, avg_values, color=bar_colors)
             count_bars = self.ax_count.barh(y_pos, avg_counts, color=bar_colors)
             duration_individual_bars = self.ax_avg_individual.barh(y_pos, avg_values_individual, color=bar_colors)
 
-            self.ax_avg.set_yticks(y_pos, labels=avg_names)
+            self.ax_avg_individual.set_yticks(y_pos, labels=avg_names)
             self.ax_count.tick_params(axis="y", left=False, labelleft=False)
-            self.ax_avg_individual.tick_params(axis="y", left=False, labelleft=False)
-            self.ax_avg.invert_yaxis()
+            self.ax_avg.tick_params(axis="y", left=False, labelleft=False)
+            self.ax_avg_individual.invert_yaxis()
 
             self.ax_avg.margins(y=0.05)
             self.ax_count.margins(y=0.05)
@@ -192,7 +198,7 @@ class PlotWindow(Gtk.ApplicationWindow):
         self.ax_avg.set_xlabel("Average (ms)", fontsize=self.label_font_size, color=self.text_color)
         self.ax_avg.set_ylabel("")
         self.ax_avg.tick_params(axis="x", labelsize=self.tick_font_size, colors=self.text_color)
-        self.ax_avg.tick_params(axis="y", labelsize=self.tick_font_size, colors=self.text_color)
+        self.ax_avg.tick_params(axis="y", left=False, labelleft=False, colors=self.text_color)
 
         self.ax_count.set_title("Average count", fontsize=self.title_font_size, color=self.text_color)
         self.ax_count.set_xlabel("Count", fontsize=self.label_font_size, color=self.text_color)
@@ -202,7 +208,7 @@ class PlotWindow(Gtk.ApplicationWindow):
         self.ax_avg_individual.set_title("Average duration per sample", fontsize=self.title_font_size, color=self.text_color)
         self.ax_avg_individual.set_xlabel("Average (ms)", fontsize=self.label_font_size, color=self.text_color)
         self.ax_avg_individual.tick_params(axis="x", labelsize=self.tick_font_size, colors=self.text_color)
-        self.ax_avg_individual.tick_params(axis="y", left=False, labelleft=False, colors=self.text_color)
+        self.ax_avg_individual.tick_params(axis="y", labelsize=self.tick_font_size, colors=self.text_color, labelfontfamily="monospace")
 
     def _style_axis(self, axis, show_grid=False):
         axis.set_facecolor(self.axes_bg)

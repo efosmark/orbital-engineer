@@ -36,9 +36,6 @@ class LedgerMonitor(GObject.GObject):
             if le['id'] > self.model.last_ledger_id:
                 self.model.add_entry(le)
                 self.model.last_ledger_id = le['id']
-                
-                if le['i'] == 125:
-                    print('ledger_ctl', le)
                 self.emit('new-entry', LedgerEntry(*le))
 
             elif le['id'] <= prev_ledger_id:

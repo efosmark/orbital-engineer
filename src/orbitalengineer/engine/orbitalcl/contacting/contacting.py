@@ -1,7 +1,5 @@
-import pyopencl as cl
 import numpy as np
 from orbitalengineer import flags
-from orbitalengineer.engine.config import MAX_NUM_CONTACTS_PER_BODY
 from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
 from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
 from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
@@ -13,17 +11,21 @@ class FindContactingBodiesPipeline(PipelineComponent):
 
     def initialize(self):
         self._find_contacting_bodies = self._load_kernel("find_contacting_bodies", KERNEL_FILE_LOCATION)
-        self.n_direct_contacts = self.alloc(self.N, dtype=np.uint32)
-        self.direct_contacts = self.alloc(self.N * self.N, dtype=np.uint32)
+        self.n_direct_contacts = self.alloc(self.N, dtype=np.uint32, shared_name="n_direct_contacts")
+        self.direct_contacts = self.alloc(self.N * self.N, dtype=np.uint32, shared_name="direct_contacts")
+
+        self.n_near_contacts = self.alloc(self.N, dtype=np.uint32)
+        self.near_contacts = self.alloc(self.N * self.N, dtype=np.uint32)
         
-    def get_ids(self, flags_buffer:cl.Buffer):
+    def get_ids(self, state:PrimaryStateVectors):
         n_direct_contacts = self.get_host_vector(self.n_direct_contacts, sync=True)
-        flags_host = self.get_host_vector(flags_buffer, sync=True)
-                        
+        flags_host = state.get_host_vector(state.flags, sync=True)
+        
         all_colliding_ids = np.array([
             i for i in range(n_direct_contacts.size) 
-            if n_direct_contacts[i] > 0 and not (flags_host[i]|flags.REMOVED)
+            if n_direct_contacts[i] > 0 and not (flags_host[i]&flags.REMOVED)
         ], dtype=np.uint32)
+        
         if all_colliding_ids.size == 0:
             return None, 0, 0
         
@@ -61,10 +63,11 @@ class FindContactingBodiesPipeline(PipelineComponent):
             state.flags,
             distance.is_touching,
             self.n_direct_contacts,
-            self.direct_contacts
+            self.direct_contacts,
+            self.n_near_contacts,
+            self.near_contacts
         )
 
     def __call__(self, state:PrimaryStateVectors, distance:DistancePipeline):
         self.find_contacting_bodies(state, distance)
-        #self.find_contacting_bodies_on_host(state, distance)
         return (self.n_direct_contacts, self.direct_contacts)

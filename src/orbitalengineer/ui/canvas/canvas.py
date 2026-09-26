@@ -7,7 +7,7 @@ from orbitalengineer.ui.canvas.render.event_ledger import EventLedgerRenderer
 from orbitalengineer.ui.model import main
 from orbitalengineer.ui.audio.synth import ToneSynthController
 from orbitalengineer.ui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
-from orbitalengineer.ui.canvas.render.gpu_status import GPUStatusRenderer
+from orbitalengineer.ui.canvas.render.resource_monitor import ResourceMonitorRenderer
 from orbitalengineer.ui.canvas.render.osd import OSDRenderer
 from orbitalengineer.ui.gtk4 import Gtk, Gdk, Graphene
 from orbitalengineer.ui.canvas import renderer
@@ -165,13 +165,14 @@ class OrbitalCanvas(Gtk.DrawingArea):
             SelectionRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             ReticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             #PinpointRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
+            CGroupRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
         ]
         
         self.hud_fg_renderers = [
             DebugInfoRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             FocusInfoRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             HudClockRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            GPUStatusRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            ResourceMonitorRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             WarningRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             OSDRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
         ]

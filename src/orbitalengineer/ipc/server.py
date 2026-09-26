@@ -1,4 +1,11 @@
+import os
+CPU_NUM = 15 # TODO: instead of manually pinning, identify the most appropriate core to pin to.
+os.sched_setaffinity(0, {CPU_NUM})
+
 import socket
+import time
+
+import psutil
 
 from orbitalengineer.engine import logger
 from orbitalengineer.engine.orbitalcl import orbitalcl
@@ -9,12 +16,19 @@ from orbitalengineer.ipc.config import SERVER_IPC_HOST, SERVER_IPC_PORT
 
 class OrbitalControlServer:
     tick_ctl:TickController
+    
+    host_status:message.HostStatus
+    host_status_last_time:float = 0
 
     def __init__(self):
         self.orbital = orbitalcl.SimController_CL()
         self.clock = SimClock()
         self.tick_ctl = TickController(self.orbital, self.clock)
         self.enabled = True
+        
+        self.cpu_num = psutil.Process().cpu_num()
+        if self.cpu_num != CPU_NUM:
+            logger.warning("ERROR: set_affinity failed.   cpu_num=%s   CPU_NUM=%s", self.cpu_num, CPU_NUM)
 
     def serve(self, host=SERVER_IPC_HOST, port=SERVER_IPC_PORT):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -30,7 +44,7 @@ class OrbitalControlServer:
                     print("Connection reset by peer:", addr)
             self.end()
 
-    def initialize(self, particles):
+    def initialize(self, particles):        
         if self.orbital.is_initialized:
             logger.warning("Already initialized. Re-initializing with %s bodies...", len(particles))
             self.end()
@@ -45,6 +59,17 @@ class OrbitalControlServer:
         else:
             logger.error("Failed to initialize.")
             return False
+
+    def _update_host_status(self):
+        utilization = psutil.cpu_percent(interval=None, percpu=True)[self.cpu_num]
+        self.host_status = message.HostStatus(self.cpu_num, utilization)
+
+    def get_cpu_status(self) -> message.HostStatus:
+        now = time.monotonic()
+        if now - self.host_status_last_time > 0.5:
+            self._update_host_status()
+            self.host_status_last_time = now        
+        return self.host_status
 
     def start(self):
         self.tick_ctl.start()
@@ -94,7 +119,9 @@ class OrbitalControlServer:
             radius=self._get_shared_memory_info('radius'),
             force=self._get_shared_memory_info('force'),
             ledger=self._get_shared_memory_info('ledger'),
-            #cgroup=self._get_shared_memory_info('cgroup'),
+            cgroup=self._get_shared_memory_info('cgroup'),
+            n_direct_contacts=self._get_shared_memory_info('n_direct_contacts'),
+            direct_contacts=self._get_shared_memory_info('direct_contacts'),
         )
 
     def _get_status_response(self):
@@ -112,7 +139,8 @@ class OrbitalControlServer:
             curr_tick_at=self.tick_ctl.curr_tick_at,
             next_tick_at=self.tick_ctl.next_tick_at,
             dt_step=self.tick_ctl.dt_step,
-            gpu_status=gpu_status
+            device_status=gpu_status,
+            host_status=self.get_cpu_status()
         )
     
     def _get_state_response(self):
@@ -131,6 +159,8 @@ class OrbitalControlServer:
                 except ConnectionError as e:
                     logger.error("Connection error: %s", e)
                     break
+                
+                #with self.orbital.tr(f"server.handle_request({message.MessageType(message_type).name})"):
                 r = self._handle_request(conn, message.MessageType(message_type), payload)
                 #if r == False:
                 #    break
@@ -142,7 +172,6 @@ class OrbitalControlServer:
         if message_type == message.MessageType.INIT_REQ:
             req = message.InitRequest.from_dict(payload)
             self.device = req.device
-            print({len(req.particles)})
             result = self.initialize(req.particles)
             if not result:
                 transport.send_message(conn, message.MessageType.ERROR, message.ErrorResponse(False, "Unable to initialize."))
@@ -154,8 +183,7 @@ class OrbitalControlServer:
             transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
         
         elif message_type == message.MessageType.SYNC_REQ:
-            self.orbital.state.sync()
-            self.orbital._ledger.sync()
+            self.orbital.sync()
             transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
 
         elif message_type == message.MessageType.STATUS_REQ:

@@ -24,7 +24,7 @@ class MergePipeline(PipelineComponent):
         self._groups = np.arange(self.N, dtype=np.uint32) 
         self._groups_prev = np.arange(self.N, dtype=np.uint32)
 
-    def compute_merging_collision_direct(self, state:PrimaryStateVectors, contacting:FindContactingBodiesPipeline, ledger:LedgerController):
+    def compute_merging_collision_direct(self, state:PrimaryStateVectors, distance:DistancePipeline, ledger:LedgerController):
         return self._compute_merging_collision_direct(
                 self.queue,
                 (self.N * config.MAX_NUM_CONTACTS_PER_BODY, ),
@@ -37,8 +37,8 @@ class MergePipeline(PipelineComponent):
                 state.velocity,
                 state.mass,
                 state.radius,
-                contacting.n_direct_contacts,
-                contacting.direct_contacts,
+                distance.n_direct_contacts,
+                distance.direct_contacts,
                 self._flags_intermediate,
                 self._position_intermediate,
                 self._velocity_intermediate,
@@ -48,8 +48,8 @@ class MergePipeline(PipelineComponent):
                 ledger.ledger,
             )
     
-    def __call__(self, state:PrimaryStateVectors, contacting:FindContactingBodiesPipeline, edge_distance:DistancePipeline, ledger:LedgerController):
-        self.compute_merging_collision_direct(state, contacting, ledger)
+    def __call__(self, state:PrimaryStateVectors, distance:DistancePipeline, ledger:LedgerController):
+        self.compute_merging_collision_direct(state, distance, ledger)
         cl.enqueue_copy(self.queue, state.flags,    self._flags_intermediate)
         cl.enqueue_copy(self.queue, state.position, self._position_intermediate)
         cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)

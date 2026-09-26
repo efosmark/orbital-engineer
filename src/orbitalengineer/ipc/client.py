@@ -1,3 +1,7 @@
+import os
+CPU_NUM = 14
+os.sched_setaffinity(0, {CPU_NUM})
+
 import socket
 from multiprocessing import shared_memory
 from typing import Any, Sequence, cast
@@ -8,7 +12,7 @@ from numpy.typing import NDArray
 
 from orbitalengineer import flags
 from orbitalengineer.engine import config, logger
-from orbitalengineer.engine.orbitalcl.device import GPUStatus
+from orbitalengineer.engine.orbitalcl.device import DeviceStatus
 from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
 from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
 from orbitalengineer.engine.particle import Particle
@@ -30,7 +34,8 @@ class ClientSocketConnection:
     dt_step:float = config.DEFAULT_DT_BASE
     
     cfg:SimConfig = SimConfig()
-    gpu_status:GPUStatus|None
+    gpu_status:DeviceStatus|None
+    cpu_status:message.HostStatus
     
     flags:NDArray[np.uint32]
     position:NDArray[np.complex64]
@@ -39,7 +44,9 @@ class ClientSocketConnection:
     radius:NDArray[np.float32]
     force:NDArray[np.complex64]
     ledger:NDArray
-    #cgroup:NDArray[np.uint32]
+    cgroup:NDArray[np.uint32]
+    n_direct_contacts:NDArray
+    direct_contacts:NDArray
     
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -117,7 +124,8 @@ class ClientSocketConnection:
         self.max_speed = status.max_speed
         self.curr_tick_at = status.curr_tick_at
         self.next_tick_at = status.next_tick_at
-        self.gpu_status = status.gpu_status
+        self.gpu_status = status.device_status
+        self.cpu_status = status.host_status
         self.clock.update(status.clock)
 
     def _connect_shared_memory(self, shared: message.SharedMemoryResponse):

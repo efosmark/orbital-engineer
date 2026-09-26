@@ -125,7 +125,11 @@ class FocusInfoRenderer(renderer.Renderer):
         else:
             return
         
+        if b.idx is None: return
+        
+        xy = b.get_xy()
         disp = [
+            ("Poition",  f"({xy[0]:.0f}, {xy[1]:.0f})"),
             ("Mass",     f"{mag_format(b.get_mass())} kg"),
             ("Radius",   f"{mag_format(b.get_radius())} m"),
          ]
@@ -137,13 +141,19 @@ class FocusInfoRenderer(renderer.Renderer):
         disp.extend([
             ("Velocity",  f"{mag_format(mag)} m/s"),
             ("Heading",   f"{angle_degrees:.1f}°"),
-            #("Impact",    min_dt)
+            ("Group",     f"{self.orbital.cgroup[b.idx]}")
         ])
+        
+        n_contacting = self.orbital.n_direct_contacts[b.idx]
+        offset = self.orbital.N * b.idx
+        contacting = sorted(self.orbital.direct_contacts[offset:offset+n_contacting])
+        if n_contacting > 0:
+            disp.append(("In Contact", ",".join([str(c) for c in contacting])))
         
         cr.translate(20, 20)
         
         name = self.app.particle_names.get(b.idx, f"{b.idx}")
-        w, h = create_panel(cr, f"{name}-{b.idx}", [
+        w, h = create_panel(cr, f"{name}", [
             f"{label:<14} {value:>14}"
             for label, value in disp
         ])

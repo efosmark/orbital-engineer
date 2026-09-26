@@ -4,16 +4,20 @@
 
 __kernel void cgroup_assign(
              const uint  N,
-    __global const uint* restrict ids,      // (num_ids, )
-    __global const uint* restrict n_direct_contacts,     // (num_ids, )
-    __global const uint* restrict direct_contacts, // (N * N)
-    __global const uint* restrict cgroup_src,       
-    __global       uint* restrict cgroup_dest,      
-    __global       uint* restrict has_updates       
+    __global const uint* ids,
+    __global const uint* n_direct_contacts,
+    __global const uint* direct_contacts,
+    __global const uint* cgroup_src,       
+    __global       uint* cgroup_dest,
+    __global atomic_uint* n_updates
 ) {
-    uint gid = get_group_id(0);
-    uint lid = get_local_id(0);
+    uint gid = get_group_id(0);  // One group per node
+    uint lid = get_local_id(0);  // One lane per edge
     uint Lx = get_local_size(0);
+
+    if (get_local_id(0) == 0 && get_global_id(0) == 0) {
+        atomic_init(n_updates, 0);
+    }
 
     uint i = ids[gid];
     bool updated = false;
@@ -43,54 +47,6 @@ __kernel void cgroup_assign(
     uint wg_min_index = work_group_reduce_min(min_contact);
     if (lid == 0) {
         cgroup_dest[i] = wg_min_index;
-        has_updates[i] = wg_has_updated;
+        atomic_fetch_add(n_updates, (uint)wg_has_updated);
     }
 }
-
-
-__kernel void organize_cgroup_state_vectors(
-             const uint    N,
-    __global const uint*   restrict flags,
-    __global const float2* restrict position,
-    __global const float2* restrict velocity,
-    __global const float*  restrict mass,
-    __global const uint*   restrict cgroup,
-    __global       float2* restrict p_com_by_id,
-    __global       float2* restrict v_com_by_id,
-    __global       float*  restrict m_com_by_id
-) {
-    uint i = get_global_id(0);
-    bool i_enabled = (flags[i]&REMOVED) || (flags[i]&BOUNCE_AS_PRIMARY) == 0;
-    if (!i_enabled) return;
-
-    uint idx = (cgroup[i] * N) + i;
-    
-    p_com_by_id[idx] = position[i];
-    v_com_by_id[idx] = velocity[i];
-    m_com_by_id[idx] = mass[i];
-}
-
-
-
-// __kernel void combine_cgroup_state_vectors(
-//              const uint    N,
-//     __global const uint*   restrict cgroup,
-//     __global const float2* restrict p_com_by_id,
-//     __global const float2* restrict v_com_by_id,
-//     __global const float*  restrict m_com_by_id,
-//     __global       float2* restrict p_com,
-//     __global       float2* restrict v_com,
-//     __global       float*  restrict m_com
-// ) {
-//     uint i = get_group_id(0);
-//     bool i_enabled = (flags[i]&REMOVED) || (flags[i]&BOUNCE_AS_PRIMARY) == 0;
-//     if (!i_enabled) return;
-
-
-
-//     uint idx = (cgroup[i] * N) + i;
-    
-//     p_com[i] = p_com_by_id[i];
-//     v_com[i] = v_com_by_id[i];
-//     m_com[i] = m_com_by_id[i];
-// }

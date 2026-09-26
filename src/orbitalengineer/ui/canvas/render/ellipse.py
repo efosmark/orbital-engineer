@@ -20,8 +20,8 @@ class EllipseRenderer(renderer.Renderer):
             cr,
             self.camera.zoom,
             o,
-            show_semimajor_axis=show_detailed_view,
-            show_anomaly=show_detailed_view,
+            #show_semimajor_axis=show_detailed_view,
+            #show_anomaly=show_detailed_view,
             apsis_radius=secondary.get_radius() if show_detailed_view else None
         )
 

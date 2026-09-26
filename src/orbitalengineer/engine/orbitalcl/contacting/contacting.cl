@@ -8,7 +8,9 @@ __kernel void find_contacting_bodies(
     __global const uint* restrict flags,
     __global const bool* restrict is_touching,
     __global uint* num_contacts,
-    __global uint* contacts
+    __global uint* contacts,
+    __global uint* num_contacts,
+    __global uint* contacts,
 ) {
     GRID_STRIDE_INIT();
     if (flags[i]&REMOVED) return;

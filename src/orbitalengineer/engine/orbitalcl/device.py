@@ -52,7 +52,7 @@ def get_amd_drm_card(platform_id: int, device_id: int) -> int | None:
     return None
 
 @dataclass
-class GPUStatus:
+class DeviceStatus:
     id: tuple[int,int]
     name:str
     platform:str
@@ -116,7 +116,7 @@ class CLDeviceManager:
         avg_temp = None
         if temps:
             avg_temp = sum(temps.values()) / len(temps)
-        return GPUStatus(
+        return DeviceStatus(
             (self.platform_id, self.device_id),
             self.opencl_platform_name,
             self.opencl_device_name,

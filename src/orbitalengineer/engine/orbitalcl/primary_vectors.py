@@ -1,11 +1,8 @@
-import functools
 from typing import Sequence
 
 import numpy as np
-from numpy.typing import NDArray
 import pyopencl as cl
 
-from orbitalengineer import flags
 from orbitalengineer.engine import logger
 from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
 from orbitalengineer.helpers import r_from_mass
@@ -74,16 +71,16 @@ class PrimaryStateVectors(PipelineComponent):
         self.mass = self.alloc(self.N, np.float32, shared_name='mass')
         self.radius = self.alloc(self.N, np.float32, shared_name='radius')
     
-    def _get_valid_ids(self) -> NDArray:
-        flags_host = self.get_host_vector(self.flags, sync=True)
-        return np.where((flags_host & flags.REMOVED) != flags.REMOVED)[0]
+    # def _get_valid_ids(self) -> NDArray:
+    #     flags_host = self.get_host_vector(self.flags, sync=True)
+    #     return np.where((flags_host & flags.REMOVED) != flags.REMOVED)[0]
     
-    functools.cache
-    def ids(self, cache_key) -> tuple[int, NDArray, cl.Buffer]:
-        id_list = self._get_valid_ids()
-        N = id_list.size
-        id_buffer = self._create_buffer(id_list)
-        return N, id_list, id_buffer
+    # functools.cache
+    # def ids(self, cache_key) -> tuple[int, NDArray, cl.Buffer]:
+    #     id_list = self._get_valid_ids()
+    #     N = id_list.size
+    #     id_buffer = self._create_buffer(id_list)
+    #     return N, id_list, id_buffer
     
     def apply_vector_offset(self, vector_name:str, ids:Sequence[int], op:str, offset:tuple[float,float]):
         if vector_name == "position":
@@ -120,10 +117,8 @@ class PrimaryStateVectors(PipelineComponent):
         return True
 
     def sync(self):
-        self.queue.finish()
         self.sync_to_host(self.flags)
         self.sync_to_host(self.velocity)
         self.sync_to_host(self.position)
         self.sync_to_host(self.mass)
         self.sync_to_host(self.radius)
-        self.queue.finish()

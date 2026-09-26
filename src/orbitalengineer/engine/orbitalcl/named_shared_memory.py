@@ -23,8 +23,7 @@ class NamedSharedMemory:
         return self.vec[field_name]
 
     def disconnect(self):
-        if not hasattr(self, 'shm'):
-            return
+        if not hasattr(self, 'shm'): return
         closed = []
         for name, shm in self.shm.items():
             try:

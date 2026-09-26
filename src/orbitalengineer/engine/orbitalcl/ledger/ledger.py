@@ -48,4 +48,4 @@ class LedgerController(PipelineComponent):
         return evt
     
     def sync(self):
-        self.sync_to_host(self.ledger).wait()
+        self.sync_to_host(self.ledger)

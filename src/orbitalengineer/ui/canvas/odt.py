@@ -109,8 +109,10 @@ class OrbitDrawingTool:
         o: twobody.TwoBody,            # TwoBody details describing the orbit
         *,                             
         apsis_radius:float|None=None,  
-        show_semimajor_axis=True,      
-        show_anomaly:bool=False        
+        show_semimajor_axis=False,      
+        show_anomaly:bool=False,
+        show_major_aux_circle:bool=False,
+        show_minor_aux_circle:bool=False,
     ):
         self.cr = cr
         self.orbit = o
@@ -129,9 +131,12 @@ class OrbitDrawingTool:
             if show_anomaly:
                 self._draw_anomaly_visualization(scale)
 
-            self._draw_aux_circle(o.semi_major_axis, scale)
-            self._draw_aux_circle(o.semi_minor_axis, scale)
-
+            if show_major_aux_circle:
+                self._draw_aux_circle(o.semi_major_axis, scale)
+            
+            if show_minor_aux_circle:
+                self._draw_aux_circle(o.semi_minor_axis, scale)
+                
             if show_semimajor_axis:
                 self.draw_semimajor_axis(dash=[2.0/scale, 4.0/scale])
                 self.draw_semiminor_axis(dash=[2.0/scale, 4.0/scale])

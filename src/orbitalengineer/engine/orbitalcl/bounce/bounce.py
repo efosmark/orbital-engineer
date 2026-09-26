@@ -30,7 +30,7 @@ class BouncePipeline(PipelineComponent):
         # Clear out the impulse table
         self._impulse.fill(np.complex64(0, 0))
 
-        ids, global_size, local_size = contacting.get_ids(state.flags)        
+        ids, global_size, local_size = contacting.get_ids(state)        
         if ids is None:
             return
 
@@ -143,7 +143,6 @@ class BouncePipeline(PipelineComponent):
         )
         cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
 
-
-    def __call__(self, state:PrimaryStateVectors, interact:InteractionPipeline, contacting: FindContactingBodiesPipeline, cgroup:CGroupPipeline, distance: DistancePipeline, velocity_along_normal: VelocityAlongNormalPipeline, ledger:LedgerController):
+    def __call__(self, state:PrimaryStateVectors, interact:InteractionPipeline, cgroup:CGroupPipeline, distance: DistancePipeline, velocity_along_normal: VelocityAlongNormalPipeline, ledger:LedgerController):
         cl.enqueue_copy(self.queue, self._velocity_intermediate, np.zeros(self.N, dtype=np.complex64))
         self.collide_bounce_single(state, interact, ledger)        
