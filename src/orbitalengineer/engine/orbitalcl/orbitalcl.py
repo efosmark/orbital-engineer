@@ -50,6 +50,7 @@ class SimController_CL:
             logger.info("OpenCL profiling enabled.")
             properties = cl.command_queue_properties.PROFILING_ENABLE
         self.q = cl.CommandQueue(self.ctx, properties=properties)
+        self.copy_queue = cl.CommandQueue(self.ctx, properties=properties)
     
     def _generate_headers(self):
         build_dir = Path(".opencl_build")
@@ -76,7 +77,7 @@ class SimController_CL:
         if config.USE_FAST_RELAXED_MATH:
             build_options.append('-cl-fast-relaxed-math')
         
-        args = [self.shm, self.pipeline_state, self.ctx, self.q, self.tr, build_options]        
+        args = [self.shm, self.pipeline_state, self.ctx, self.q, self.copy_queue, self.tr, build_options]        
         try:
             self._ledger = LedgerController(*args)
             self._velocity = VelocityPipeline(*args)
@@ -106,7 +107,7 @@ class SimController_CL:
         self.pipeline_state.tick_id = 0
         self.pipeline_state.step_id = 0
         self._init_queue()
-        self.state = PrimaryStateVectors(self.shm, self.pipeline_state, self.ctx, self.q, self.tr)
+        self.state = PrimaryStateVectors(self.shm, self.pipeline_state, self.ctx, self.q, self.copy_queue, self.tr)
         self.state.populate(particles)
         
         if not self._init_kernels():
@@ -126,13 +127,19 @@ class SimController_CL:
         return self._nudge(self.state)
     
     def kick(self, dt_step):
-        return self._velocity(dt_step, self.state, self._distance)
+        with self.tr('wait-for-kick (host)'):
+            self._velocity(dt_step, self.state, self._distance)
+            self._velocity.queue.finish()
     
     def drift(self, dt_step):
-        return self._position(dt_step, self.state)
+        with self.tr('wait-for-drift (host)'):
+            self._position(dt_step, self.state)
+            self._position.queue.finish()
     
     def compute_interaction_dt(self, min_dt:float):
-        self._interaction(self.cfg.DEFAULT_DT_BASE, self.state)
+        with self.tr('wait-for-dt (host)'):
+            self._interaction(self.cfg.DEFAULT_DT_BASE, self.state)
+            self._interaction.queue.finish()
     
     def substep(self, dt_step):
         dt = self._interaction.minimum_viable_dt(dt_step)
@@ -151,8 +158,15 @@ class SimController_CL:
             self._velocity_along_normal(self.state)
             self._bounce(self.state, self._interaction, self._cgroup, self._distance, self._velocity_along_normal, self._ledger)
 
-        self._cgroup(self._distance)
+        with self.tr('wait-for-collisions (host)'):
+            self.q.finish()
+
+        with self.tr('wait-for-cgroup'):
+            self._cgroup(self._distance)
+            self.q.finish()
+
         self.compute_interaction_dt(dt)
+
         self._ledger.commit(self.pipeline_state.tick_id, self.pipeline_state.step_id) #.wait()
         return dt
     
@@ -189,7 +203,7 @@ class SimController_CL:
         return count, dt_unprocessed
     
     def emit_metrics(self, dt_step_size:float):
-        with self.tr('(cpu) emit_metrics'):
+        with self.tr('emit_metrics (host)'):
             if not self.cfg.ENABLE_PROFILING: return
             self.q.finish()
     
@@ -202,11 +216,12 @@ class SimController_CL:
             ], dt_step=round(float(dt_step_size), 6))
 
     def sync(self):
-        self.state.sync()
-        self._ledger.sync_to_host(self._ledger.ledger)
-        self._cgroup.sync_to_host(self._cgroup.group)
-        self._distance.sync_to_host(self._distance.direct_contacts)
-        self._distance.sync_to_host(self._distance.n_direct_contacts)            
+        self.state.sync(self.copy_queue)
+        self._ledger.sync_to_host(self._ledger.ledger, queue=self.copy_queue)
+        self._cgroup.sync_to_host(self._cgroup.group, queue=self.copy_queue)
+        self._distance.sync_to_host(self._distance.direct_contacts, queue=self.copy_queue)
+        self._distance.sync_to_host(self._distance.n_direct_contacts, queue=self.copy_queue)            
+        #self.copy_queue.finish()
         #self.q.finish()
 
 

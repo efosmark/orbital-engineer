@@ -52,7 +52,7 @@ class PipelineComponent:
     
     dependencies:list['PipelineComponent']|None = None 
     
-    def __init__(self, shm:NamedSharedMemory, pipeline_state:SimState, ctx:cl.Context, queue:cl.CommandQueue, tr:EventTracer, build_options:Sequence|None=None):
+    def __init__(self, shm:NamedSharedMemory, pipeline_state:SimState, ctx:cl.Context, queue:cl.CommandQueue, copy_queue:cl.CommandQueue, tr:EventTracer, build_options:Sequence|None=None):
         self.N = pipeline_state.N
         if self.N < self.Lx: self.Lx = self.N
         
@@ -61,6 +61,7 @@ class PipelineComponent:
         self.default_build_options = build_options or ['-cl-std=CL2.0']
         self.ctx = ctx
         self.queue = queue
+        self.copy_queue = copy_queue
         self.tr = tr
         self._host_vector:dict[cl.Buffer, NDArray] = dict()
         self._check_debug_flag()
@@ -83,11 +84,13 @@ class PipelineComponent:
             self.sync_to_host(buffer).wait()
         return vec
     
-    def sync_to_host(self, buffer: cl.Buffer) -> cl.Event:
-        return self.tr.add('sync_to_host', cl.enqueue_copy(self.queue, self.get_host_vector(buffer), buffer))
+    def sync_to_host(self, buffer: cl.Buffer, queue:cl.CommandQueue|None=None) -> cl.Event:
+        if queue is None:
+            queue = self.queue
+        return self.tr.add('enqueue_copy', cl.enqueue_copy(queue, self.get_host_vector(buffer), buffer))
     
     def sync_to_device(self, buffer: cl.Buffer) -> cl.Event:
-        return self.tr.add('sync_to_device', cl.enqueue_copy(self.queue, buffer, self.get_host_vector(buffer)))
+        return self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, buffer, self.get_host_vector(buffer)))
     
     def _check_debug_flag(self):
         debug_flags = os.environ.get("DEBUG", "").lower()

@@ -4,7 +4,7 @@ import numpy as np
 # Simulation Bounds
 #############################################
 
-EPS_DIST = 1.0
+EPS_DIST = 1e-3
 EPS_TIME = 1e-3
 
 DV_MAX = 1e10
@@ -21,7 +21,7 @@ MAX_NUM_CONTACTS_PER_BODY = 8
 # Tick-rate Settings
 #############################################
 
-DEFAULT_DT_BASE =  1/30.0
+DEFAULT_DT_BASE =  1/15.0
 DEFAULT_SPEED = 1.0
 MAX_STEPS_PER_TICK = int(1.0/np.sqrt(DEFAULT_DT_BASE))
 MAX_SUB_STEPS = 60
@@ -32,7 +32,7 @@ TARGET_TICKS_PER_SECOND = 10
 #############################################
 
 COLLISION_MERGE_ENABLE = True
-COLLISION_BOUNCE_ENABLE = True
+COLLISION_BOUNCE_ENABLE = False
 NUDGE_ON_START_ENABLE = True
 
 #############################################

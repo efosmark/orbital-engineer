@@ -116,9 +116,9 @@ class PrimaryStateVectors(PipelineComponent):
         
         return True
 
-    def sync(self):
-        self.sync_to_host(self.flags)
-        self.sync_to_host(self.velocity)
-        self.sync_to_host(self.position)
-        self.sync_to_host(self.mass)
-        self.sync_to_host(self.radius)
+    def sync(self, queue):
+        self.sync_to_host(self.flags, queue=queue)
+        self.sync_to_host(self.velocity, queue=queue)
+        self.sync_to_host(self.position, queue=queue)
+        self.sync_to_host(self.mass, queue=queue)
+        self.sync_to_host(self.radius, queue=queue)

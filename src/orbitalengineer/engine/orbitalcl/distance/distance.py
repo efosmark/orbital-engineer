@@ -12,6 +12,8 @@ KERNEL_FILE_LOCATION = "distance/distance.cl"
 class DistancePipeline(PipelineComponent):
     debug_flag = 'distance'
     
+    _evt_edge_distance:cl.Event|None = None
+    
     def initialize(self):
         self._knl_edge_distance = self._load_kernel("edge_distance", KERNEL_FILE_LOCATION)
         self.edge_to_edge = self.alloc(self.N * self.N, dtype=np.float32)
@@ -28,9 +30,9 @@ class DistancePipeline(PipelineComponent):
         self.nearby_contacts = self.alloc(self.N * self.N, dtype=np.uint32)
     
     def get_all_colliding_ids(self):
+        n_all_colliding_ids = self.get_host_vector(self.n_all_colliding_ids)
         with self.tr('n_all_colliding_ids (sync)'):
-            n_all_colliding_ids = self.get_host_vector(self.n_all_colliding_ids)
-            cl.enqueue_copy(self.queue, n_all_colliding_ids[:1], self.n_all_colliding_ids).wait()
+            self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, n_all_colliding_ids[:1], self.n_all_colliding_ids, wait_for=[self._evt_edge_distance] if self._evt_edge_distance is not None else None)) #.wait()
             n_all_colliding_ids = n_all_colliding_ids[0]
         if n_all_colliding_ids == 0: return None, 0, 0
         local_size = min(n_all_colliding_ids, 64)
@@ -38,7 +40,7 @@ class DistancePipeline(PipelineComponent):
         return self.all_colliding_ids, global_size, local_size
 
     def __call__(self, state:PrimaryStateVectors):
-        self._knl_edge_distance(
+        self._evt_edge_distance = self._knl_edge_distance(
                 self.queue,
                 state.grid_stride_global_size,
                 state.grid_stride_local_size,

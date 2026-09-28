@@ -151,7 +151,7 @@ class PlotWindow(Gtk.ApplicationWindow):
                 self.ax_avg.text(
                     bar.get_width(),
                     bar.get_y() + (bar.get_height() / 2.0),
-                    f"{value:.2f}",
+                    f"{value:.1f}",
                     ha="left",
                     va="center",
                     fontsize=self.value_font_size,
@@ -161,7 +161,7 @@ class PlotWindow(Gtk.ApplicationWindow):
                 self.ax_count.text(
                     bar.get_width(),
                     bar.get_y() + (bar.get_height() / 2.0),
-                    f"{value:.2f}",
+                    f"{value:.1f}",
                     ha="left",
                     va="center",
                     fontsize=self.value_font_size,
@@ -171,7 +171,7 @@ class PlotWindow(Gtk.ApplicationWindow):
                 self.ax_avg_individual.text(
                     bar.get_width(),
                     bar.get_y() + (bar.get_height() / 2.0),
-                    f"{value:.2f}",
+                    f"{value:.1f}",
                     ha="left",
                     va="center",
                     fontsize=self.value_font_size,

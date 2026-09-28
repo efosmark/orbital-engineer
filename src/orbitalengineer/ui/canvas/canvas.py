@@ -154,7 +154,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.hud_renderers = [
             BackgroundRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             GridRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            EventLedgerRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            #EventLedgerRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
         ]
         
         self.scene_renderers = [
@@ -165,7 +165,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
             SelectionRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             ReticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             #PinpointRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            CGroupRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            #CGroupRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
         ]
         
         self.hud_fg_renderers = [
@@ -236,7 +236,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
                 try:
                     r.draw(cr, width, height)
                 except Exception as e:
-                    self.scene_renderers.remove(r)
+                    self.hud_renderers.remove(r)
                     raise e
                 cr.restore()
             

@@ -62,19 +62,19 @@ class CGroupPipeline(PipelineComponent):
                 logger.error("global_size=%s local_size=%s", global_size, local_size)
                 break
 
-            with self.tr("(cpu) cgroup_get_updated"):
+            with self.tr("cgroup_get_updated (host)"):
                 n_updated = self.get_host_vector(self._n_updated)
                 cl.enqueue_copy(self.queue, n_updated[:1], self._n_updated).wait()
                 if n_updated[0] == 0: break
 
             # Sync the most up-to-date results back to the source buffer
-            self.tr.add("cgroup_sync", cl.enqueue_copy(self.queue, self.new_cgroups_A, self.new_cgroups_B)) #.wait() 
+            cl.enqueue_copy(self.queue, self.new_cgroups_A, self.new_cgroups_B).wait()
             
             num_iterations += 1
             if num_iterations >= self.N or num_iterations >= config.CGROUP_ASSIGN_MAX_ITERATIONS:
                 raise CGroupAssignException(self.N)
 
-        self.tr.add("cgroup_sync", cl.enqueue_copy(self.queue, self.group, self.new_cgroups_B)) #.wait()   
+        cl.enqueue_copy(self.queue, self.group, self.new_cgroups_B).wait()
     
     def __call__(self, dist:DistancePipeline):
         self.cgroup_assign(dist)

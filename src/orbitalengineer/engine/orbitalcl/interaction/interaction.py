@@ -15,7 +15,7 @@ class InteractionPipeline(PipelineComponent):
         self.min_dt_per_body = self.alloc(self.N, np.float32, fill=[np.inf for i in range(self.N)])
     
     def minimum_viable_dt(self, dt_step):
-        with self.tr('(cpu) minimum_viable_dt'):
+        with self.tr('minimum_viable_dt (host)'):
             min_dt_per_body = self.get_host_vector(self.min_dt_per_body, sync=True)
             try:
                 min_toi = np.min(min_dt_per_body[min_dt_per_body > 0])
