@@ -44,7 +44,7 @@ def on_activate(app: App):
     app.model.show_focused_history = True
     app.model.show_debug_info = True
     app.model.show_focus_info = True
-    app.model.secondary_body = 1011
+    #app.model.secondary_body = 1011
     app.model.engine.clock_speed = 0.1
     app.show_message("Ready.", duration=10.0, desc="Press [space] to start.")
 

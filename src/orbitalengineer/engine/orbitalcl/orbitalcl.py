@@ -8,6 +8,7 @@ from orbitalengineer.engine.exception import InitKernelException
 from orbitalengineer.engine.metric import MetricsProducer
 
 from orbitalengineer.engine.orbitalcl import flags
+from orbitalengineer.engine.orbitalcl.defragment.defragment import DefragBodies
 from orbitalengineer.engine.orbitalcl.ledger.ledger import LedgerController
 from orbitalengineer.engine.orbitalcl.named_shared_memory import NamedSharedMemory
 from orbitalengineer.engine.orbitalcl.cgroup.cgroup import CGroupPipeline
@@ -89,6 +90,7 @@ class SimController_CL:
             self._cgroup = CGroupPipeline(*args)
             self._distance = DistancePipeline(*args)
             self._velocity_along_normal = VelocityAlongNormalPipeline(*args)
+            self._defrag = DefragBodies(*args)
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
             logger.error(str(e))
             return False
@@ -161,11 +163,13 @@ class SimController_CL:
         with self.tr('wait-for-collisions (host)'):
             self.q.finish()
 
-        with self.tr('wait-for-cgroup'):
+        with self.tr('wait-for-cgroup (host)'):
             self._cgroup(self._distance)
             self.q.finish()
 
         self.compute_interaction_dt(dt)
+
+        self._defrag(self.state)
 
         self._ledger.commit(self.pipeline_state.tick_id, self.pipeline_state.step_id) #.wait()
         return dt
