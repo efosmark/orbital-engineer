@@ -17,7 +17,7 @@ $$
 M = \sum_{i=0}^{N} m_i
 $$
 
-### Center-of-mass velocity
+### Center-of-momentum velocity
 
 $$
 \vec{v}_{\text{cm}} = \frac{\vec{p}_{\text{tot}}}{M} = \frac{\sum_{i=0}^{N} m_i \vec{v}_i}{\sum_{i=0}^{N} m_i}
@@ -28,7 +28,7 @@ Where,
 - $\vec{p}_{\text{tot}}$ is the sum total of momentum
 - $M$ is the sum total of mass
 
-### Center-of-mass position
+### Center-of-momentum position
 
 $$
 \vec{r}_{\text{cm}} = \frac{\sum_{i=0}^{N} m_i \vec{r}_i}{\sum_{i=0}^{N} m_i}

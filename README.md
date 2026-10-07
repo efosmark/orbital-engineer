@@ -40,6 +40,85 @@ Each time step is broken down into three phases:
     - **_Merge_** : Bodies are combined. Their velocities and positions are computed based on their center-of-mass.
     - **_Bounce_** : Bodies deflect off of eachother. The strength is controlled by the [coefficient of restitution](https://en.wikipedia.org/wiki/Coefficient_of_restitution). Set via the config option, `COEF_OF_RESTITUTION`.
 
+## Elastic Collisions
+
+**Related kernel**: [`engine/bounce/*`](/src/orbitalengineer/engine/bounce/)
+
+### Coefficient of Restitution
+
+- The coefficient of restitution (denoted as $e$ below), is a value between `0` and `1` that indicates how elastic the collision will be.
+- A value of `1` will make the collision fully repulsive (no energy loss), whereas a value of `0` will be attenuated (full energy loss) and "stick" together.
+- More information: [Coefficient of Restituion](https://en.wikipedia.org/wiki/Coefficient_of_restitution)
+- The default value is defined in the config via the field `COEF_OF_RESTITUTION`.
+
+### Algorithm
+
+These steps are ran for each colliding pair $(i, j)$.
+
+1. Normalize the difference in position
+
+   $$
+   r_{norm} = |r_j - r_i|
+   $$
+
+2. Find the relative speed along normal
+
+   $$
+   v_{nrel} = \operatorname{Re}((v_i - v_j) \cdot \overline{r_{norm}})
+   $$
+
+3. Get the scalar impulse magnitude
+
+   $$
+   \frac{1.0 + (e \cdot v_{nrel})}{
+      \frac{1}{M_i} + \frac{1}{M_j}
+   }
+   $$
+
+4. Apply the final impulse
+
+   $$
+    V_i = V_i + \frac{r_{norm} \cdot \text{scalar impulse}}{M_i}
+   $$
+
+## Coalescing (e.g. "merging")
+
+### Algorithm for Coalescence
+
+1. Identify collision groups where coalescence is enabled (in this case, this is handled by the flags vector, where `i` and `j` must have the bits `MERGE_AS_PRIMARY` and `MERGE_AS_SECONDARY`)
+2. Compute the total momentum of the group
+
+   $$
+   \vec{p}_{\text{tot}} = \sum_{i=0}^{N} m_i \vec{v}_i
+   $$
+
+3. Compute the total mass of the group
+
+   $$
+   M = \sum_{i=0}^{N} m_i
+   $$
+
+4. Apply those values to determine CoM velocity and CoM position
+
+   $$
+   \vec{v}_{\text{cm}} = \frac{\vec{p}_{\text{tot}}}{M} = \frac{\sum_{i=0}^{N} m_i \vec{v}_i}{\sum_{i=0}^{N} m_i}
+   $$
+
+   Where,
+
+   - $\vec{v}_{\text{cm}}$ is the center-of-mass velocity
+   - $\vec{p}_{\text{tot}}$ is the sum total of momentum
+   - $M$ is the sum total of mass
+
+   $$
+   \vec{r}_{\text{cm}} = \frac{\sum_{i=0}^{N} m_i \vec{r}_i}{\sum_{i=0}^{N} m_i}
+   $$
+
+   Where,
+
+   - $\vec{r}_{\text{cm}}$ is the center-of-mass position
+
+
 ## Performance
 
 Given the following criteria, a reasonable number between 5000-8000 individual bodies can be simulated.

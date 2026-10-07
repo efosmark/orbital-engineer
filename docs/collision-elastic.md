@@ -1,6 +1,6 @@
 # Elastic Collision
 
-**Related kernel**: [`engine/orbitalcl/bounce/*`](/src/orbitalengineer/engine/orbitalcl/bounce/)
+**Related kernel**: [`engine/bounce/*`](/src/orbitalengineer/engine/bounce/)
 
 ## Coefficient of Restitution
 
