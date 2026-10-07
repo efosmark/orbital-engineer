@@ -32,6 +32,7 @@ Each time step is broken down into three phases:
 
     During kick operations, position vector is read-only.
     And during drift operations, velocity vector is read-only.
+    The first `KICK` and `DRIFT` are performed here, and the final `KICK` is performed after the collision detection step.
 
  3. **Collision Detection** - Determine which bodies are touching, and apply collision operations. Based on the per-body feature flags, one of the following strategies will be enacted.
 
@@ -39,15 +40,27 @@ Each time step is broken down into three phases:
     - **_Merge_** : Bodies are combined. Their velocities and positions are computed based on their center-of-mass.
     - **_Bounce_** : Bodies deflect off of eachother. The strength is controlled by the [coefficient of restitution](https://en.wikipedia.org/wiki/Coefficient_of_restitution). Set via the config option, `COEF_OF_RESTITUTION`.
 
+## Performance
+
+Given the following criteria, a reasonable number between 5000-8000 individual bodies can be simulated.
+
+- **Hardware:** AMD Radeon 890M
+- **Integration**: `EPS_TIME=1e-3`, `DT_BASE=1/15`
+  - The tick controller starts with `DT_BASE`, but the `dt` is _adaptive_. After several ticks, will start to fall into place, between `DT_MIN` and `DT_MAX`, that allows for the highest performance.
+- **Elastic Collisions**: Enabled, restitution coefficient `0.98`
+- **Coalescence**: disabled (no "merging")
+- **Scenario**: 5000-8000 bodies, all configured as secondary, orbiting a central ultra-massive body
+- **Performance**: 1-1 wall-time to sim-time. 90% utilization on device (GPU). 20% utilization on host (CPU). No visible bottlenecks in any "hot path" code.
+
 ## Apps
 
 ### Orbital Engineer Server
 
 The core app that manages the n-body engine. It is responsible for:
 
-- taking in commands via a socket connection from client apps
-- dispatching ticks/steps to the kernels (either OpenCL or NumPy)
-- syncing orbital state vectors from GPU memory to shared memory
+- Taking in commands via a socket connection from client apps
+- Dispatching ticks/steps to the kernels (either OpenCL or NumPy)
+- Syncing orbital state vectors from GPU memory to shared memory
 - Tracking & writing kernel metrics to an IPC socket
 
 It will not do anything "on its own" and needs a client to direct it.
@@ -99,6 +112,10 @@ Metrics are enabled via:
 When set to `True` (default), pyopencl will enable profiling (which may slightly affect kernel speed), and the orbital-engine will emit the kernel metrics to the socket specified  by `METRIC_SOCKET_PATH`.
 
 ## IPC Message Transport Protocol
+
+The IPC communication between client and the engine is governed by a simple protocol consisting of a binary header and a JSON payload. Each payload follows a strict schema.
+
+The full reference is outlined in thi document:
 
 - [Reference](/docs/transport-protocol.md)
 
