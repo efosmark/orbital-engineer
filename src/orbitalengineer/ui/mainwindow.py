@@ -2,7 +2,7 @@ from typing import Any, cast
 
 from orbitalengineer.ui import canvas, ui_config
 from orbitalengineer.ui.audio.synth import ToneSynthController
-from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib
+from orbitalengineer.ui.gtk4 import Gtk, Gio, GLib, GObject
 from orbitalengineer.ui.model.main import AppModel
 from orbitalengineer.ipc.clock import SimClock
 from orbitalengineer.ipc.client import ClientSocketConnection
@@ -27,7 +27,12 @@ class MainWindow(Gtk.ApplicationWindow):
         self.canvas.set_valign(Gtk.Align.FILL)
         
         self.set_default_size(*ui_config.WINDOW_DEFAULT_SIZE)
-        self.set_child(self.canvas)
+        #self.set_child(self.canvas)
+
+        box = Gtk.Box(spacing=0, orientation=Gtk.Orientation.VERTICAL)
+        box.append(self.canvas)
+        box.append(self._init_status_bar())
+        self.set_child(box)
 
         header = Gtk.HeaderBar()
         self.set_titlebar(header)
@@ -38,6 +43,31 @@ class MainWindow(Gtk.ApplicationWindow):
         header.pack_end(menu_button)
         self._init_menu_actions()
 
+    def _init_status_bar(self) -> Gtk.Box:
+        box = Gtk.Box()
+        
+        l = Gtk.Label()
+                
+        def transform_to(_binding, value):
+            print(value)
+            return str(value)  # Return int converted to a bool
+
+        def transform_from(_binding, value):
+            return str(value)  # Return bool converted to a int
+
+        self.view.engine.bind_property(
+            'clock-speed',
+            l,
+            'label',
+            GObject.BindingFlags.DEFAULT,
+            transform_to,
+            transform_from
+        )
+        l.set_label('')
+        
+        box.append(l)
+        
+        return box
 
     def _init_menu_actions(self):
         app = cast(Any, self.get_application())

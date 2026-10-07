@@ -99,7 +99,6 @@ class ReticleRenderer(renderer.Renderer):
             cr.translate(x, y)
         except cairo.Error:
             print(f"ERROR. Cannot translate {x} and {y}")
-            cr.restore()
             return
                 
         #if radius * self.camera.zoom < 5:

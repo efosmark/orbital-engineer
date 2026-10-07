@@ -2,7 +2,8 @@
 #include "flags.clh"
 
 __kernel void apply_nudge(
-             const uint    N,
+             const uint    N_bodies_alloc,
+             const uint    N_bodies_valid,
     __global const uint*   restrict flags,
     __global const float2* restrict position,
     __global const float*  restrict mass,

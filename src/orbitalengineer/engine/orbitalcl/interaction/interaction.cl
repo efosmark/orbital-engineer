@@ -29,7 +29,8 @@ inline float2 compute_time_of_impact(const float2 dV, const float2 dP, const flo
 }
 
 __kernel void compute_interaction(
-             const uint    N,
+             const uint    N_bodies_alloc,
+             const uint    N_bodies_valid,
              const float   dt_step,
     __global const uint*   restrict flags,
     __global const float2* restrict position,

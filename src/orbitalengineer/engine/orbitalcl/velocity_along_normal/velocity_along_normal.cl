@@ -12,7 +12,8 @@ inline float relative_speed_along_normal(
 }
 
 __kernel void velocity_along_normal(
-             const uint    N,
+             const uint    N_bodies_alloc,
+             const uint    N_bodies_valid,
     __global const uint*   restrict flags,
     __global const float2* restrict position,
     __global const float2* restrict velocity,

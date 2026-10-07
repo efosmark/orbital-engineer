@@ -22,9 +22,9 @@ class BouncePipeline(PipelineComponent):
         self._compute_impulse = self._load_kernel("compute_impulse", KERNEL_FILE_LOCATION)
         self._assign_impulse = self._load_kernel("assign_impulse", KERNEL_FILE_LOCATION)
 
-        self._velocity_intermediate = self.alloc(self.N, dtype=np.complex64)
+        self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=np.complex64)
 
-        self._impulse = array.zeros(self.queue, self.N * self.N, dtype=np.complex64)
+        self._impulse = array.zeros(self.queue, self.vec.N * self.vec.N, dtype=np.complex64)
 
     def compute_impulse(self, state:PrimaryStateVectors, contacting: FindContactingBodiesPipeline, cgroup: cl.Buffer):
         # Clear out the impulse table
@@ -34,13 +34,13 @@ class BouncePipeline(PipelineComponent):
         if ids is None:
             return
 
-        com_momentum = np.zeros(self.N, dtype=np.complex64)
-        com_velocity = np.zeros(self.N, dtype=np.complex64)
-        com_total_mass = np.zeros(self.N, dtype=np.float32)
+        com_momentum = np.zeros(state.N, dtype=np.complex64)
+        com_velocity = np.zeros(state.N, dtype=np.complex64)
+        com_total_mass = np.zeros(state.N, dtype=np.float32)
         
-        com_momentum_cl = self._create_buffer(com_momentum)
-        com_velocity_cl = self._create_buffer(com_velocity)
-        com_total_mass_cl = self._create_buffer(com_total_mass)
+        com_momentum_cl = self.vec._create_buffer(com_momentum)
+        com_velocity_cl = self.vec._create_buffer(com_velocity)
+        com_total_mass_cl = self.vec._create_buffer(com_total_mass)
     
         self._compute_center_of_mass(
             self.queue,
@@ -48,7 +48,8 @@ class BouncePipeline(PipelineComponent):
             (local_size, ),                           # local work size
             
             # Args
-            np.uint32(self.N),
+            np.uint32(self.vec.N_bodies_alloc),
+            np.uint32(self.vec.N_bodies_valid),
             state.flags,
             state.position,
             state.velocity,
@@ -67,7 +68,7 @@ class BouncePipeline(PipelineComponent):
             (local_size, ),                           # local work size
             
             # Args
-            np.uint32(self.N),
+            np.uint32(state.N),
             state.flags,
             state.position,
             state.velocity,
@@ -93,7 +94,7 @@ class BouncePipeline(PipelineComponent):
             (local_size, ),                           # local work size
             
             # Args
-            np.uint32(self.N),
+            np.uint32(state.N),
             ids,
             contacting.n_direct_contacts,
             contacting.direct_contacts,
@@ -105,11 +106,12 @@ class BouncePipeline(PipelineComponent):
     def collide_bounce_single(self,  state:PrimaryStateVectors, interact:InteractionPipeline, ledger:LedgerController):
         self._collide_bounce_single(
             self.queue,
-            state.grid_stride_global_size,
-            state.grid_stride_local_size,
+            (self.vec.N_bodies_valid * self.vec.Lx, ),
+            (self.vec.Lx, ),
                         
             # Args
-            np.uint32(self.N),
+            np.uint32(self.vec.N_bodies_alloc),
+            np.uint32(self.vec.N_bodies_valid),
             state.flags,
             state.position,
             state.velocity,
@@ -126,11 +128,12 @@ class BouncePipeline(PipelineComponent):
         cl.enqueue_copy(self.queue, self._velocity_intermediate, state.velocity)
         self._collide_bounce_simple(
             self.queue,
-            state.grid_stride_global_size,
-            state.grid_stride_local_size,
+            (self.vec.N_bodies_valid * self.vec.Lx, ),
+            (self.vec.Lx, ),
                         
             # Args
-            np.uint32(self.N),
+            np.uint32(self.vec.N_bodies_alloc),
+            np.uint32(self.vec.N_bodies_valid),
             state.flags,
             state.position,
             state.velocity,
@@ -144,5 +147,5 @@ class BouncePipeline(PipelineComponent):
         cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
 
     def __call__(self, state:PrimaryStateVectors, interact:InteractionPipeline, cgroup:CGroupPipeline, distance: DistancePipeline, velocity_along_normal: VelocityAlongNormalPipeline, ledger:LedgerController):
-        cl.enqueue_copy(self.queue, self._velocity_intermediate, np.zeros(self.N, dtype=np.complex64))
+        cl.enqueue_copy(self.queue, self._velocity_intermediate, np.zeros(state.N, dtype=np.complex64))
         self.collide_bounce_single(state, interact, ledger)        

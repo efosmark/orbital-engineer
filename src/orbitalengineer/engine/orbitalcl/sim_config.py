@@ -14,6 +14,12 @@ class SimConfig:
     ENABLE_PROFILING:bool = config.ENABLE_PROFILING
     TARGET_TICKS_PER_SECOND:int = config.TARGET_TICKS_PER_SECOND
     LEDGER_SIZE:int = config.LEDGER_SIZE
+    USE_FAST_RELAXED_MATH:bool = config.USE_FAST_RELAXED_MATH
+    METRIC_SOCKET_PATH:str = config.METRIC_SOCKET_PATH
+    NUDGE_ON_START_ENABLE:bool = config.NUDGE_ON_START_ENABLE
+    COLLISION_MERGE_ENABLE:bool = config.COLLISION_MERGE_ENABLE
+    COLLISION_BOUNCE_ENABLE:bool = config.COLLISION_BOUNCE_ENABLE
+    MAX_SUB_STEPS:int = config.MAX_SUB_STEPS
 
     def as_build_contants(self):
         defs = dict()

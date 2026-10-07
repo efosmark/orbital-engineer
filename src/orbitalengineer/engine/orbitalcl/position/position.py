@@ -14,7 +14,7 @@ class PositionPipeline(PipelineComponent):
     def compute_position(self, dt_step, state:PrimaryStateVectors):
         self._compute_position(
             self.queue,
-            (self.N,), # global work size
+            (self.vec.N_bodies_valid,), # global work size
             None,      # local work size
             
             # Args

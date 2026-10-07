@@ -9,6 +9,7 @@ import psutil
 
 from orbitalengineer.engine import logger
 from orbitalengineer.engine.orbitalcl import orbitalcl
+from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
 from orbitalengineer.ipc import message, transport
 from orbitalengineer.ipc.ticker import TickController
 from orbitalengineer.ipc.clock import SimClock
@@ -44,13 +45,16 @@ class OrbitalControlServer:
                     print("Connection reset by peer:", addr)
             self.end()
 
-    def initialize(self, particles):        
+    def initialize(self, particles, config:SimConfig|None):        
         if self.orbital.is_initialized:
             logger.warning("Already initialized. Re-initializing with %s bodies...", len(particles))
             self.end()
             self.orbital.reset()
         self.enabled = True
         self.orbital.set_cl_device(self.device.platform_id, self.device.device_id)
+        if config is None:
+            config = SimConfig()
+        self.orbital.cfg = config
         if self.orbital.init_sim(particles):
             self.clock.reset()
             self.tick_ctl.reset()
@@ -112,6 +116,8 @@ class OrbitalControlServer:
 
     def _get_shared_memory_response(self):
         return message.SharedMemoryResponse(
+            id_to_index=self._get_shared_memory_info('id_to_index'),
+            body_id=self._get_shared_memory_info('body_id'),
             flags=self._get_shared_memory_info('flags'),
             velocity=self._get_shared_memory_info('velocity'),
             position=self._get_shared_memory_info('position'),
@@ -172,7 +178,7 @@ class OrbitalControlServer:
         if message_type == message.MessageType.INIT_REQ:
             req = message.InitRequest.from_dict(payload)
             self.device = req.device
-            result = self.initialize(req.particles)
+            result = self.initialize(req.particles, req.config)
             if not result:
                 transport.send_message(conn, message.MessageType.ERROR, message.ErrorResponse(False, "Unable to initialize."))
                 return
@@ -191,7 +197,7 @@ class OrbitalControlServer:
         
         elif message_type == message.MessageType.SHIFT_VECTOR_REQ:
             req = message.ShiftVectorsRequest(**payload)
-            self.orbital.state.apply_vector_offset(req.vector_name, req.ids, req.op, req.offset)
+            self.orbital.vec.apply_vector_offset(req.vector_name, req.ids, req.op, req.offset)
             self.orbital.nudge()
             transport.send_message(conn, message.MessageType.SUCCESS)
         

@@ -153,12 +153,12 @@ class FocusInfoRenderer(renderer.Renderer):
         cr.translate(20, 20)
         
         name = self.app.particle_names.get(b.idx, f"{b.idx}")
-        w, h = create_panel(cr, f"{name}", [
+        w, h = create_panel(cr, f"{name} [{b.idx}]", [
             f"{label:<14} {value:>14}"
             for label, value in disp
         ])
         
-        orbit = b.get_orbit_info()
+        orbit = b.get_orbit_info() # type:ignore
         if orbit is None:
             return
         

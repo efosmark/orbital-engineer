@@ -12,16 +12,21 @@ class ParticleCL(Particle):
         This should not be used for bulk operations, but rather for cases when
         dealing with one or two specific bodies.
     """
-    instances:ClassVar[dict[int, Particle]] = dict()
     ctl:Any
     
-    def __new__(cls, idx:int, ctl):
-        if idx not in cls.instances:
-            self = object.__new__(cls)
-            self.ctl = ctl
-            self.idx = idx
-            cls.instances[idx] = self
-        return cls.instances[idx]
+    def __init__(self, ident:int, ctl):
+        self.ident = ident
+        self.ctl = ctl
+    
+    @property
+    def idx(self) -> int:
+        #if self.ident < 10:
+        #    print(self.ident, self.ctl.id_to_index[self.ident])
+        return self.ident
+        return self.ctl.id_to_index[self.ident]
+
+    def get_body_id(self):
+        return self.ident
 
     def get_position(self):
         return np.complex128(self.ctl.position[self.idx])
@@ -37,32 +42,26 @@ class ParticleCL(Particle):
 
     def get_radius(self):
         return self.ctl.radius[self.idx]
-
-    def get_status(self):
-        return 0
     
-    def get_all_impact_times(self) -> Sequence[float]:
-        # This items ID is available via self.idx
-        # self.ctl.toi is the time-of-impact ndarray. Pairwise triu-indexed.
-        # The pairwise indices can be found in self.ctl.ix and self.ctl.jx
-        # Since the self-impact-time is undefined, set it to negative infinity.
-        impact_times = np.full(self.ctl.N, np.inf, dtype=self.ctl.toi.dtype)
-        idx = self.idx
+    # def get_all_impact_times(self) -> Sequence[float]:
+    #     # This items ID is available via self.idx
+    #     # self.ctl.toi is the time-of-impact ndarray. Pairwise triu-indexed.
+    #     # The pairwise indices can be found in self.ctl.ix and self.ctl.jx
+    #     # Since the self-impact-time is undefined, set it to negative infinity.
+    #     impact_times = np.full(self.ctl.N, np.inf, dtype=self.ctl.toi.dtype)
+    #     idx = self.idx
 
-        left_mask = self.ctl.ix == idx
-        if np.any(left_mask):
-            impact_times[self.ctl.jx[left_mask]] = self.ctl.toi[left_mask]
+    #     left_mask = self.ctl.ix == idx
+    #     if np.any(left_mask):
+    #         impact_times[self.ctl.jx[left_mask]] = self.ctl.toi[left_mask]
 
-        right_mask = self.ctl.jx == idx
-        if np.any(right_mask):
-            impact_times[self.ctl.ix[right_mask]] = self.ctl.toi[right_mask]
+    #     right_mask = self.ctl.jx == idx
+    #     if np.any(right_mask):
+    #         impact_times[self.ctl.ix[right_mask]] = self.ctl.toi[right_mask]
 
-        impact_times[idx] = -np.inf
-        assert impact_times.size == self.ctl.N
-        return impact_times # type:ignore
-    
-    def get_min_toi(self) -> float:
-        return self.ctl._interaction.node_dt[self.idx]
+    #     impact_times[idx] = -np.inf
+    #     assert impact_times.size == self.ctl.N
+    #     return impact_times # type:ignore
 
     def get_flags(self) -> int:
         return self.ctl.flags[self.idx]

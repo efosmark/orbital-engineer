@@ -11,18 +11,18 @@ class FindContactingBodiesPipeline(PipelineComponent):
 
     def initialize(self):
         self._find_contacting_bodies = self._load_kernel("find_contacting_bodies", KERNEL_FILE_LOCATION)
-        self.n_direct_contacts = self.alloc(self.N, dtype=np.uint32, shared_name="n_direct_contacts")
-        self.direct_contacts = self.alloc(self.N * self.N, dtype=np.uint32, shared_name="direct_contacts")
+        self.n_direct_contacts = self.vec.alloc(self.vec.N, dtype=np.uint32, shared_name="n_direct_contacts")
+        self.direct_contacts = self.vec.alloc(self.vec.N * self.vec.N, dtype=np.uint32, shared_name="direct_contacts")
 
-        self.n_near_contacts = self.alloc(self.N, dtype=np.uint32)
-        self.near_contacts = self.alloc(self.N * self.N, dtype=np.uint32)
+        self.n_near_contacts = self.vec.alloc(self.vec.N, dtype=np.uint32)
+        self.near_contacts = self.vec.alloc(self.vec.N * self.vec.N, dtype=np.uint32)
         
     def get_ids(self, state:PrimaryStateVectors):
-        n_direct_contacts = self.get_host_vector(self.n_direct_contacts, sync=True)
+        n_direct_contacts = self.vec.get_host_vector(self.n_direct_contacts, sync=True)
         flags_host = state.get_host_vector(state.flags, sync=True)
         
         all_colliding_ids = np.array([
-            i for i in range(n_direct_contacts.size) 
+            i for i in range(state.N_bodies_valid) 
             if n_direct_contacts[i] > 0 and not (flags_host[i]&flags.REMOVED)
         ], dtype=np.uint32)
         
@@ -34,32 +34,33 @@ class FindContactingBodiesPipeline(PipelineComponent):
             return None, 0, 0
         
         global_size = all_colliding_ids.size * local_size
-        return self._create_buffer(all_colliding_ids), global_size, local_size
+        return self.vec._create_buffer(all_colliding_ids), global_size, local_size
      
-    def _print_collisions_per_body(self):
-        """Debug printing of the collision matrix."""
-        n_direct_contacts = self.get_host_vector(self.n_direct_contacts, sync=True)
-        direct_contacts = self.get_host_vector(self.direct_contacts, sync=True)
-        for i in range(self.N):
-            try:
-                if n_direct_contacts[i] <= 1: continue
-                print(f" {i:3.0f} [{n_direct_contacts[i]:2.0f}] | ", end="")
-                contacts = [
-                    f"{direct_contacts[(self.N * i) + j]:3.0f}"
-                    for j in range(n_direct_contacts[i])
-                ]
-                print(" ".join(contacts))
-            except IndexError:
-                break
+    # def _print_collisions_per_body(self):
+    #     """Debug printing of the collision matrix."""
+    #     n_direct_contacts = self.get_host_vector(self.n_direct_contacts, sync=True)
+    #     direct_contacts = self.get_host_vector(self.direct_contacts, sync=True)
+    #     for i in range(self.vec.N):
+    #         try:
+    #             if n_direct_contacts[i] <= 1: continue
+    #             print(f" {i:3.0f} [{n_direct_contacts[i]:2.0f}] | ", end="")
+    #             contacts = [
+    #                 f"{direct_contacts[(self.vec.N * i) + j]:3.0f}"
+    #                 for j in range(n_direct_contacts[i])
+    #             ]
+    #             print(" ".join(contacts))
+    #         except IndexError:
+    #             break
 
     def find_contacting_bodies(self, state:PrimaryStateVectors, distance:DistancePipeline):        
         self._find_contacting_bodies(
             self.queue,
-            state.grid_stride_global_size,
-            state.grid_stride_local_size,
+            (self.vec.N * self.vec.Lx, ),
+            (self.vec.Lx, ),
             
             # Args
-            np.uint32(self.N),
+            np.uint32(self.vec.N_bodies_alloc),
+            np.uint32(self.vec.N_bodies_valid),
             state.flags,
             distance.is_touching,
             self.n_direct_contacts,

@@ -11,12 +11,6 @@ from orbitalengineer.ipc.clock import SimClock
 LOG_ENABLE_ENV_VAR = 'LOG_TICK_CTL'
 NUM_TICK_DURATION_SAMPLES = 30
 
-DT_MIN = config.EPS_TIME
-DT_MAX = config.DEFAULT_DT_BASE
-
-TARGET_TICKS_PER_SEC = 30
-TARGET_TICK_RATE = (1.0/TARGET_TICKS_PER_SEC)
-
 def clamp(value, val_min, val_max):
     return max(min(value, val_max), val_min)
 
@@ -60,8 +54,12 @@ class TickController:
             self._run_tick()
 
     def _compute_dt_step(self) -> float:
-        dt_step = (TARGET_TICK_RATE * self.clock.speed) / 1.1
-        return clamp(dt_step, DT_MIN, DT_MAX)
+        dt_step = ((1.0/self.orbital.cfg.TARGET_TICKS_PER_SECOND) * self.clock.speed) / 1.1
+        return clamp(
+            dt_step,
+            self.orbital.cfg.EPS_TIME,
+            1.0
+        )
 
     def _run_tick(self):
         self.curr_tick_at = self.clock.time()
@@ -70,7 +68,7 @@ class TickController:
         if os.environ.get(LOG_ENABLE_ENV_VAR):
             avg_tick_real_dt = self.avg_tick_duration_hot()
             avg_sim = avg_tick_real_dt*self.clock.speed
-            tick_rate = 1.0/TARGET_TICKS_PER_SEC
+            tick_rate = (1.0/self.orbital.cfg.TARGET_TICKS_PER_SECOND)
             logger.info(f"[now T{self.curr_tick_at:+3.4f}]   [next T{self.next_tick_at:+3.4f}]   [diff {dt_diff:+3.4f}]")
             logger.info(f"[dt  {self.dt_step:3.4f}]  [avg {avg_tick_real_dt:3.4f}]  [avg_sim {avg_sim:3.4f}]  [max {tick_rate/avg_tick_real_dt:3.3f}x]  [tick_rate={tick_rate:.3f}]")
 

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-from orbitalengineer.engine.config import LEDGER_SIZE
 from orbitalengineer.ui.gtk4 import GObject
 from orbitalengineer.ui.model.ledger import LedgerModel
 from orbitalengineer.ui.model.main import AppModel
@@ -28,10 +27,11 @@ class LedgerMonitor(GObject.GObject):
         if self.app.engine.ledger is None or self.model.last_tick_checked == self.app.engine.tick_id:
             return
 
+        ledger_size = self.app.engine.config.LEDGER_SIZE
         prev_ledger_id = self.model.last_ledger_id
         
-        for i in range(1, LEDGER_SIZE + 1):
-            idx = (prev_ledger_id + i) % LEDGER_SIZE
+        for i in range(1, ledger_size + 1):
+            idx = (prev_ledger_id + i) % ledger_size
             le = self.app.engine.ledger[idx]
             if le['id'] > self.model.last_ledger_id:
                 self.model.add_entry(le)

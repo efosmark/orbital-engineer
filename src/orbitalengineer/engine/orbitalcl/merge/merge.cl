@@ -13,10 +13,9 @@
  *  - FIXED_VELOCITY     -- Prevent the node's velocity from being changed.
  *  - FIXED_POSITION     -- Prevent the node's position from being changed.
  */
-
-
 __kernel void compute_merging_collision_direct(
-             const uint    N,
+             const uint    N_bodies_alloc,
+             const uint    N_bodies_valid,
     __global const uint*   restrict flags,
     __global const float2* restrict position,
     __global const float2* restrict velocity,
@@ -41,10 +40,10 @@ __kernel void compute_merging_collision_direct(
         position_out[i] = position[i];
         radius_out[i] = radius[i];
     }
-
+    if (i >= N_bodies_valid) return;
     if (flags[i]&REMOVED) return;
 
-    uint j = (lane < num_contacts[i]) ? direct_contacts[(N * i) + lane] : i; 
+    uint j = (lane < num_contacts[i]) ? direct_contacts[(N_bodies_alloc * i) + lane] : i; 
     bool supports_ji = (flags[j]&MERGE_AS_PRIMARY) && (flags[i]&MERGE_AS_SECONDARY);
     bool supports_ij = (flags[i]&MERGE_AS_PRIMARY) && (flags[j]&MERGE_AS_SECONDARY);
     
@@ -59,7 +58,6 @@ __kernel void compute_merging_collision_direct(
     float2  wg_mr = FLOAT2_WG_REDUCE_ADD(total_mr);
     bool wg_is_merging = work_group_any(is_merging);
     uint wg_leader = work_group_reduce_min(wg_is_merging ? j : INT_MAX);
-
 
     WRITE_LEDGER(is_merging, i, j, (i == wg_leader ? MERGE_AS_PRIMARY : (REMOVED|MERGE_AS_SECONDARY)));
 
@@ -76,37 +74,12 @@ __kernel void compute_merging_collision_direct(
         position_out[i] = (flags[i]&FIXED_POSITION) ? position[i] : position_center_of_mass;
 
         // New radius based on updated mass
-        radius_out[i] = (flags[i]&FIXED_RADIUS) ? radius_out[i] : cbrt(mass_out[i] / 3.14159f);        
+        radius_out[i] = (flags[i]&FIXED_RADIUS) ? radius_out[i] : sqrt(mass_out[i] / 3.14159f);        
 
     } else if (wg_is_merging && lane == 0) {
         DEBUG_PRINTF("(coalesce) [%u] <-- %u", i, wg_leader);
 
         mass_out[i] = (flags[i]&FIXED_MASS) ? mass[i] : 0;
         flags_out[i] = flags[i]|REMOVED;
-
-        //evt.action = REMOVED|MERGE_AS_SECONDARY;
     }
-
-
-    // uint emit = is_merging ? 1 : 0;
-
-    // // Where am I among the emitting lanes?
-    // uint offset = sub_group_scan_exclusive_add(emit);
-
-    // // How many events did this subgroup produce?
-    // uint count = sub_group_reduce_add(emit);
-
-    // uint base = 0;
-
-    // // One atomic allocation for the entire subgroup.
-    // if (get_sub_group_local_id() == 0 && count)
-    //     base = atomic_fetch_add(global_count, count);
-
-    // base = sub_group_broadcast(base, 0);
-
-    // // Every emitting lane now has a unique global destination.
-    // if (emit) {
-    //     ledger[base + offset] = evt;
-    //     printf("ledger[%u] = LedgerEvent(%u, %u, %u)", base + offset, evt.a, evt.b, evt.action);
-    // }
 }

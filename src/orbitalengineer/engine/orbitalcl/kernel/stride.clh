@@ -10,7 +10,6 @@ Lx    = 64, 128, or 256
     uint lane = get_local_id(0);              \
     uint Lx = get_local_size(0);
 
-
 #define GRID_STRIDE_INIT_ID_LIST()            \
     uint g0 = get_group_id(0);                \
     uint lane = get_local_id(0);              \
@@ -18,14 +17,14 @@ Lx    = 64, 128, or 256
     uint i = ids[g0];
 
 
-#define GRID_STRIDE_IJ( ...)                  \
-    do {                                      \
-        uint row_start = i * N;               \
-        for (uint j = lane; j < N; j += Lx) { \
-            if (j == i) continue;             \
-            uint const IDX = row_start + j;   \
-            __VA_ARGS__;                      \
-        }                                     \
+#define GRID_STRIDE_IJ( ...)                                \
+    do {                                                    \
+        uint row_start = i * N_bodies_alloc;                \
+        for (uint j = lane; j < N_bodies_valid; j += Lx) {  \
+            if (j == i) continue;                           \
+            uint const IDX = row_start + j;                 \
+            __VA_ARGS__;                                    \
+        }                                                   \
     } while (0)
 
 
