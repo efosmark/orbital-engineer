@@ -55,31 +55,31 @@ Each time step is broken down into three phases:
 
 These steps are ran for each colliding pair $(i, j)$.
 
-1. Normalize the difference in position
+1. Normalize the difference in position:
 
-   $$
-   r_{norm} = |r_j - r_i|
-   $$
+$$
+r_{norm} = |r_j - r_i|
+$$
 
-2. Find the relative speed along normal
+2. Find the relative speed along normal:
 
-   $$
-   v_{nrel} = \operatorname{Re}((v_i - v_j) \cdot \overline{r_{norm}})
-   $$
+$$
+v_{nrel} = {Re}((v_i - v_j) \cdot \overline{r_{norm}})
+$$
 
 3. Get the scalar impulse magnitude
 
-   $$
-   \frac{1.0 + (e \cdot v_{nrel})}{
-      \frac{1}{M_i} + \frac{1}{M_j}
-   }
-   $$
+$$
+\frac{1.0 + (e \cdot v_{nrel})}{
+   \frac{1}{M_i} + \frac{1}{M_j}
+}
+$$
 
 4. Apply the final impulse
 
-   $$
-    V_i = V_i + \frac{r_{norm} \cdot \text{scalar impulse}}{M_i}
-   $$
+$$
+V_i = V_i + \frac{r_{norm} \cdot \text{scalar impulse}}{M_i}
+$$
 
 ## Coalescing (e.g. "merging")
 
@@ -88,21 +88,21 @@ These steps are ran for each colliding pair $(i, j)$.
 1. Identify collision groups where coalescence is enabled (in this case, this is handled by the flags vector, where `i` and `j` must have the bits `MERGE_AS_PRIMARY` and `MERGE_AS_SECONDARY`)
 2. Compute the total momentum of the group
 
-   $$
-   \vec{p}_{\text{tot}} = \sum_{i=0}^{N} m_i \vec{v}_i
-   $$
+$$
+\vec{p}_{\text{tot}} = \sum_{i=0}^{N} m_i \vec{v}_i
+$$
 
 3. Compute the total mass of the group
 
-   $$
-   M = \sum_{i=0}^{N} m_i
-   $$
+$$
+M = \sum_{i=0}^{N} m_i
+$$
 
 4. Apply those values to determine CoM velocity and CoM position
 
-   $$
+$$
    \vec{v}_{\text{cm}} = \frac{\vec{p}_{\text{tot}}}{M} = \frac{\sum_{i=0}^{N} m_i \vec{v}_i}{\sum_{i=0}^{N} m_i}
-   $$
+$$
 
    Where,
 
@@ -110,9 +110,9 @@ These steps are ran for each colliding pair $(i, j)$.
    - $\vec{p}_{\text{tot}}$ is the sum total of momentum
    - $M$ is the sum total of mass
 
-   $$
+$$
    \vec{r}_{\text{cm}} = \frac{\sum_{i=0}^{N} m_i \vec{r}_i}{\sum_{i=0}^{N} m_i}
-   $$
+$$
 
    Where,
 
