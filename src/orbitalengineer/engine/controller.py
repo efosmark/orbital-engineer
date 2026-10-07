@@ -7,29 +7,29 @@ from orbitalengineer.engine import log_timing, logger
 from orbitalengineer.engine.exception import InitKernelException
 from orbitalengineer.engine.metric import MetricsProducer
 
-from orbitalengineer.engine.orbitalcl import flags
-from orbitalengineer.engine.orbitalcl.ledger.ledger import LedgerController
-from orbitalengineer.engine.orbitalcl.named_shared_memory import NamedSharedMemory
-from orbitalengineer.engine.orbitalcl.cgroup.cgroup import CGroupPipeline
-from orbitalengineer.engine.orbitalcl.device import CLDeviceManager
-from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
-from orbitalengineer.engine.orbitalcl.sim_state import SimState
-from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
-from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
-from orbitalengineer.engine.orbitalcl.tracer import EventTracer
-from orbitalengineer.engine.orbitalcl.merge.merge import MergePipeline
-from orbitalengineer.engine.orbitalcl.interaction.interaction import InteractionPipeline
-from orbitalengineer.engine.orbitalcl.nudge.nudge import NudgePipeline
-from orbitalengineer.engine.orbitalcl.position.position import PositionPipeline
-from orbitalengineer.engine.orbitalcl.velocity.velocity import VelocityPipeline
-from orbitalengineer.engine.orbitalcl.bounce.bounce import BouncePipeline
-from orbitalengineer.engine.orbitalcl.velocity_along_normal.velocity_along_normal import VelocityAlongNormalPipeline
+from orbitalengineer.engine import flags
+from orbitalengineer.engine.ledger.ledger import LedgerController
+from orbitalengineer.engine.named_shared_memory import NamedSharedMemory
+from orbitalengineer.engine.cgroup.cgroup import CGroupPipeline
+from orbitalengineer.engine.device import CLDeviceManager
+from orbitalengineer.engine.distance.distance import DistancePipeline
+from orbitalengineer.engine.sim_state import SimState
+from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
+from orbitalengineer.engine.sim_config import SimConfig
+from orbitalengineer.engine.tracer import EventTracer
+from orbitalengineer.engine.merge.merge import MergePipeline
+from orbitalengineer.engine.interaction.interaction import InteractionPipeline
+from orbitalengineer.engine.nudge.nudge import NudgePipeline
+from orbitalengineer.engine.position.position import PositionPipeline
+from orbitalengineer.engine.velocity.velocity import VelocityPipeline
+from orbitalengineer.engine.bounce.bounce import BouncePipeline
+from orbitalengineer.engine.velocity_along_normal.velocity_along_normal import VelocityAlongNormalPipeline
 from orbitalengineer.ipc import message
 
 mf = cl.mem_flags
 kernel_dir = Path(__file__).parent
 
-class SimController_CL:
+class SimController:
     cfg:SimConfig
     last_tick_at:float|None = None
     

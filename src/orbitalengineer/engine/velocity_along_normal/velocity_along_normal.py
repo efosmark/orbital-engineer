@@ -1,6 +1,6 @@
 import numpy as np
-from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
-from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
+from orbitalengineer.engine.dimension import PipelineComponent
+from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
 
 KERNEL_FILE_LOCATION = "velocity_along_normal/velocity_along_normal.cl"
 

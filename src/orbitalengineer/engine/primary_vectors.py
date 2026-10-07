@@ -10,8 +10,8 @@ DEFAULT_MEM_FLAGS = mf.READ_WRITE|mf.COPY_HOST_PTR
 
 from orbitalengineer import flags
 from orbitalengineer.engine import logger
-from orbitalengineer.engine.orbitalcl.named_shared_memory import NamedSharedMemory
-from orbitalengineer.engine.orbitalcl.tracer import EventTracer
+from orbitalengineer.engine.named_shared_memory import NamedSharedMemory
+from orbitalengineer.engine.tracer import EventTracer
 from orbitalengineer.helpers import r_from_mass
 from orbitalengineer.ipc import message
 

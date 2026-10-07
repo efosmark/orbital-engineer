@@ -1,14 +1,14 @@
 import numpy as np
 import pyopencl as cl
 from pyopencl import array
-from orbitalengineer.engine.orbitalcl.cgroup.cgroup import CGroupPipeline
-from orbitalengineer.engine.orbitalcl.contacting.contacting import FindContactingBodiesPipeline
-from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
-from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
-from orbitalengineer.engine.orbitalcl.interaction.interaction import InteractionPipeline
-from orbitalengineer.engine.orbitalcl.ledger.ledger import LedgerController
-from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
-from orbitalengineer.engine.orbitalcl.velocity_along_normal.velocity_along_normal import VelocityAlongNormalPipeline
+from orbitalengineer.engine.cgroup.cgroup import CGroupPipeline
+from orbitalengineer.engine.contacting.contacting import FindContactingBodiesPipeline
+from orbitalengineer.engine.dimension import PipelineComponent
+from orbitalengineer.engine.distance.distance import DistancePipeline
+from orbitalengineer.engine.interaction.interaction import InteractionPipeline
+from orbitalengineer.engine.ledger.ledger import LedgerController
+from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
+from orbitalengineer.engine.velocity_along_normal.velocity_along_normal import VelocityAlongNormalPipeline
 
 KERNEL_FILE_LOCATION = "bounce/bounce.cl"
 

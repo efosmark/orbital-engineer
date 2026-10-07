@@ -12,9 +12,9 @@ from numpy.typing import NDArray
 
 from orbitalengineer import flags
 from orbitalengineer.engine import config, logger
-from orbitalengineer.engine.orbitalcl.device import DeviceStatus
-from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
-from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
+from orbitalengineer.engine.device import DeviceStatus
+from orbitalengineer.engine.particle_cl import ParticleCL
+from orbitalengineer.engine.sim_config import SimConfig
 from orbitalengineer.engine.particle import Particle
 from orbitalengineer.ipc import message, transport
 from orbitalengineer.ipc.clock import SimClock

@@ -1,8 +1,8 @@
 import numpy as np
 from orbitalengineer import flags
-from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
-from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
-from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
+from orbitalengineer.engine.dimension import PipelineComponent
+from orbitalengineer.engine.distance.distance import DistancePipeline
+from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
 
 KERNEL_FILE_LOCATION = "contacting/contacting.cl"
 

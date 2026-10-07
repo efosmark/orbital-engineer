@@ -1,7 +1,7 @@
 import numpy as np
 import pyopencl as cl
-from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
-from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
+from orbitalengineer.engine.dimension import PipelineComponent
+from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
 
 KERNEL_FILE_LOCATION = "nudge/nudge.cl"
 

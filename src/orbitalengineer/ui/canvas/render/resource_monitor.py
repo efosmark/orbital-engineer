@@ -2,7 +2,7 @@ from collections import deque
 import time
 from gi.repository import Gst #  type:ignore
 
-from orbitalengineer.engine.orbitalcl.device import DeviceStatus
+from orbitalengineer.engine.device import DeviceStatus
 from orbitalengineer.ipc.message import HostStatus
 from orbitalengineer.ui.audio import tone
 from orbitalengineer.ui.canvas import renderer, sparkline

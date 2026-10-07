@@ -1,11 +1,11 @@
 import numpy as np
 import pyopencl as cl
 from orbitalengineer.engine import config
-from orbitalengineer.engine.orbitalcl.contacting.contacting import FindContactingBodiesPipeline
-from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
-from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
-from orbitalengineer.engine.orbitalcl.ledger.ledger import LedgerController
-from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
+from orbitalengineer.engine.contacting.contacting import FindContactingBodiesPipeline
+from orbitalengineer.engine.dimension import PipelineComponent
+from orbitalengineer.engine.distance.distance import DistancePipeline
+from orbitalengineer.engine.ledger.ledger import LedgerController
+from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
 
 KERNEL_FILE_LOCATION = "merge/merge.cl"
 

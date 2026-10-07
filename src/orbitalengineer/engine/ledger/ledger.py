@@ -2,7 +2,7 @@ import numpy as np
 import pyopencl as cl
 
 from orbitalengineer.engine.config import LEDGER_SIZE
-from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
+from orbitalengineer.engine.dimension import PipelineComponent
 
 ledger_dtype = np.dtype([
     ("id",     np.uint32), 

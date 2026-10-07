@@ -5,7 +5,7 @@ import threading
 import time
 
 from orbitalengineer.engine import config, logger
-from orbitalengineer.engine.orbitalcl.orbitalcl import SimController_CL
+from orbitalengineer.engine.controller import SimController
 from orbitalengineer.ipc.clock import SimClock
 
 LOG_ENABLE_ENV_VAR = 'LOG_TICK_CTL'
@@ -16,7 +16,7 @@ def clamp(value, val_min, val_max):
 
 class TickController:
         
-    def __init__(self, orbital:SimController_CL, clock:SimClock):
+    def __init__(self, orbital:SimController, clock:SimClock):
         self.orbital = orbital
         self.clock = clock
         self.logic_thread = threading.Thread(target=self._logic_loop, daemon=True)

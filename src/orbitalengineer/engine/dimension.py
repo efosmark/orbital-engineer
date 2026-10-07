@@ -7,9 +7,9 @@ import pyopencl as cl
 from pyopencl import typing
 
 
-from orbitalengineer.engine.orbitalcl.named_shared_memory import NamedSharedMemory
-from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
-from orbitalengineer.engine.orbitalcl.tracer import EventTracer
+from orbitalengineer.engine.named_shared_memory import NamedSharedMemory
+from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
+from orbitalengineer.engine.tracer import EventTracer
 
 _ExtendedKernelArg: TypeAlias = """typing.KernelArg | cl.MemoryObjectHolder"""
 

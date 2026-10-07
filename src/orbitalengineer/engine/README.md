@@ -9,7 +9,7 @@ kernels. Supports body merging or collision bouncing.
 
 | file             | purpose                                                  |
 | ---------------- | -------------------------------------------------------- |
-| `orbitalcl.py`   | Host contoller responsible for dispatching CL kernels    |
+| `controller.py`  | Host contoller responsible for dispatching CL kernels    |
 | `particle_cl.py` | Proxy object for fetching field values for a particle    |
 | `tracer.py`      | EventTracer emits kernel metrics                         |
 | `flags.py`       | Bitwise per-body feature flags                           |
@@ -69,19 +69,6 @@ kernels. Supports body merging or collision bouncing.
     ╰─╥──────────────────────────────╯         ┃
       ║                                       ━┛  
       ║                                       ━┓
-    ╭─╨──────────────────────────────╮         ┃ KICK
-    │ compute_velocity               │         ┃
-    ├────────────────────────────────┤         ┃ 
-    │                                │         ┃ 
-    │  IN:               OUT:        │         ┃ 
-    │  - node_min_dt     - velocity  │         ┃ 
-    │  - position                    │         ┃ 
-    │  - mass                        │         ┃ 
-    │  - radius                      │         ┃ 
-    │                                │         ┃ 
-    ╰─╥──────────────────────────────╯         ┃
-      ║                                       ━┛
-      ║                                       ━┓
     ╭─╨──────────────────────────────────╮     ┃ COLLISION DETECTION
     │ compute_relative_velocity          │     ┃ 
     ├────────────────────────────────────┤     ┃ 
@@ -130,6 +117,19 @@ kernels. Supports body merging or collision bouncing.
     │  - mass                            │     ┃  
     │                                    │     ┃  
     ╰─╥──────────────────────────────────╯     ┃
+      ║                                       ━┛  
+      ║                                       ━┓
+    ╭─╨──────────────────────────────╮         ┃ KICK
+    │ compute_velocity               │         ┃
+    ├────────────────────────────────┤         ┃ 
+    │                                │         ┃ 
+    │  IN:               OUT:        │         ┃ 
+    │  - node_min_dt     - velocity  │         ┃ 
+    │  - position                    │         ┃ 
+    │  - mass                        │         ┃ 
+    │  - radius                      │         ┃ 
+    │                                │         ┃ 
+    ╰─╥──────────────────────────────╯         ┃
       ║                                       ━┛
     ╭─╨─╮
     ╰───╯

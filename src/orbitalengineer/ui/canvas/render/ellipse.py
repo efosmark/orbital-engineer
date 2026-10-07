@@ -1,6 +1,6 @@
 from typing import cast
 import cairo
-from orbitalengineer.engine.orbitalcl.particle_cl import ParticleCL
+from orbitalengineer.engine.particle_cl import ParticleCL
 from orbitalengineer.ui.canvas import renderer
 from orbitalengineer.ui.canvas import odt
 

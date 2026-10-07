@@ -3,8 +3,8 @@ from enum import IntEnum
 from typing import Any, Literal, Self, Sequence, Protocol
 import numpy as np
 
-from orbitalengineer.engine.orbitalcl.device import DeviceStatus
-from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
+from orbitalengineer.engine.device import DeviceStatus
+from orbitalengineer.engine.sim_config import SimConfig
 from orbitalengineer.ipc.clock import SimClock
 
 class SupportsFromDict(Protocol):

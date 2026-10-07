@@ -1,8 +1,8 @@
 import numpy as np
 import pyopencl as cl
 from orbitalengineer.engine import logger, config
-from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
-from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
+from orbitalengineer.engine.dimension import PipelineComponent
+from orbitalengineer.engine.distance.distance import DistancePipeline
 
 class CGroupAssignException(Exception):
     def __init__(self, num_bodies:int):

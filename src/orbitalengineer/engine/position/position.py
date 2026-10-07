@@ -1,7 +1,7 @@
 import pyopencl as cl
 import numpy as np
-from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
-from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
+from orbitalengineer.engine.dimension import PipelineComponent
+from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
 
 KERNEL_FILE = "position/position.cl"
 

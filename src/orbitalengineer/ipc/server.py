@@ -8,8 +8,8 @@ import time
 import psutil
 
 from orbitalengineer.engine import logger
-from orbitalengineer.engine.orbitalcl import orbitalcl
-from orbitalengineer.engine.orbitalcl.sim_config import SimConfig
+from orbitalengineer.engine import controller
+from orbitalengineer.engine.sim_config import SimConfig
 from orbitalengineer.ipc import message, transport
 from orbitalengineer.ipc.ticker import TickController
 from orbitalengineer.ipc.clock import SimClock
@@ -22,7 +22,7 @@ class OrbitalControlServer:
     host_status_last_time:float = 0
 
     def __init__(self):
-        self.orbital = orbitalcl.SimController_CL()
+        self.orbital = controller.SimController()
         self.clock = SimClock()
         self.tick_ctl = TickController(self.orbital, self.clock)
         self.enabled = True
