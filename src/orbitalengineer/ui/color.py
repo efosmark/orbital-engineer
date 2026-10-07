@@ -20,6 +20,26 @@ def hex_to_rgba(hexcolor:str) -> tuple:
         raise Exception("Invalid color value. Must be of RRGGBB or RRGGBBAA")
     return ( r/255.0, g/255.0, b/255.0, a/255.0 )
 
+
 def set_source_hex(cr:cairo.Context, hexcolor:str):
     r,g,b,a = hex_to_rgba(hexcolor)
     cr.set_source_rgba(r, g, b, a)
+
+
+from matplotlib.colors import LinearSegmentedColormap
+
+# https://en.wikipedia.org/wiki/Stellar_classification
+cmap_stellar = LinearSegmentedColormap.from_list(
+    "stellar",
+    [
+        (0.00, "#FF856C"),   #   red               #   < 2,300 K
+        (0.31, "#FFB56C"),   #   orange-red        #   2,300–3,900 K
+        (0.76, "#FFDAB5"),   #   yellow-orange     #   3,900–5,300 K
+        (0.84, "#FFEDE3"),   #   yell w-white      #   5,300–6,000 K
+        (0.92, "#F9F5FF"),   #   white             #   6,000–7,300 K
+        (0.96, "#D5E0FF"),   #   blue-white        #   7,300–10,000 K
+        (0.98, "#A2C0FF"),   #   deep-blue-white   #   10,000–33,000 K
+        (1.00, "#92B5FF"),   #   blue              #   ≥ 33,000 K
+    ], 
+    N=256
+)

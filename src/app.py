@@ -20,9 +20,9 @@ def populate(app: App):
     
     app.insert_particle(sol, color=SOL_COLOR)
 
-    N = int(2048 * 2)
+    N = 1024 * 4
     mass_min, mass_max = 1_000, 500_000
-    dist_min, dist_max =   10000,  200_000
+    dist_min, dist_max =   4000,  200_000
     dist_norm = colors.Normalize(dist_min, dist_max)
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)
@@ -40,12 +40,17 @@ def on_activate(app: App):
     app.bootstrap()
     populate(app)
     
-    app.client.init_sim()
+    app.client.init_sim(
+        coef_of_restitution=0.99,
+        target_ticks_per_second=20,
+        enable_profiling=True,
+    
+    )
     app.model.show_focused_history = True
     app.model.show_debug_info = True
     app.model.show_focus_info = True
     #app.model.secondary_body = 1011
-    app.model.engine.clock_speed = 0.1
+    #app.model.engine.clock_speed = 0.1
     app.show_message("Ready.", duration=10.0, desc="Press [space] to start.")
 
 def run():

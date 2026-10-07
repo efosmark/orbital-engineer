@@ -6,12 +6,9 @@ from numpy.typing import NDArray
 import pyopencl as cl
 from pyopencl import typing
 
-mf = cl.mem_flags
-
-DEFAULT_MEM_FLAGS = mf.READ_WRITE|mf.COPY_HOST_PTR
 
 from orbitalengineer.engine.orbitalcl.named_shared_memory import NamedSharedMemory
-from orbitalengineer.engine.orbitalcl.sim_state import SimState
+from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
 from orbitalengineer.engine.orbitalcl.tracer import EventTracer
 
 _ExtendedKernelArg: TypeAlias = """typing.KernelArg | cl.MemoryObjectHolder"""
@@ -47,50 +44,20 @@ class OrbitalKernel(cl.Kernel):
         ) #.wait()
 
 class PipelineComponent:
-    Lx:int = 256
-    debug_flag:str = '_'
-    
+    debug_flag:str = '_'    
     dependencies:list['PipelineComponent']|None = None 
     
-    def __init__(self, shm:NamedSharedMemory, pipeline_state:SimState, ctx:cl.Context, queue:cl.CommandQueue, copy_queue:cl.CommandQueue, tr:EventTracer, build_options:Sequence|None=None):
-        self.N = pipeline_state.N
-        if self.N < self.Lx: self.Lx = self.N
-        
-        self.pipeline_state = pipeline_state
+    def __init__(self, shm:NamedSharedMemory, vec:PrimaryStateVectors, ctx:cl.Context, queue:cl.CommandQueue, copy_queue:cl.CommandQueue, tr:EventTracer, build_options:Sequence|None=None):
         self.shm = shm
-        self.default_build_options = build_options or ['-cl-std=CL2.0']
+        self.vec = vec
         self.ctx = ctx
         self.queue = queue
         self.copy_queue = copy_queue
+        self.default_build_options = build_options or ['-cl-std=CL2.0']
         self.tr = tr
         self._host_vector:dict[cl.Buffer, NDArray] = dict()
         self._check_debug_flag()
         self.initialize()
-        
-    def alloc(self, size:int, dtype:type|np.dtype, fill:Sequence|None=None, shared_name:None|str=None, mem_flags=DEFAULT_MEM_FLAGS) -> cl.Buffer:
-        if shared_name is not None:
-            vec = self.shm.create_shared_memory(shared_name, size, dtype)
-        elif fill is not None:
-            vec = np.array(fill, dtype=dtype)
-        else:
-            vec = np.zeros(size, dtype)
-        b = self._create_buffer(vec, mem_flags=mem_flags)
-        self._host_vector[b] = vec
-        return b
-    
-    def get_host_vector(self, buffer: cl.Buffer, sync:bool=False) -> NDArray:
-        vec = self._host_vector[buffer]
-        if sync:
-            self.sync_to_host(buffer).wait()
-        return vec
-    
-    def sync_to_host(self, buffer: cl.Buffer, queue:cl.CommandQueue|None=None) -> cl.Event:
-        if queue is None:
-            queue = self.queue
-        return self.tr.add('enqueue_copy', cl.enqueue_copy(queue, self.get_host_vector(buffer), buffer))
-    
-    def sync_to_device(self, buffer: cl.Buffer) -> cl.Event:
-        return self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, buffer, self.get_host_vector(buffer)))
     
     def _check_debug_flag(self):
         debug_flags = os.environ.get("DEBUG", "").lower()
@@ -99,9 +66,6 @@ class PipelineComponent:
                 *self.default_build_options,
                 f"-DDEBUG=true"
             ]
-    
-    def _create_buffer(self, hostbuf, mem_flags=DEFAULT_MEM_FLAGS) -> cl.Buffer:
-        return cl.Buffer(self.ctx, mem_flags, hostbuf=hostbuf)
     
     def _get_kernel_src(self, kernel_file: str):
         with open(Path(__file__).parent / kernel_file, 'r') as f:

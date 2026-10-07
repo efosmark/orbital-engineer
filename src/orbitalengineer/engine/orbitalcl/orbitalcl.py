@@ -3,12 +3,11 @@ from typing import Sequence, cast
 from pathlib import Path
 import pyopencl as cl
 
-from orbitalengineer.engine import log_timing, logger, config
+from orbitalengineer.engine import log_timing, logger
 from orbitalengineer.engine.exception import InitKernelException
 from orbitalengineer.engine.metric import MetricsProducer
 
 from orbitalengineer.engine.orbitalcl import flags
-from orbitalengineer.engine.orbitalcl.defragment.defragment import DefragBodies
 from orbitalengineer.engine.orbitalcl.ledger.ledger import LedgerController
 from orbitalengineer.engine.orbitalcl.named_shared_memory import NamedSharedMemory
 from orbitalengineer.engine.orbitalcl.cgroup.cgroup import CGroupPipeline
@@ -35,9 +34,9 @@ class SimController_CL:
     last_tick_at:float|None = None
     
     def __init__(self):
-        self.metrics = MetricsProducer(config.METRIC_SOCKET_PATH)
         self.tr = EventTracer(self)
         self.reset()
+        self.metrics = MetricsProducer(self.cfg.METRIC_SOCKET_PATH)
 
     def reset(self):
         self.is_initialized = False
@@ -75,10 +74,10 @@ class SimController_CL:
             *self.cfg.as_build_contants()
         ]
         
-        if config.USE_FAST_RELAXED_MATH:
+        if self.cfg.USE_FAST_RELAXED_MATH:
             build_options.append('-cl-fast-relaxed-math')
         
-        args = [self.shm, self.pipeline_state, self.ctx, self.q, self.copy_queue, self.tr, build_options]        
+        args = [self.shm, self.vec, self.ctx, self.q, self.copy_queue, self.tr, build_options]        
         try:
             self._ledger = LedgerController(*args)
             self._velocity = VelocityPipeline(*args)
@@ -90,7 +89,6 @@ class SimController_CL:
             self._cgroup = CGroupPipeline(*args)
             self._distance = DistancePipeline(*args)
             self._velocity_along_normal = VelocityAlongNormalPipeline(*args)
-            self._defrag = DefragBodies(*args)
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
             logger.error(str(e))
             return False
@@ -109,14 +107,15 @@ class SimController_CL:
         self.pipeline_state.tick_id = 0
         self.pipeline_state.step_id = 0
         self._init_queue()
-        self.state = PrimaryStateVectors(self.shm, self.pipeline_state, self.ctx, self.q, self.copy_queue, self.tr)
-        self.state.populate(particles)
+        self.vec = PrimaryStateVectors(self.shm, self.ctx, self.q, self.tr)
+        self.vec.initialize(len(particles))
+        self.vec.populate(particles)
         
         if not self._init_kernels():
             return False
         
-        self._interaction(self.cfg.DEFAULT_DT_BASE, self.state)
-        if config.NUDGE_ON_START_ENABLE:
+        self._interaction(self.cfg.DEFAULT_DT_BASE, self.vec)
+        if self.cfg.NUDGE_ON_START_ENABLE:
             for i in range(10):
                 self.nudge()
         self.is_initialized = True
@@ -126,39 +125,38 @@ class SimController_CL:
         return hasattr(self, 'q')
     
     def nudge(self):
-        return self._nudge(self.state)
+        return self._nudge(self.vec)
     
     def kick(self, dt_step):
         with self.tr('wait-for-kick (host)'):
-            self._velocity(dt_step, self.state, self._distance)
+            self._velocity(dt_step, self.vec, self._distance)
             self._velocity.queue.finish()
     
     def drift(self, dt_step):
         with self.tr('wait-for-drift (host)'):
-            self._position(dt_step, self.state)
+            self._position(dt_step, self.vec)
             self._position.queue.finish()
     
     def compute_interaction_dt(self, min_dt:float):
         with self.tr('wait-for-dt (host)'):
-            self._interaction(self.cfg.DEFAULT_DT_BASE, self.state)
+            self._interaction(self.cfg.DEFAULT_DT_BASE, self.vec)
             self._interaction.queue.finish()
     
     def substep(self, dt_step):
-        dt = self._interaction.minimum_viable_dt(dt_step)
+        dt = self._interaction.minimum_viable_dt(dt_step, self.cfg.EPS_TIME)
         self.pipeline_state.step_id += 1
 
         self.kick(dt / 2.0)
         self.drift(dt)
-        self.kick(dt / 2.0)
 
-        self._distance(self.state)
+        self._distance(self.vec)
         
-        if config.COLLISION_MERGE_ENABLE:
-           self._merge(self.state, self._distance, self._ledger)
+        if self.cfg.COLLISION_MERGE_ENABLE:
+           self._merge(self.vec, self._distance, self._ledger)
         
-        if config.COLLISION_BOUNCE_ENABLE:
-            self._velocity_along_normal(self.state)
-            self._bounce(self.state, self._interaction, self._cgroup, self._distance, self._velocity_along_normal, self._ledger)
+        if self.cfg.COLLISION_BOUNCE_ENABLE:
+            self._velocity_along_normal(self.vec)
+            self._bounce(self.vec, self._interaction, self._cgroup, self._distance, self._velocity_along_normal, self._ledger)
 
         with self.tr('wait-for-collisions (host)'):
             self.q.finish()
@@ -167,17 +165,16 @@ class SimController_CL:
             self._cgroup(self._distance)
             self.q.finish()
 
+        self.kick(dt / 2.0)
         self.compute_interaction_dt(dt)
-
-        self._defrag(self.state)
-
+        self.vec.defragment()
         self._ledger.commit(self.pipeline_state.tick_id, self.pipeline_state.step_id) #.wait()
         return dt
     
     def single_step(self, dt_step):
         logger.debug("single_step(dt_step=%.4f)", dt_step)
         count = 0
-        while dt_step > config.EPS_TIME and count < config.MAX_SUB_STEPS:
+        while dt_step > self.cfg.EPS_TIME and count < self.cfg.MAX_SUB_STEPS:
             dt = self.substep(dt_step)
             dt_step -= dt
             self.pipeline_state.step_id += 1
@@ -220,56 +217,10 @@ class SimController_CL:
             ], dt_step=round(float(dt_step_size), 6))
 
     def sync(self):
-        self.state.sync(self.copy_queue)
-        self._ledger.sync_to_host(self._ledger.ledger, queue=self.copy_queue)
-        self._cgroup.sync_to_host(self._cgroup.group, queue=self.copy_queue)
-        self._distance.sync_to_host(self._distance.direct_contacts, queue=self.copy_queue)
-        self._distance.sync_to_host(self._distance.n_direct_contacts, queue=self.copy_queue)            
-        #self.copy_queue.finish()
-        #self.q.finish()
-
-
-    # def to_dict(self) -> dict:
-    #     self.sync()
-    #     return {
-    #         # Simulation state
-    #         "tick_id": int(self.tick_id),
-    #         "dt_base": float(self.dt_base),
-    #         "step_count": int(self.step_count),
-    #         "Lx": int(self.Lx),
-    #         "N": int(self.N),
-            
-    #         # Constants
-    #         "G": float(self.G),
-    #         "coef_of_restitution": float(self.coef_of_restitution),
-    #         "EPS_DIST": float(self.EPS_DIST),
-    #         "EPS_TIME": float(self.EPS_TIME),
-            
-    #         # particle field vectors
-    #         "flags":    [int(fl) for fl in self.flags],
-    #         "position": [(f"{p.real:.6f}", f"{p.imag:.6f}") for p in self.position],
-    #         "velocity": [(f"{v.real:.6f}", f"{v .imag:.6f}") for v in self.velocity],
-    #         "mass":     [f"{m:.6f}" for m in self.mass],
-    #         "radius":   [f"{r:.6f}" for r in self.radius],
-    #     }
-    
-    # def load_from_dict(self, obj:dict):
-    #     for field in ['tick_id', 'dt_base', 'step_count', 'Lx', 'N', 'G', 'EPS_DIST', 'EPS_TIME']:
-    #         setattr(self, field, obj[field])
-        
-    #     def vector_complex64(values:list):
-    #         return np.array([np.complex64(float(v[0]), float(v[1])) for v in values], dtype=np.complex64)
-
-    #     def vector_float32(values:list):
-    #         return np.array([np.float32(v) for v in values], dtype=np.float32)
-
-    #     def vector_uint32(values:list):
-    #         return np.array([np.uint32(v) for v in values], dtype=np.uint32)
-        
-    #     self._allocate_memory()
-    #     self.flags[:] = vector_uint32(obj['flags'])
-    #     self.position[:] = vector_complex64(obj['position'])
-    #     self.velocity[:] = vector_complex64(obj['velocity'])
-    #     self.mass[:] = vector_float32(obj['mass'])
-    #     self.radius[:] = vector_float32(obj['radius'])
-    #     return self
+        self.vec.sync(self.copy_queue)
+        self.vec.sync_to_host(self._ledger.ledger, queue=self.copy_queue)
+        self.vec.sync_to_host(self._cgroup.group, queue=self.copy_queue)
+        self.vec.sync_to_host(self._distance.direct_contacts, queue=self.copy_queue)
+        self.vec.sync_to_host(self._distance.n_direct_contacts, queue=self.copy_queue)            
+        self.copy_queue.finish()
+        self.q.finish()

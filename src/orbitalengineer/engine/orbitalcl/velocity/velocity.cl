@@ -2,7 +2,8 @@
 #include "flags.clh"
 
 __kernel void compute_velocity(
-             const uint    N,
+             const uint    N_bodies_alloc,
+             const uint    N_bodies_valid,
              const float   dt,
     __global const uint*   flags,
     __global const float2* position,
@@ -27,8 +28,8 @@ __kernel void compute_velocity(
     float radius_i = radius[i];
     float mass_i = mass[i];
 
-    uint row_start = i * N;
-    for (uint j = lane; j < N; j += Lx) {
+    uint row_start = i * N_bodies_alloc;
+    for (uint j = lane; j < N_bodies_valid; j += Lx) {
         if (j == i || (flags[j]&REMOVED)) continue;
         uint IDX = row_start + j;
 

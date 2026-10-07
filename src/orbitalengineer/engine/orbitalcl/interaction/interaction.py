@@ -11,31 +11,32 @@ class InteractionPipeline(PipelineComponent):
     def initialize(self):
         self._knl_compute_interaction = self._load_kernel("compute_interaction", KERNEL_FILE_LOCATION)
 
-        self.dt_until_collision = self.alloc(self.N * self.N * 2, dtype=np.float32)
-        self.min_dt_per_body = self.alloc(self.N, np.float32, fill=[np.inf for i in range(self.N)])
+        self.dt_until_collision = self.vec.alloc(self.vec.N * self.vec.N * 2, dtype=np.float32)
+        self.min_dt_per_body = self.vec.alloc(self.vec.N, np.float32, fill=[np.inf for i in range(self.vec.N)])
     
-    def minimum_viable_dt(self, dt_step):
+    def minimum_viable_dt(self, dt_step, eps_time):
         with self.tr('minimum_viable_dt (host)'):
-            min_dt_per_body = self.get_host_vector(self.min_dt_per_body, sync=True)
+            min_dt_per_body = self.vec.get_host_vector(self.min_dt_per_body, sync=True)
             try:
                 min_toi = np.min(min_dt_per_body[min_dt_per_body > 0])
             except ValueError:
                 min_toi = dt_step
-            result = max(min(dt_step, min_toi), config.EPS_TIME)
+            result = max(min(dt_step, min_toi), eps_time)
         return result      
 
     def compute_interaction(self, dt_step:float, state:PrimaryStateVectors):
-        min_dt_per_body = self.get_host_vector(self.min_dt_per_body)
+        min_dt_per_body = self.vec.get_host_vector(self.min_dt_per_body)
         min_dt_per_body[:] = 0.0
-        self.sync_to_device(self.min_dt_per_body)
+        self.vec.sync_to_device(self.min_dt_per_body)
         
         return self._knl_compute_interaction(
                 self.queue,
-                state.grid_stride_global_size,
-                state.grid_stride_local_size,
+                (self.vec.N_bodies_valid * self.vec.Lx, ),
+                (self.vec.Lx, ),
                 
                 # Args
-                np.uint32(self.N),
+                np.uint32(self.vec.N_bodies_alloc),
+                np.uint32(self.vec.N_bodies_valid),
                 np.float32(dt_step),
                 state.flags,
                 state.position,

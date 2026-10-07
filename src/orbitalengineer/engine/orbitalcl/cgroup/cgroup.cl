@@ -3,7 +3,7 @@
 
 
 __kernel void cgroup_assign(
-             const uint  N,
+             const uint  N_bodies_alloc,
     __global const uint* ids,
     __global const uint* n_direct_contacts,
     __global const uint* direct_contacts,
@@ -30,7 +30,7 @@ __kernel void cgroup_assign(
         min_contact = cgroup_src[i];
 
         // Get the individual collision
-        uint j = direct_contacts[(N * i) + lid];
+        uint j = direct_contacts[(N_bodies_alloc * i) + lid];
 
         // Look up its current min ID based on _its_ collision neighbors
         uint j_min_contact = cgroup_src[j];

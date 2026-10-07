@@ -2,7 +2,8 @@
 #include "flags.clh"
 
 __kernel void edge_distance(
-             const uint    N,
+             const uint    N_bodies_alloc,
+             const uint    N_bodies_valid,
     __global const uint*   flags,
     __global const float2* position,
     __global const float2* velocity,
@@ -18,6 +19,7 @@ __kernel void edge_distance(
     __global       uint*   nearby
 ) {
     GRID_STRIDE_INIT();
+    if (i >= N_bodies_valid) return;
     if (flags[i]&REMOVED) return;
 
     __local atomic_uint local_num_contacts;
@@ -64,14 +66,14 @@ __kernel void edge_distance(
 
     uint offset = atomic_fetch_add(&local_num_contacts, 0);
     for (uint jx=lane; jx < offset && jx < MAX_NUM_CONTACTS_PER_BODY; jx += Lx) {
-        uint index = (i * N) + jx;
+        uint index = (i * N_bodies_alloc) + jx;
         contacts[index] = contacting_i[jx];
     }
     num_contacts[i] = offset;
 
     offset = atomic_fetch_add(&local_num_nearby, 0);
     for (uint jx=lane; jx < offset && jx < MAX_NUM_CONTACTS_PER_BODY; jx += Lx) {
-        uint index = (i * N) + jx;
+        uint index = (i * N_bodies_alloc) + jx;
         nearby[index] = nearby_i[jx];
     }
     num_nearby[i] = offset;

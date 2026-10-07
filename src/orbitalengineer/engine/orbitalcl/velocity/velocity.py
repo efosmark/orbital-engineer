@@ -1,7 +1,6 @@
 import pyopencl as cl
 import numpy as np
 
-from orbitalengineer.engine.orbitalcl.contacting.contacting import FindContactingBodiesPipeline
 from orbitalengineer.engine.orbitalcl.dimension import PipelineComponent
 from orbitalengineer.engine.orbitalcl.distance.distance import DistancePipeline
 from orbitalengineer.engine.orbitalcl.primary_vectors import PrimaryStateVectors
@@ -14,20 +13,19 @@ class VelocityPipeline(PipelineComponent):
     
     def initialize(self):
         self._compute_velocity = self._load_kernel('compute_velocity', KERNEL_FILE)
-        self._velocity_intermediate = self.alloc(self.N, dtype=np.complex64)
-        self.force = self.alloc(self.N * self.N, dtype=np.complex64, shared_name="force")
+        self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=np.complex64)
+        self.force = self.vec.alloc(self.vec.N * self.vec.N, dtype=np.complex64, shared_name="force")
 
-        self.grid_stride_global_size = (self.N * self.Lx, )
-        self.grid_stride_local_size = (self.Lx, )
     
     def compute_velocity(self, dt_step:float, state:PrimaryStateVectors, distance: DistancePipeline):
         self._compute_velocity(
             self.queue,
-            self.grid_stride_global_size,
-            self.grid_stride_local_size,
+            self.vec.grid_stride_global_size,
+            self.vec.grid_stride_local_size,
             
             # Args
-            np.uint32(state.N),
+            np.uint32(self.vec.N_bodies_alloc),
+            np.uint32(self.vec.N_bodies_valid),
             np.float32(dt_step),
             state.flags,
             state.position,

@@ -4,7 +4,8 @@
 
 
 __kernel void find_contacting_bodies(
-             const uint  N,
+             const uint  N_bodies_alloc,
+             const uint  N_bodies_valid,
     __global const uint* restrict flags,
     __global const bool* restrict is_touching,
     __global uint* num_contacts,

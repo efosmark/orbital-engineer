@@ -83,7 +83,10 @@ __kernel void defrag_orbital_vectors(
     if (emit && count) {
         uint j = (N_curr - base) + offset;
 
-        if (j <= i) {
+
+
+
+        if (j <= i || (flags[j]&REMOVED)) {
             return;
         }
         //DEBUG_PRINTF("[g0=%u, l0=%u] Swapping %u -> %u", (uint)get_global_id(0), (uint)get_local_id(0), i, j);

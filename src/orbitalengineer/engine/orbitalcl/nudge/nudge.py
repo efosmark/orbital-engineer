@@ -9,16 +9,17 @@ class NudgePipeline(PipelineComponent):
     
     def initialize(self):
         self._apply_nudge = self._load_kernel("apply_nudge", KERNEL_FILE_LOCATION)
-        self._position_intermediate = self.alloc(self.N, dtype=np.complex64)
+        self._position_intermediate = self.vec.alloc(self.vec.N, dtype=np.complex64)
 
     def __call__(self, state:PrimaryStateVectors):
         self._apply_nudge(
             self.queue,
-            (self.N * self.Lx, ),  # global work size
-            (self.Lx, ),           # local work size
+            self.vec.grid_stride_global_size,
+            self.vec.grid_stride_local_size,
             
             # Args
-            np.uint32(self.N),
+            np.uint32(self.vec.N_bodies_alloc),
+            np.uint32(self.vec.N_bodies_valid),
             state.flags,
             state.position,
             state.mass,

@@ -2,19 +2,19 @@ from typing import Any, Protocol, Sequence
 
 
 class Particle(Protocol):
-    idx:int|None = None
+    
+    @property
+    def idx(self) -> int:...
 
     def get_xy(self) -> tuple[float,float]:
         position = self.get_position()
         return position.real, position.imag
-        
+    
+    def get_body_id(self) -> int:...    
     def get_position(self) -> complex:...
     def get_velocity(self) -> complex:...
     def get_mass(self) -> float:...
     def get_radius(self) -> float:...
-    def get_min_toi(self) -> float:...
-    def get_all_impact_times(self) -> Sequence[float]:...
-    def get_status(self) -> float:...
 
     def get_flags(self) -> int:...
     def has_flag(self, flag:int) -> bool:
@@ -47,7 +47,6 @@ class Particle(Protocol):
         }
 
 class ParticleRaw(Particle):
-    idx:int|None = None
     
     _flags:int
     _position:complex
@@ -78,12 +77,6 @@ class ParticleRaw(Particle):
     
     def get_radius(self) -> float:
         return self._radius
-        
-    def get_status(self) -> float:
-        return self._status
-
-    def get_min_toi(self) -> float:
-        return 0.0
     
     def get_all_impact_times(self) -> Sequence[float]:
         raise NotImplementedError()

@@ -32,7 +32,7 @@ TARGET_TICKS_PER_SECOND = 10
 #############################################
 
 COLLISION_MERGE_ENABLE = True
-COLLISION_BOUNCE_ENABLE = False
+COLLISION_BOUNCE_ENABLE = True
 NUDGE_ON_START_ENABLE = True
 
 #############################################

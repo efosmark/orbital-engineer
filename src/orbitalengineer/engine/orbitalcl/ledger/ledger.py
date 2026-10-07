@@ -23,11 +23,11 @@ class LedgerController(PipelineComponent):
 
     def initialize(self):
         self._commit_ledger = self._load_kernel("commit_ledger", KERNEL_FILE_LOCATION)
-        self.ledger_entry_count = self.alloc(1, dtype=np.uint32)
-        self.ledger = self.alloc(LEDGER_SIZE, dtype=ledger_dtype, shared_name='ledger')
+        self.ledger_entry_count = self.vec.alloc(1, dtype=np.uint32)
+        self.ledger = self.vec.alloc(LEDGER_SIZE, dtype=ledger_dtype, shared_name='ledger')
     
     def commit(self, tick_id:int, step_id:int):
-        ledger_entry_count = self.get_host_vector(self.ledger_entry_count, sync=True)[0]
+        ledger_entry_count = self.vec.get_host_vector(self.ledger_entry_count, sync=True)[0]
         
         num_entries = ledger_entry_count - self.last_ledger_entry_committed
         if num_entries == 0: return
@@ -48,4 +48,4 @@ class LedgerController(PipelineComponent):
         return evt
     
     def sync(self):
-        self.sync_to_host(self.ledger)
+        self.vec.sync_to_host(self.ledger)

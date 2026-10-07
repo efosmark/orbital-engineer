@@ -45,7 +45,8 @@ class Device:
 class InitRequest:
     device: Device
     particles: list
-    
+    config: SimConfig|None
+
     @classmethod
     def from_dict(cls, d:dict) -> Self: 
         return cls(
@@ -53,7 +54,8 @@ class InitRequest:
             particles=[
                 ParticleInit.from_dict(p)
                 for p in d["particles"]
-            ]
+            ],
+            config=SimConfig.from_dict(d["config"]) if d["config"] is not None else None
         )   
 
 @dataclass
@@ -92,6 +94,8 @@ class SharedMemoryInfo:
 
 @dataclass
 class SharedMemoryResponse:
+    id_to_index: SharedMemoryInfo
+    body_id: SharedMemoryInfo
     flags: SharedMemoryInfo
     position: SharedMemoryInfo
     velocity: SharedMemoryInfo

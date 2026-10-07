@@ -9,16 +9,17 @@ class VelocityAlongNormalPipeline(PipelineComponent):
     
     def initialize(self):
         self._knl_velocity_along_normal = self._load_kernel("velocity_along_normal", KERNEL_FILE_LOCATION)
-        self.velocity_along_normal = self.alloc(self.N * self.N, dtype=np.float32)
+        self.velocity_along_normal = self.vec.alloc(self.vec.N * self.vec.N, dtype=np.float32)
     
     def compute_velocity_along_normal(self, state:PrimaryStateVectors):
         return self._knl_velocity_along_normal(
                 self.queue,
-                state.grid_stride_global_size,
-                state.grid_stride_local_size,
+                (self.vec.N_bodies_valid * self.vec.Lx, ),
+                (self.vec.Lx, ),
                 
                 # Args
-                np.uint32(self.N),
+                np.uint32(self.vec.N_bodies_alloc),
+                np.uint32(self.vec.N_bodies_valid),
                 state.flags,
                 state.position,
                 state.velocity,

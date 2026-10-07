@@ -234,7 +234,8 @@ __kernel void assign_impulse(
 
 
 __kernel void compute_bouncing_collision_single(
-             const uint    N,
+             const uint    N_bodies_alloc,
+             const uint    N_bodies_valid,
     __global const uint*   restrict flags,
     __global const float2* restrict position,
     __global const float2* restrict velocity,
@@ -346,7 +347,8 @@ __kernel void compute_bouncing_collision_single(
 
 
 __kernel void compute_bouncing_collision_simple(
-             const uint    N,
+             const uint    N_bodies_alloc,
+             const uint    N_bodies_valid,
     __global const uint*   restrict flags,
     __global const float2* restrict position,
     __global const float2* restrict velocity,

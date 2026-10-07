@@ -3,7 +3,6 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from orbitalengineer.engine import config
 from orbitalengineer.ipc.client import ClientSocketConnection
 from orbitalengineer.ui.gtk4 import GObject, GLib
 
@@ -26,6 +25,8 @@ SPEED_SCALE = [
 
 class EngineModel(GObject.GObject): 
     props:Any
+    
+    config = GObject.Property(type=object)
        
     tick_id = GObject.Property(type=int, default=0)
     dt_step = GObject.Property(type=float, default=0)
@@ -35,12 +36,14 @@ class EngineModel(GObject.GObject):
     valid_indices = GObject.Property(type=object)
     
     paused = GObject.Property(type=bool, default=True)
-    clock_speed = GObject.Property(type=float, default=config.DEFAULT_SPEED)
+    clock_speed = GObject.Property(type=float, default=1.0)
     clock_time = GObject.Property(type=float, default=0.0)
     max_speed = GObject.Property(type=object)
     curr_tick_at = GObject.Property(type=float, default=0.0)
     next_tick_at = GObject.Property(type=float, default=0.0)
 
+    id_to_index:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
+    body_id:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
     flags:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
     position:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
     velocity:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
@@ -57,12 +60,14 @@ class EngineModel(GObject.GObject):
         if idx >= len(SPEED_SCALE):
             idx = len(SPEED_SCALE) - 1
         self.clock_speed = SPEED_SCALE[idx]
+        self.notify('clock-speed')
 
     def decrease_speed(self):
         idx = SPEED_SCALE.index(self.clock_speed) - 1
         if idx < 0:
             idx = 0
         self.clock_speed = SPEED_SCALE[idx]
+        self.notify('clock-speed')
 
 
 
@@ -80,22 +85,27 @@ class ClientSyncController(GObject.GObject):
         
     def sync(self):
         self.client.sync()
-
         if self.model.clock_speed != self.client.clock.speed:
-            self.model.clock_speed = self.client.clock.speed
-        self.model.clock_time = self.client.clock.time()
-        self.model.tick_id = self.client.tick_id
-        self.model.dt_step = self.client.dt_step
-        self.model.is_initialized = self.client.is_initialized
-        self.model.N = self.client.N
-        self.model.accum = self.client.accum
+            self.model.props.clock_speed = self.client.clock.speed
+            self.model.notify('clock-speed')
 
-        self.model.max_speed = self.client.max_speed
-        self.model.curr_tick_at = self.client.curr_tick_at
-        self.model.next_tick_at = self.client.next_tick_at
-        self.model.valid_indices = self.client.get_valid_indices()
+        self.model.props.config = self.client.config
+        self.model.notify('config')
+        self.model.props.clock_time = self.client.clock.time()
+        self.model.props.tick_id = self.client.tick_id
+        self.model.props.dt_step = self.client.dt_step
+        self.model.props.is_initialized = self.client.is_initialized
+        self.model.props.N = self.client.N
+        self.model.props.accum = self.client.accum
+
+        self.model.props.max_speed = self.client.max_speed
+        self.model.props.curr_tick_at = self.client.curr_tick_at
+        self.model.props.next_tick_at = self.client.next_tick_at
+        self.model.props.valid_indices = self.client.get_valid_indices()
         self.model.notify('valid-indices')
         
+        self.model.id_to_index = self.client.id_to_index
+        self.model.body_id = self.client.body_id
         self.model.flags = self.client.flags
         self.model.position = self.client.position
         self.model.velocity = self.client.velocity
@@ -104,8 +114,8 @@ class ClientSyncController(GObject.GObject):
         self.model.force = self.client.force
         self.model.ledger = self.client.ledger
         self.model.cgroup = self.client.cgroup
-        self.model.n_direct_contacts = self.client.n_direct_contacts
-        self.model.direct_contacts = self.client.direct_contacts
+        self.model.props.n_direct_contacts = self.client.n_direct_contacts
+        self.model.props.direct_contacts = self.client.direct_contacts
         return True
     
     def on_clock_speed_changed(self, model, param):
