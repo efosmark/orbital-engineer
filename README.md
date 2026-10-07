@@ -194,7 +194,7 @@ When set to `True` (default), pyopencl will enable profiling (which may slightly
 
 The IPC communication between client and the engine is governed by a simple protocol consisting of a binary header and a JSON payload. Each payload follows a strict schema.
 
-The full reference is outlined in thi document:
+The full reference is outlined in this document:
 
 - [Reference](/docs/transport-protocol.md)
 
