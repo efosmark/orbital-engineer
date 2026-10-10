@@ -2,30 +2,34 @@ import cmath
 from functools import cache
 import math
 import numpy as np
-from numba import jit
+from numba import boolean, float64, jit, types
 
 TAU = math.pi * 2.0
+VEC_UNIT_DEFAULT_EPS = 1e-15
+ELLIPSE_AXES_DEFAULT_EPS = 1e-12
 
 Vec2 = tuple[float, float]
 Point = tuple[float, float]
+VEC2_SIG = types.UniTuple(float64, 2)
+VEC2_PAIR_SIG = types.UniTuple(VEC2_SIG, 2)
 
-@jit(cache=False)
+@jit(VEC2_SIG(VEC2_SIG, VEC2_SIG), cache=True)
 def vec_sub(a: Vec2, b: Vec2) -> Vec2:
     """Elementwise a - b (vector from b to a)."""
     return (a[0] - b[0], a[1] - b[1])
 
-@jit(cache=False)
+@jit(float64(VEC2_SIG, VEC2_SIG), cache=True)
 def vec_dot(a: Vec2, b: Vec2) -> float:
     """Dot product a·b."""
     return a[0]*b[0] + a[1]*b[1]
 
-@jit(cache=False)
+@jit(float64(VEC2_SIG), cache=True)
 def vec_norm(a: Vec2) -> float:
     """Euclidean norm |a|."""
     return np.hypot(a[0], a[1])
 
-@jit(cache=False)
-def vec_unit(a: Vec2, eps: float = 1e-15) -> Vec2:
+@jit(VEC2_SIG(VEC2_SIG, float64), cache=True)
+def _vec_unit_jit(a: Vec2, eps: float) -> Vec2:
     """
     Unit vector in the direction of a.
     Returns None if |a| is too small (to avoid divide-by-zero).
@@ -34,8 +38,11 @@ def vec_unit(a: Vec2, eps: float = 1e-15) -> Vec2:
     if n < eps: return (0,0)
     return (a[0]/n, a[1]/n)
 
+def vec_unit(a: Vec2, eps: float = 1e-15) -> Vec2:
+    return _vec_unit_jit(a, eps)
 
-@jit(cache=False)
+
+@jit(float64(float64, float64, float64, float64), cache=True)
 def universal_gravitation(G:float, M1:float, M2:float, r:float) -> float:
     """
     Newton's Law of Universal Gravitation
@@ -51,8 +58,8 @@ def universal_gravitation(G:float, M1:float, M2:float, r:float) -> float:
     """
     return G * ((M1 * M2) / r**2)
 
-@jit(cache=False)
-def vis_viva_velocity(x:float, y:float, r:float, mu:float, a:float, prograde=True) -> Vec2:
+@jit(VEC2_SIG(float64, float64, float64, float64, float64, boolean), cache=True)
+def _vis_viva_velocity_jit(x:float, y:float, r:float, mu:float, a:float, prograde: bool) -> Vec2:
     """
     Find the velocity of a bound object at a specific radius from a central mass.
 
@@ -85,7 +92,10 @@ def vis_viva_velocity(x:float, y:float, r:float, mu:float, a:float, prograde=Tru
     
     return vx, vy
 
-@jit(cache=False)
+def vis_viva_velocity(x:float, y:float, r:float, mu:float, a:float, prograde=True) -> Vec2:
+    return _vis_viva_velocity_jit(x, y, r, mu, a, prograde)
+
+@jit(VEC2_PAIR_SIG(VEC2_SIG, VEC2_SIG, VEC2_SIG, VEC2_SIG), cache=True)
 def relative_state(r1: Vec2, v1: Vec2, r2: Vec2, v2: Vec2) -> tuple[Vec2, Vec2]:
     """
     Orbital state vectors for position and velocity.
@@ -103,7 +113,7 @@ def relative_state(r1: Vec2, v1: Vec2, r2: Vec2, v2: Vec2) -> tuple[Vec2, Vec2]:
     v = vec_sub(v2, v1)
     return (float(r[0]), float(r[1])), (float(v[0]), float(v[1]))
 
-@jit(cache=False)
+@jit(float64(float64, float64, float64), cache=True)
 def orbital_energy(mu:float, r:float, v:float) -> float:
     """
     Energy per unit mass of the orbiting body.
@@ -127,7 +137,10 @@ def orbital_energy(mu:float, r:float, v:float) -> float:
     """ 
     return (v**2 / 2) - (mu / r)
 
-@jit(cache=False)
+@jit(float64(float64, float64, float64), cache=True)
+def _standard_grav_param_jit(m1:float, m2:float, G:float) -> float:
+    return G * (m1 + m2)
+
 def standard_grav_param(m1:float, m2:float, G:float=1.0) -> float:
     """
     Standard gravitational parameter (μ or mu).
@@ -143,9 +156,16 @@ def standard_grav_param(m1:float, m2:float, G:float=1.0) -> float:
     Returns:
         float: Standard grav. parameter, in unit `m^3 ⋅ s^-2`
     """
-    return G * (m1 + m2)
+    return _standard_grav_param_jit(m1, m2, G)
 
-@jit(cache=False)
+@jit(VEC2_SIG(VEC2_SIG, VEC2_SIG, float64, float64, float64), cache=True)
+def _ellipse_axes_jit(r:Vec2, v:Vec2, mu:float, e:float, eps:float) -> tuple[float, float]:
+    rmag = vec_norm(r) + eps
+    v2 = vec_dot(v, v)
+    a = 1.0 / (2.0/rmag - v2/mu) if mu > 0 else 0
+    b = a*math.sqrt(max(0.0, 1.0 - e*e))
+    return a, b
+
 def ellipse_axes(r:Vec2, v:Vec2, mu:float, e:float, eps:float=1e-12) -> tuple[float, float]:
     """
     Semi-major/semi-minor axes for an ellipse.
@@ -164,13 +184,9 @@ def ellipse_axes(r:Vec2, v:Vec2, mu:float, e:float, eps:float=1e-12) -> tuple[fl
     Returns:
         tuple[float, float]: The pair of both semi-major and semi-minor axes (a, b).
     """
-    rmag = vec_norm(r) + eps
-    v2 = vec_dot(v, v)
-    a = 1.0 / (2.0/rmag - v2/mu) if mu > 0 else 0
-    b = a*math.sqrt(max(0.0, 1.0 - e*e))
-    return a, b
+    return _ellipse_axes_jit(r, v, mu, e, eps)
 
-@jit(cache=False)
+@jit(VEC2_SIG(VEC2_SIG, VEC2_SIG, float64), cache=True)
 def eccentricity_vec(r: Vec2, v: Vec2, mu: float) -> Vec2:
     """
     Eccentricity vector that defines the shape of the orbit.
@@ -195,7 +211,7 @@ def eccentricity_vec(r: Vec2, v: Vec2, mu: float) -> Vec2:
         ey = ((v2 - mu/rmag)*r[1] - rv*v[1]) / mu
     return (ex, ey)
 
-@jit(cache=False)
+@jit(float64(VEC2_SIG), cache=True)
 def argument_of_periapsis(e_unit: tuple[float, float]) -> float:
     """
     Orientation angle of the major axis from reference direction to periapsis.
@@ -208,7 +224,7 @@ def argument_of_periapsis(e_unit: tuple[float, float]) -> float:
     """
     return np.atan2(e_unit[1], e_unit[0])
 
-@jit(cache=False)
+@jit(float64(VEC2_SIG, VEC2_SIG), cache=True)
 def specific_angular_momentum(r_vec:Vec2, v_vec:Vec2) -> float:
     """
     Magnitude of angular momentum per unit mass.
@@ -222,7 +238,7 @@ def specific_angular_momentum(r_vec:Vec2, v_vec:Vec2) -> float:
     """
     return (r_vec[0] * v_vec[1]) - (r_vec[1] * v_vec[0])
 
-@jit(cache=False)
+@jit(float64(VEC2_SIG, float64), cache=True)
 def true_anomaly(r_vec:Vec2, arg_of_periapsis:float) -> float:
     """
     Current angular position with respect to periapsis, encoded in radians.
@@ -238,7 +254,7 @@ def true_anomaly(r_vec:Vec2, arg_of_periapsis:float) -> float:
     if T_0 < 0: T_0 += TAU
     return T_0 % TAU
 
-@jit(cache=False)
+@jit(float64(float64, VEC2_SIG), cache=True)
 def eccentric_anomaly(true_anom:float, e_vec:Vec2) -> float:
     r""" 
     Eccentric Anomaly (E) is the bridge between circular and elliptical motion. 
@@ -260,7 +276,7 @@ def eccentric_anomaly(true_anom:float, e_vec:Vec2) -> float:
         E = TAU + E
     return E 
 
-@jit(cache=False)
+@jit(float64(VEC2_SIG, float64), cache=True)
 def mean_anomaly(e_vec:Vec2, E:float) -> float:
     """
     A time-based angular parameter that describes how far along the orbit the 
@@ -280,7 +296,7 @@ def mean_anomaly(e_vec:Vec2, E:float) -> float:
     return E - (e * math.sin(E))
 
 
-@jit(cache=False)
+@jit(float64(float64, float64), cache=True)
 def orbital_period(a:float, mu:float) -> float:
     r"""
     Time to complete one orbit (for bound orbits).
@@ -297,7 +313,7 @@ def orbital_period(a:float, mu:float) -> float:
     return (2.0 * np.pi) * np.sqrt( a**3 / mu )
 
 
-@jit(cache=False)
+@jit(float64(float64), cache=True)
 def mean_motion(T:float) -> float:
     """ 
     Angular speed required for a body to complete one orbit.
@@ -314,7 +330,10 @@ def mean_motion(T:float) -> float:
     return TAU / T
 
 
-@jit(cache=False)
+@jit(VEC2_SIG(VEC2_SIG, float64), cache=True)
+def _periapsis_direction_jit(e_vec: Vec2, eps:float) -> Vec2:
+    return _vec_unit_jit(e_vec, eps)
+
 def periapsis_direction(e_vec: Vec2, eps:float=1e-12) -> Vec2:
     """
     Unit vector e_unit pointing toward periapsis.
@@ -326,10 +345,10 @@ def periapsis_direction(e_vec: Vec2, eps:float=1e-12) -> Vec2:
     Returns:
         float: Unit vector pointing toward periapsis.
     """
-    return vec_unit(e_vec, eps=eps)
+    return _periapsis_direction_jit(e_vec, eps)
 
 
-@jit(cache=False)
+@jit(boolean(VEC2_SIG, VEC2_SIG), cache=True)
 def is_retrograde(r_vec:Vec2, v_vec:Vec2) -> bool:
     """
     Determine the direction of the orbit.
@@ -351,7 +370,7 @@ def is_retrograde(r_vec:Vec2, v_vec:Vec2) -> bool:
     return specific_angular_momentum(r_vec, v_vec) < 0
 
 
-@jit(cache=False)
+@jit(VEC2_SIG(VEC2_SIG, VEC2_SIG, float64, float64), cache=True)
 def barycenter(r1: Vec2, r2: Vec2, m1: float, m2: float) -> Vec2:
     """
     Barycenter (center of mass).
@@ -369,7 +388,7 @@ def barycenter(r1: Vec2, r2: Vec2, m1: float, m2: float) -> Vec2:
     return ((m1*r1[0] + m2*r2[0]) * inv, (m1*r1[1] + m2*r2[1]) * inv)
 
 
-@jit(cache=False)
+@jit(VEC2_SIG(VEC2_SIG, VEC2_SIG, float64, float64), cache=True)
 def ellipse_center(r1:Vec2, e_vec:Vec2, e:float, a:float) -> Vec2:
     """
     Center point of the orbital ellipse as an (x,y) vector.
@@ -383,13 +402,13 @@ def ellipse_center(r1:Vec2, e_vec:Vec2, e:float, a:float) -> Vec2:
     Returns:
         Point: Pair of values for the (x,y) position
     """
-    e_unit = vec_unit(e_vec) or (0,0)
+    e_unit = _vec_unit_jit(e_vec, 1e-15) or (0,0)
     cx = r1[0] - a*e*e_unit[0]
     cy = r1[1] - a*e*e_unit[1]
     return cx, cy
 
 
-@jit(cache=False)
+@jit(float64(VEC2_SIG, float64), cache=True)
 def escape_velocity(r_rel: Vec2, grav_param: float) -> float:
     """
     Given the orbital state, find the velocity required to escape a bound orbit.
@@ -504,11 +523,11 @@ class TwoBody:
  
         self.orbital_energy = orbital_energy(self.standard_grav_param, vec_norm(self.r_rel), vec_norm(self.v_rel))        
         self.eccentricity_vec = eccentricity_vec(self.r_rel, self.v_rel, self.standard_grav_param)
-        self.e_unit = vec_unit(self.eccentricity_vec) or (0,0)
+        self.e_unit = vec_unit(self.eccentricity_vec, VEC_UNIT_DEFAULT_EPS) or (0,0)
         self.eccentricity = vec_norm(self.eccentricity_vec)
         self.is_bound = self.eccentricity < 1.0
         
-        self.semi_major_axis, self.semi_minor_axis = ellipse_axes(self.r_rel, self.v_rel, self.standard_grav_param, self.eccentricity)
+        self.semi_major_axis, self.semi_minor_axis = ellipse_axes(self.r_rel, self.v_rel, self.standard_grav_param, self.eccentricity, ELLIPSE_AXES_DEFAULT_EPS)
         self.ellipse_center = ellipse_center(r1, self.eccentricity_vec, self.eccentricity, self.semi_major_axis)
         self.argument_of_periapsis = argument_of_periapsis(self.e_unit)
         self.true_anomaly = true_anomaly(self.r_rel, self.argument_of_periapsis)
