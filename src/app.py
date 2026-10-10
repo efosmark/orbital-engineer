@@ -20,9 +20,9 @@ def populate(app: App):
     
     app.insert_particle(sol, color=SOL_COLOR)
 
-    N = 1024 * 4
+    N = 512
     mass_min, mass_max = 1_000, 500_000
-    dist_min, dist_max =   4000,  200_000
+    dist_min, dist_max = 2_000,  30_000
     dist_norm = colors.Normalize(dist_min, dist_max)
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)
@@ -33,7 +33,7 @@ def populate(app: App):
             mass=mass,
             #ecc=0.7,
             radius=math.sqrt(mass/math.pi),
-            flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY|flags.MERGE,
+            flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY,
         ), color=cmap(1-dist_norm(abs(pos))))
 
 def on_activate(app: App):
@@ -41,7 +41,7 @@ def on_activate(app: App):
     populate(app)
     
     app.client.init_sim(
-        coef_of_restitution=0.99,
+        coef_of_restitution=0.999,
         target_ticks_per_second=20,
         enable_profiling=True,
     

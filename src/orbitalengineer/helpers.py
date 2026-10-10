@@ -7,7 +7,7 @@ from orbitalengineer.engine.particle import Particle, ParticleRaw
 seed = 0xf00d11
 rng = np.random.default_rng(seed)
 
-def r_from_mass(m: np.float64) -> np.float64:
+def r_from_mass(m: np.float64|float) -> np.float64:
     r = np.sqrt(m / np.pi)
     if r <= 0:
         return np.float64(1.0)
