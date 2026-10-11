@@ -125,19 +125,34 @@ class SimController:
         return hasattr(self, 'q')
     
     def nudge(self):
+        """
+        Attempt to push away any overlapping bodies.
+        This is useful during startup as a means to ensure randomly-placed bodies don't occupy the same space.
+        """
         return self._nudge(self.vec)
     
     def kick(self, dt_step):
+        """
+        Run the kick step of Leapfrog KDK.
+        Updates the velocity for each body, based on the interactions between every other body.
+        
+        This expects the value of `dt_step` to already be 1/2 the full step value.
+        """
         with self.tr('wait-for-kick (host)'):
             self._velocity(dt_step, self.vec, self._distance)
             self._velocity.queue.finish()
     
     def drift(self, dt_step):
+        """Run the drift step of Leapfrog KDK in order to update the body positions."""
         with self.tr('wait-for-drift (host)'):
             self._position(dt_step, self.vec)
             self._position.queue.finish()
     
-    def compute_interaction_dt(self, min_dt:float):
+    def compute_interaction_dt(self):
+        """Determine the interaction time for each body.
+        
+        Interaction time is defined as when the body will collide with another body.
+        """
         with self.tr('wait-for-dt (host)'):
             self._interaction(self.cfg.DEFAULT_DT_BASE, self.vec)
             self._interaction.queue.finish()
@@ -166,7 +181,7 @@ class SimController:
             self.q.finish()
 
         self.kick(dt / 2.0)
-        self.compute_interaction_dt(dt)
+        self.compute_interaction_dt()
         self.vec.defragment()
         self._ledger.commit(self.pipeline_state.tick_id, self.pipeline_state.step_id) #.wait()
         return dt

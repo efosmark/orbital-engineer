@@ -1,6 +1,6 @@
 # Orbital Engineer
 
-An N-body orbital engine that implements a Leapfrog KDK integrator. Supports body merging or collision bouncing.
+Orbital Engineer is a GPU-accelerated N-body simulation engine for modeling gravity-driven systems with stable Leapfrog KDK integration. It is built to handle dynamic interactions at scale, including swept collision detection, configurable body merging, and elastic bouncing for fast, expressive orbital experiments.
 
 ![screenshots/n-body-example-1.png](screenshots/n-body-example-1.png)
 
