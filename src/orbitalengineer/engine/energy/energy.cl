@@ -43,6 +43,6 @@ __kernel void compute_energy(
     );
     float total_potential_energy = work_group_reduce_add(potential_energy);
     if (lane == 0) {
-        grav_potential_energy[i] = total_potential_energy;
+        grav_potential_energy[i] = 0.5f * total_potential_energy;
     }
 }
