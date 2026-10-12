@@ -1,5 +1,5 @@
 from orbitalengineer import flags
-from orbitalengineer.ui.mainapp import App
+from gui.mainapp import App
 from orbitalengineer.helpers import create_primary, create_secondary, random_position
 
 import matplotlib.pyplot as plt

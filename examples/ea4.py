@@ -1,4 +1,4 @@
-from orbitalengineer.ui.gtk4 import Gtk, GLib
+from gui.gtk4 import Gtk, GLib
 
 import cairo
 import math

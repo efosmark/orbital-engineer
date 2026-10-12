@@ -3,7 +3,7 @@ import math
 from matplotlib import colors
 
 from orbitalengineer import flags
-from orbitalengineer.ui.mainapp import App
+from gui.mainapp import App
 from orbitalengineer.helpers import create_primary, create_secondary, random_position, rng
 
 import matplotlib.pyplot as plt

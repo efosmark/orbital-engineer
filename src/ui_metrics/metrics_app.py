@@ -5,7 +5,7 @@ import json
 from collections import defaultdict, deque
 from typing import Any
 
-from orbitalengineer.ui.gtk4 import Gtk, Gio, GObject, GLib
+from gui.gtk4 import Gtk, Gio, GObject, GLib
 from ui_metrics import ui_metrics_config
 from ui_metrics.plot import PlotWindow
 from orbitalengineer.engine.config import METRIC_SOCKET_PATH

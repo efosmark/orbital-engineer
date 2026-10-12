@@ -2,7 +2,7 @@ import math
 
 from orbitalengineer import flags
 from orbitalengineer.engine.particle import Particle, ParticleRaw
-from orbitalengineer.ui.mainapp import App
+from gui.mainapp import App
 from orbitalengineer.helpers import create_primary, create_secondary, r_from_mass, random_color, random_position, rng
 
 import matplotlib.pyplot as plt

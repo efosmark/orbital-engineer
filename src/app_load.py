@@ -1,4 +1,4 @@
-from orbitalengineer.ui.mainapp import App
+from gui.mainapp import App
 
 def on_activate(app: App):
     app.bootstrap(reset=False)

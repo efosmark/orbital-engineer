@@ -13,7 +13,7 @@ from numpy.typing import NDArray
 
 from orbitalengineer.engine import logger
 from orbitalengineer.engine.orbitalnp.history import HISTORY_DEPTH
-from orbitalengineer.ui.fmt import mag_format
+from gui.fmt import mag_format
 
 
 STATUS_NOMINAL = 0

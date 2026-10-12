@@ -1,7 +1,7 @@
 from orbitalengineer import flags
 from orbitalengineer.engine.particle import ParticleRaw
 from orbitalengineer.helpers import random_color
-from orbitalengineer.ui.mainapp import App
+from gui.mainapp import App
 
 
 def on_activate(app: App):
