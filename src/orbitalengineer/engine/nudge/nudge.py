@@ -26,4 +26,4 @@ class NudgePipeline(PipelineComponent):
             state.radius,
             self._position_intermediate,
         )
-        self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, state.position, self._position_intermediate))
+        cl.enqueue_copy(self.queue, state.position, self._position_intermediate)

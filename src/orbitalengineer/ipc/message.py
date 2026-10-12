@@ -1,7 +1,6 @@
 from dataclasses import dataclass, fields
 from enum import IntEnum
-from typing import Any, Literal, Self, Sequence, Protocol
-import numpy as np
+from typing import Literal, Self, Sequence, Protocol
 
 from orbitalengineer.engine.device import DeviceStatus
 from orbitalengineer.engine.sim_config import SimConfig
@@ -106,6 +105,8 @@ class SharedMemoryResponse:
     cgroup: SharedMemoryInfo
     n_direct_contacts: SharedMemoryInfo
     direct_contacts: SharedMemoryInfo
+    kinetic_energy: SharedMemoryInfo
+    grav_potential_energy: SharedMemoryInfo        
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:

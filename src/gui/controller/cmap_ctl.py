@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 
 from orbitalengineer.engine import logger
 from gui.model.main import AppModel
-from gui.model.cmap import OPT_KE, OPT_MASS, OPT_MOMENTUM
-
+from gui.model.cmap import OPT_KE, OPT_MASS, OPT_MOMENTUM, OPT_GPE, OPT_TE
 
 class ColorizedMapController:
     original_colors:dict|None = None
@@ -22,7 +21,6 @@ class ColorizedMapController:
         self.app.engine.connect('notify::tick-id', self.on_color_map_changed)
     
     def on_color_map_changed(self, _model, param):
-        print('on_color_map_changed')
         if self.model.option is None or self.model.colormap is None:
             if self.original_colors is not None:
                 self.app.props.particle_colors = self.original_colors
@@ -35,12 +33,16 @@ class ColorizedMapController:
             self.colors = dict()
         
         self.last_option_type = self.model.option
-                
+        
         if self.model.option == OPT_KE:
-            values = [
-               float((0.5 * self.app.engine.mass[i] * (abs(self.app.engine.velocity[i])**2))) #+ (self.app.engine.mass[i] * (300_000**2)))
-               for i in range(self.app.engine.N)
-            ]
+            values = self.app.engine.kinetic_energy
+            
+        elif self.model.option == OPT_GPE:
+            values = self.app.engine.grav_potential_energy
+        
+        elif self.model.option == OPT_TE:
+            values = self.app.engine.kinetic_energy + self.app.engine.grav_potential_energy
+
         elif self.model.option == OPT_MOMENTUM:
             values = [
                 self.app.engine.mass[i] * abs(self.app.engine.velocity[i])
@@ -53,7 +55,7 @@ class ColorizedMapController:
             return
         
         vmin, vmax = np.nanpercentile(values, [1, 99])
-        norm = colors.PowerNorm(gamma=self.model.gamma, vmin=vmin, vmax=vmax, clip=False)
+        norm = colors.PowerNorm(gamma=self.model.gamma, vmin=vmin, vmax=vmax, clip=True)
         cmap = plt.colormaps[self.model.colormap]
         
         for b in self.app.engine.valid_indices:

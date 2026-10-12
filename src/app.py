@@ -15,14 +15,14 @@ def populate(app: App):
     sol = create_primary(
         mass=1e11,
         radius=200,
-        flags=flags.FIXED_POSITION|flags.FIXED_RADIUS|flags.FIXED_VELOCITY|flags.MERGE_AS_PRIMARY
+        flags=flags.MERGE_AS_PRIMARY
     )
     
     app.insert_particle(sol, color=SOL_COLOR)
 
-    N = 512
-    mass_min, mass_max = 1_000, 500_000
-    dist_min, dist_max = 2_000,  30_000
+    N = 1024 * 2
+    mass_min, mass_max = 100_000, 500_000
+    dist_min, dist_max =   2_000, 100_000
     dist_norm = colors.Normalize(dist_min, dist_max)
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)
@@ -31,9 +31,9 @@ def populate(app: App):
             sol,
             position=pos,
             mass=mass,
-            #ecc=0.7,
             radius=math.sqrt(mass/math.pi),
-            flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY,
+            ecc=0.55 + rng.random(),
+            flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY|flags.MERGE,
         ), color=cmap(1-dist_norm(abs(pos))))
 
 def on_activate(app: App):
@@ -49,8 +49,6 @@ def on_activate(app: App):
     app.model.show_focused_history = True
     app.model.show_debug_info = True
     app.model.show_focus_info = True
-    #app.model.secondary_body = 1011
-    #app.model.engine.clock_speed = 0.1
     app.show_message("Ready.", duration=10.0, desc="Press [space] to start.")
 
 def run():

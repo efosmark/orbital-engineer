@@ -54,6 +54,8 @@ class EngineModel(GObject.GObject):
     cgroup:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
     n_direct_contacts:NDArray = GObject.Property(type=object) #type:ignore
     direct_contacts:NDArray = GObject.Property(type=object) #type:ignore
+    kinetic_energy:NDArray = GObject.Property(type=object) #type:ignore
+    grav_potential_energy:NDArray = GObject.Property(type=object) #type:ignore
 
     def increase_speed(self):
         idx = SPEED_SCALE.index(self.clock_speed) + 1
@@ -92,8 +94,10 @@ class ClientSyncController(GObject.GObject):
         self.model.props.config = self.client.config
         self.model.notify('config')
         self.model.props.clock_time = self.client.clock.time()
-        self.model.props.tick_id = self.client.tick_id
-        self.model.props.dt_step = self.client.dt_step
+        if self.model.props.tick_id != self.client.tick_id:
+            self.model.props.tick_id = self.client.tick_id
+        if self.model.props.dt_step != self.client.dt_step:
+            self.model.props.dt_step = self.client.dt_step
         self.model.props.is_initialized = self.client.is_initialized
         self.model.props.N = self.client.N
         self.model.props.accum = self.client.accum
@@ -104,6 +108,7 @@ class ClientSyncController(GObject.GObject):
         self.model.props.valid_indices = self.client.get_valid_indices()
         self.model.notify('valid-indices')
         
+        # Vectors
         self.model.id_to_index = self.client.id_to_index
         self.model.body_id = self.client.body_id
         self.model.flags = self.client.flags
@@ -116,6 +121,9 @@ class ClientSyncController(GObject.GObject):
         self.model.cgroup = self.client.cgroup
         self.model.props.n_direct_contacts = self.client.n_direct_contacts
         self.model.props.direct_contacts = self.client.direct_contacts
+        self.model.props.kinetic_energy = self.client.kinetic_energy
+        self.model.props.grav_potential_energy = self.client.grav_potential_energy
+                
         return True
     
     def on_clock_speed_changed(self, model, param):

@@ -10,12 +10,16 @@ class CMapOption:
     default_gamma:float = 1.0
 
 OPT_KE = CMapOption('Kinetic Energy', 'afmhot')
+OPT_GPE = CMapOption('Grav. Potential Energy', 'afmhot')
+OPT_TE = CMapOption('Total Energy', 'afmhot')
 OPT_MOMENTUM = CMapOption('Momentum', 'gnuplot2')
 OPT_MASS = CMapOption('Mass', 'viridis')
 
 CMAP_OPTIONS = [
     None,
     OPT_KE,
+    OPT_GPE,
+    OPT_TE,
     OPT_MOMENTUM,
     OPT_MASS,
 ]

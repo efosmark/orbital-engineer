@@ -49,6 +49,8 @@ class ClientSocketConnection:
     cgroup:NDArray[np.uint32]
     n_direct_contacts:NDArray
     direct_contacts:NDArray
+    kinetic_energy:NDArray[np.float32]
+    grav_potential_energy:NDArray[np.float32]
     
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

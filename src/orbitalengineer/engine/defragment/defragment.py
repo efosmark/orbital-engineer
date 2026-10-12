@@ -54,13 +54,13 @@ class DefragBodies(PipelineComponent):
         evt.wait()
         
         #print("N = ", self.N, flush=True)
-        self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, state.id_to_index, self._id_to_index_intermediate))
-        self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, state.body_id, self._body_id_intermediate))
-        self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, state.flags, self._flags_intermediate))
-        self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, state.position, self._position_intermediate))
-        self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate))
-        self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, state.mass, self._mass_intermediate))
-        self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, state.radius, self._radius_intermediate))
+        cl.enqueue_copy(self.queue, state.id_to_index, self._id_to_index_intermediate)
+        cl.enqueue_copy(self.queue, state.body_id, self._body_id_intermediate)
+        cl.enqueue_copy(self.queue, state.flags, self._flags_intermediate)
+        cl.enqueue_copy(self.queue, state.position, self._position_intermediate)
+        cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
+        cl.enqueue_copy(self.queue, state.mass, self._mass_intermediate)
+        cl.enqueue_copy(self.queue, state.radius, self._radius_intermediate)
         self.queue.finish()
         
         return evt

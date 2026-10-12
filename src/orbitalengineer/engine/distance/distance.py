@@ -31,9 +31,8 @@ class DistancePipeline(PipelineComponent):
     
     def get_all_colliding_ids(self):
         n_all_colliding_ids = self.vec.get_host_vector(self.n_all_colliding_ids)
-        with self.tr('n_all_colliding_ids (sync)'):
-            self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, n_all_colliding_ids[:1], self.n_all_colliding_ids, wait_for=[self._evt_edge_distance] if self._evt_edge_distance is not None else None)) #.wait()
-            n_all_colliding_ids = n_all_colliding_ids[0]
+        cl.enqueue_copy(self.queue, n_all_colliding_ids[:1], self.n_all_colliding_ids, wait_for=[self._evt_edge_distance] if self._evt_edge_distance is not None else None)
+        n_all_colliding_ids = n_all_colliding_ids[0]
         if n_all_colliding_ids == 0: return None, 0, 0
         local_size = min(n_all_colliding_ids, 64)
         global_size = n_all_colliding_ids * local_size

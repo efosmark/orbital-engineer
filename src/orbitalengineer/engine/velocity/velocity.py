@@ -36,7 +36,7 @@ class VelocityPipeline(PipelineComponent):
             self._velocity_intermediate,
             self.force
         )
-        self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate))
+        cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
 
 
     def __call__(self, dt_step:float, state:PrimaryStateVectors, distance: DistancePipeline):

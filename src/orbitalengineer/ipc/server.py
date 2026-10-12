@@ -128,6 +128,8 @@ class OrbitalControlServer:
             cgroup=self._get_shared_memory_info('cgroup'),
             n_direct_contacts=self._get_shared_memory_info('n_direct_contacts'),
             direct_contacts=self._get_shared_memory_info('direct_contacts'),
+            kinetic_energy=self._get_shared_memory_info('kinetic_energy'),
+            grav_potential_energy=self._get_shared_memory_info('grav_potential_energy'),
         )
 
     def _get_status_response(self):
@@ -190,7 +192,10 @@ class OrbitalControlServer:
         
         elif message_type == message.MessageType.SYNC_REQ:
             self.orbital.sync()
-            transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
+            status_resp = self._get_status_response()
+            # TODO: send status payload to the metrics socket as well
+            # TODO: add total momentum, total energy, etc, to status response
+            transport.send_message(conn, message.MessageType.STATUS_RESP, status_resp)
 
         elif message_type == message.MessageType.STATUS_REQ:
             transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())

@@ -66,10 +66,10 @@ class PrimaryStateVectors:
     def sync_to_host(self, buffer: cl.Buffer, queue:cl.CommandQueue|None=None) -> cl.Event:
         if queue is None:
             queue = self.queue
-        return self.tr.add('enqueue_copy', cl.enqueue_copy(queue, self.get_host_vector(buffer), buffer))
+        return cl.enqueue_copy(queue, self.get_host_vector(buffer), buffer)
     
     def sync_to_device(self, buffer: cl.Buffer) -> cl.Event:
-        return self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, buffer, self.get_host_vector(buffer)))
+        return cl.enqueue_copy(self.queue, buffer, self.get_host_vector(buffer))
     
     def _create_buffer(self, hostbuf, mem_flags=DEFAULT_MEM_FLAGS) -> cl.Buffer:
         return cl.Buffer(self.ctx, mem_flags, hostbuf=hostbuf)
@@ -208,13 +208,13 @@ class PrimaryStateVectors:
             #print(id_to_index_host)
             
             # Push the sorted values back to the device
-            self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, self.id_to_index, id_to_index_host))
-            self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, self.body_id, body_id_host))
-            self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, self.flags, flags_host))
-            self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, self.position, position_host))
-            self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, self.velocity, velocity_host))
-            self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, self.mass, mass_host))
-            self.tr.add('enqueue_copy', cl.enqueue_copy(self.queue, self.radius, radius_host))
+            cl.enqueue_copy(self.queue, self.id_to_index, id_to_index_host)
+            cl.enqueue_copy(self.queue, self.body_id, body_id_host)
+            cl.enqueue_copy(self.queue, self.flags, flags_host)
+            cl.enqueue_copy(self.queue, self.position, position_host)
+            cl.enqueue_copy(self.queue, self.velocity, velocity_host)
+            cl.enqueue_copy(self.queue, self.mass, mass_host)
+            cl.enqueue_copy(self.queue, self.radius, radius_host)
             self.queue.finish()
 
         self.update_num_bodies()

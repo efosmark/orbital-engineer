@@ -141,7 +141,9 @@ class FocusInfoRenderer(renderer.Renderer):
         disp.extend([
             ("Velocity",  f"{mag_format(mag)} m/s"),
             ("Heading",   f"{angle_degrees:.1f}°"),
-            ("Group",     f"{self.orbital.cgroup[b.idx]}")
+            ("Group",     f"{self.orbital.cgroup[b.idx]}"),
+            ("KE",        f"{mag_format(self.orbital.kinetic_energy[b.idx])}J"),
+            ("Grav. PE",  f"{mag_format(self.orbital.grav_potential_energy[b.idx])}J")
         ])
         
         n_contacting = self.orbital.n_direct_contacts[b.idx]

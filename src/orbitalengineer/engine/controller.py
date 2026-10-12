@@ -4,6 +4,7 @@ from pathlib import Path
 import pyopencl as cl
 
 from orbitalengineer.engine import log_timing, logger
+from orbitalengineer.engine.energy.energy import EnergyPipeline
 from orbitalengineer.engine.exception import InitKernelException
 from orbitalengineer.engine.metric import MetricsProducer
 
@@ -89,6 +90,7 @@ class SimController:
             self._cgroup = CGroupPipeline(*args)
             self._distance = DistancePipeline(*args)
             self._velocity_along_normal = VelocityAlongNormalPipeline(*args)
+            self._energy = EnergyPipeline(*args)
         except (cl._cl.RuntimeError, cl._cl.LogicError) as e: #type:ignore
             logger.error(str(e))
             return False
@@ -213,6 +215,7 @@ class SimController:
             raise e
 
         if count > 0:
+            self._energy(self.vec)
             self.emit_metrics(float(dt_step))
             self.pipeline_state.tick_id += 1
             self.pipeline_state.step_id = 0
@@ -236,6 +239,7 @@ class SimController:
         self.vec.sync_to_host(self._ledger.ledger, queue=self.copy_queue)
         self.vec.sync_to_host(self._cgroup.group, queue=self.copy_queue)
         self.vec.sync_to_host(self._distance.direct_contacts, queue=self.copy_queue)
-        self.vec.sync_to_host(self._distance.n_direct_contacts, queue=self.copy_queue)            
+        self.vec.sync_to_host(self._energy.kinetic_energy, queue=self.copy_queue)
+        self.vec.sync_to_host(self._energy.grav_potential_energy, queue=self.copy_queue)
         self.copy_queue.finish()
         self.q.finish()

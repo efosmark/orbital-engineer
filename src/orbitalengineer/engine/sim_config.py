@@ -20,6 +20,7 @@ class SimConfig:
     COLLISION_MERGE_ENABLE:bool = config.COLLISION_MERGE_ENABLE
     COLLISION_BOUNCE_ENABLE:bool = config.COLLISION_BOUNCE_ENABLE
     MAX_SUB_STEPS:int = config.MAX_SUB_STEPS
+    EPS_SOFTENING:float = config.EPS_SOFTENING
 
     def as_build_contants(self):
         defs = dict()

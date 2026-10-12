@@ -33,21 +33,24 @@ __kernel void compute_velocity(
         if (j == i || (flags[j]&REMOVED)) continue;
         uint IDX = row_start + j;
 
+        // Get (r + ϵ)**2
         float2 dr = position[j] - position_i;
-        float dist = fast_length(dr);
-        
+        float r_squared = dot(dr, dr);
+        float softened_r_squared = r_squared + (EPS_SOFTENING * EPS_SOFTENING);
+
+        float inv_r = 1.0f / sqrt(softened_r_squared);
+        float inv_r3 = pown(inv_r, 3);
+
         // Compute force (Newton's theory of universal gravitation)
-        float2 mu = (float)(GRAV_CONSTANT) * mass_i * mass[j];
-        float2 F = (mu / (dist*dist*dist)) * dr;
+        float mu = GRAV_CONSTANT * mass_i * mass[j];
+        float2 F = mu * inv_r3 * dr;
 
-        float edge_distance = dist - radius_i - radius[j];
-        accel_accum += F * inv_mass_i * ((edge_distance > 0) ? 1 : -1);
-
+        accel_accum += F * inv_mass_i;
         force[IDX] = F;
     };
 
     float2 wg_accel = FLOAT2_WG_REDUCE_ADD(accel_accum);
     if (lane == 0) {
-        velocity_intermediate[i] = velocity[i] + (wg_accel * dt);// + ((fast_length(wg_accel) <= DV_MAX) ? wg_accel : 0.0f);
+        velocity_intermediate[i] = velocity[i] + (wg_accel * dt); // + ((fast_length(wg_accel) <= DV_MAX) ? wg_accel : 0.0f);
     }
 }

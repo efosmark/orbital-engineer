@@ -6,6 +6,7 @@ import numpy as np
 
 EPS_DIST = 1e-3
 EPS_TIME = 1e-3
+EPS_SOFTENING = 1e-6
 
 DV_MAX = 1e10
 
