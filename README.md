@@ -63,7 +63,6 @@ Each time step is broken down into three phases:
 $$
 \begin{align*}
  \mathbf a_i &= G\sum_{j\ne i} m_j \frac{\mathbf r_j-\mathbf r_i} {(r_{ij}^2+\epsilon^2)^{3/2}}
-
 && \text{acceleration}
 \\
 \\
@@ -73,7 +72,6 @@ $$
 \\
 \mathbf v_{n+1} &= \mathbf v_{n+1/2}+\frac h2\mathbf a(\mathbf r_{n+1})
 &&\text{second kick}
-
 \end{align*}
 $$
 
