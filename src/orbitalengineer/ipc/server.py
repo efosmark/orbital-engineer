@@ -65,8 +65,7 @@ class OrbitalControlServer:
             return False
 
     def _update_host_status(self):
-        utilization = psutil.cpu_percent(interval=None, percpu=True)[self.cpu_num]
-        self.host_status = message.HostStatus(self.cpu_num, utilization)
+        self.host_status = message.HostStatus(self.orbital.cpu_num, self.orbital.get_cpu_utilization())
 
     def get_cpu_status(self) -> message.HostStatus:
         now = time.monotonic()

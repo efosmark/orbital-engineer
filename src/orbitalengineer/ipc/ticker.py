@@ -54,6 +54,8 @@ class TickController:
             self._run_tick()
 
     def _compute_dt_step(self) -> float:
+        if not self.orbital.cfg.COLLISION_BOUNCE_ENABLE and not self.orbital.cfg.COLLISION_MERGE_ENABLE:
+            return self.orbital.cfg.DEFAULT_DT_BASE
         dt_step = ((1.0/self.orbital.cfg.TARGET_TICKS_PER_SECOND) * self.clock.speed) / 1.1
         return clamp(
             dt_step,

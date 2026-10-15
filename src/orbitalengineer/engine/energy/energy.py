@@ -16,8 +16,8 @@ class EnergyPipeline(PipelineComponent):
     
     def initialize(self):
         self._knl_compute_energy = self._load_kernel("compute_energy", KERNEL_FILE_LOCATION)
-        self.kinetic_energy = self.vec.alloc(self.vec.N, dtype=np.float32, shared_name="kinetic_energy")
-        self.grav_potential_energy = self.vec.alloc(self.vec.N, dtype=np.float32, shared_name="grav_potential_energy")
+        self.kinetic_energy = self.vec.alloc(self.vec.N, dtype=np.float64, shared_name="kinetic_energy")
+        self.grav_potential_energy = self.vec.alloc(self.vec.N, dtype=np.float64, shared_name="grav_potential_energy")
 
     def __call__(self, state:PrimaryStateVectors):
         self._evt_compute_energy = self._knl_compute_energy(

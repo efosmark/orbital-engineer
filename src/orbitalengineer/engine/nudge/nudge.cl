@@ -17,7 +17,7 @@ __kernel void apply_nudge(
 
     GRID_STRIDE_IJ(
         if ((flags[j]&REMOVED)) continue;
-        float edge_dist = fast_length(position[j] - position[i]) - radius[i] - radius[j];
+        float edge_dist = length(position[j] - position[i]) - radius[i] - radius[j];
         if (edge_dist > 0) continue;
         
         float2 dP = position[j] - position[i];

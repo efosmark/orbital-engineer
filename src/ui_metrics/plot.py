@@ -20,10 +20,12 @@ class PlotWindow(Gtk.ApplicationWindow):
         app,
         durations: dict[str, deque[tuple[int,float]]],
         max_line_points=180,
+        metric_series=None,
     ):
         super().__init__(application=app, title=ui_metrics_config.WINDOW_TITLE)
         self.set_default_size(*ui_metrics_config.WINDOW_DEFAULT_SIZE)
         self.durations = durations
+        self.metric_series = metric_series if metric_series is not None else {}
 
         #self.model = model
         self.max_line_points = max(20, int(max_line_points))
@@ -48,16 +50,25 @@ class PlotWindow(Gtk.ApplicationWindow):
         ]
 
         fig = Figure(figsize=(5, 5), dpi=100, facecolor=self.figure_bg)
+        metrics_gs = fig.add_gridspec(
+            1, 2, left=0.08, right=0.98, bottom=0.77, top=0.95, wspace=0.20,
+        )
+        self.ax_utilization = fig.add_subplot(metrics_gs[0, 0])
+        self.ax_dt_step = fig.add_subplot(metrics_gs[0, 1])
+        energy_gs = fig.add_gridspec(
+            1, 2, left=0.08, right=0.94, bottom=0.49, top=0.67, wspace=0.20,
+        )
+        self.ax_energy_error = fig.add_subplot(energy_gs[0, 0])
+        self.ax_total_ke = fig.add_subplot(energy_gs[0, 1])
+        self.ax_total_gpe = self.ax_total_ke.twinx()
         gs = fig.add_gridspec(
-            1,
-            3,
-            height_ratios=[1.0],
+            1, 3,
+            left=0.26, right=0.98, bottom=0.08, top=0.39, wspace=0.08,
             width_ratios=[1.0, 1.0, 0.4],
         )
         self.ax_avg_individual = fig.add_subplot(gs[0, 0])
         self.ax_avg = fig.add_subplot(gs[0, 1], sharey=self.ax_avg_individual)
         self.ax_count = fig.add_subplot(gs[0, 2], sharey=self.ax_avg_individual)
-        fig.subplots_adjust(left=0.26, right=0.98, bottom=0.1, top=0.9, hspace=0.1, wspace=0.10)
         self.canvas = FigureCanvas(fig)
         self.canvas.set_hexpand(True)
         self.canvas.set_vexpand(True)
@@ -85,7 +96,51 @@ class PlotWindow(Gtk.ApplicationWindow):
         self.ax_avg.clear()
         self.ax_count.clear()
         self.ax_avg_individual.clear()
+        self.ax_utilization.clear()
+        self.ax_energy_error.clear()
+        self.ax_dt_step.clear()
+        self.ax_total_ke.clear()
+        self.ax_total_gpe.clear()
         self._style_axes()
+
+        for name, axis, color in (
+            ("gpu_utilization", self.ax_utilization, self.default_colors[0]),
+            ("cpu_utilization", self.ax_utilization, self.default_colors[3]),
+            ("energy_error", self.ax_energy_error, self.default_colors[1]),
+            ("dt_step", self.ax_dt_step, self.default_colors[2]),
+            ("total_KE", self.ax_total_ke, self.default_colors[0]),
+            ("total_GPE", self.ax_total_gpe, self.default_colors[4]),
+        ):
+            data = self.metric_series.get(name)
+            if data:
+                step = max(1, math.ceil(len(data) / self.max_line_points))
+                points = list(data)[::step]
+                if points[-1] != data[-1]:
+                    points.append(data[-1])
+                x_vals, y_vals = zip(*points)
+                if name == "dt_step":
+                    y_vals = [value * 1000 for value in y_vals]
+                label = {
+                    "gpu_utilization": "GPU", "cpu_utilization": "CPU",
+                    "total_KE": "KE", "total_GPE": "GPE",
+                }.get(name)
+                axis.plot(x_vals, y_vals, color=color, linewidth=1.2, marker=".", markersize=3, label=label)
+
+        if self.ax_utilization.lines:
+            self.ax_utilization.legend(
+                loc="upper right", fontsize=self.tick_font_size,
+                facecolor=self.axes_bg, edgecolor=self.spine_color,
+                labelcolor=self.text_color,
+            )
+
+        energy_lines = list(self.ax_total_ke.lines) + list(self.ax_total_gpe.lines)
+        if energy_lines:
+            self.ax_total_ke.legend(
+                energy_lines, [line.get_label() for line in energy_lines],
+                loc="upper left", fontsize=self.tick_font_size,
+                facecolor=self.axes_bg, edgecolor=self.spine_color,
+                labelcolor=self.text_color,
+            )
 
         line_x_min = None
         line_x_max = None
@@ -190,6 +245,34 @@ class PlotWindow(Gtk.ApplicationWindow):
         return color
 
     def _style_axes(self):
+        for axis, title, ylabel in (
+            (self.ax_utilization, "Utilization", "Utilization (%)"),
+            (self.ax_energy_error, "Energy error", "Relative error (ΔE / E₀)"),
+            (self.ax_dt_step, "dt_step", "Step duration (ms)"),
+            (self.ax_total_ke, "Total energy", "KE"),
+        ):
+            self._style_axis(axis, show_grid=True)
+            axis.set_title(title, fontsize=self.title_font_size, color=self.text_color)
+            axis.set_xlabel("Tick", fontsize=self.label_font_size, color=self.text_color)
+            axis.set_ylabel(ylabel, fontsize=self.label_font_size, color=self.text_color)
+            axis.tick_params(axis="both", labelsize=self.tick_font_size, colors=self.text_color)
+
+        self.ax_utilization.set_ylim(0, 100)
+
+        self._style_axis(self.ax_total_gpe)
+        self.ax_total_gpe.yaxis.set_label_position("right")
+        self.ax_total_gpe.yaxis.tick_right()
+        self.ax_total_gpe.yaxis.set_offset_position("right")
+        self.ax_total_gpe.set_ylabel("GPE", fontsize=self.label_font_size, color=self.default_colors[4])
+        self.ax_total_gpe.tick_params(
+            axis="y", left=False, labelleft=False, right=True, labelright=True,
+            labelsize=self.tick_font_size, colors=self.default_colors[4],
+        )
+        self.ax_total_gpe.yaxis.get_offset_text().set_color(self.default_colors[4])
+        self.ax_total_ke.yaxis.label.set_color(self.default_colors[0])
+        self.ax_total_ke.tick_params(axis="y", colors=self.default_colors[0])
+        self.ax_total_ke.yaxis.get_offset_text().set_color(self.default_colors[0])
+
         self._style_axis(self.ax_avg, show_grid=True)
         self._style_axis(self.ax_count, show_grid=True)
         self._style_axis(self.ax_avg_individual, show_grid=True)

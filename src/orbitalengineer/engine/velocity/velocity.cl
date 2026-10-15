@@ -28,10 +28,8 @@ __kernel void compute_velocity(
     float radius_i = radius[i];
     float mass_i = mass[i];
 
-    uint row_start = i * N_bodies_alloc;
-    for (uint j = lane; j < N_bodies_valid; j += Lx) {
+    GRID_STRIDE_IJ(
         if (j == i || (flags[j]&REMOVED)) continue;
-        uint IDX = row_start + j;
 
         // Get (r + ϵ)**2
         float2 dr = position[j] - position_i;
@@ -47,10 +45,10 @@ __kernel void compute_velocity(
 
         accel_accum += F * inv_mass_i;
         force[IDX] = F;
-    };
+    );
 
     float2 wg_accel = FLOAT2_WG_REDUCE_ADD(accel_accum);
     if (lane == 0) {
-        velocity_intermediate[i] = velocity[i] + (wg_accel * dt); // + ((fast_length(wg_accel) <= DV_MAX) ? wg_accel : 0.0f);
+        velocity_intermediate[i] = velocity[i] + (wg_accel * dt);
     }
 }

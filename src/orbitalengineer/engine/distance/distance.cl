@@ -41,7 +41,7 @@ __kernel void edge_distance(
         float R = radius[j] + radius[i];
         float2 dV = velocity[j] - velocity[i];
         float2 dP = position[j] - position[i];
-        float distance_edge_to_edge = fast_length(dP) - R;
+        float distance_edge_to_edge = length(dP) - R;
 
         bool in_contact = distance_edge_to_edge <= EPS_DIST;
         if (in_contact) {

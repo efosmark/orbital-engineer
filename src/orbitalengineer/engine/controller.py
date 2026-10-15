@@ -1,7 +1,9 @@
 import time
 from typing import Sequence, cast
 from pathlib import Path
+import psutil
 import pyopencl as cl
+import numpy as np
 
 from orbitalengineer.engine import log_timing, logger
 from orbitalengineer.engine.energy.energy import EnergyPipeline
@@ -38,6 +40,9 @@ class SimController:
         self.tr = EventTracer(self)
         self.reset()
         self.metrics = MetricsProducer(self.cfg.METRIC_SOCKET_PATH)
+        self.cpu_num = psutil.Process().cpu_num()
+        self._cpu_last_sample = 0
+        self._cpu_utilization = 0
 
     def reset(self):
         self.is_initialized = False
@@ -120,6 +125,10 @@ class SimController:
         if self.cfg.NUDGE_ON_START_ENABLE:
             for i in range(10):
                 self.nudge()
+        
+        self._energy(self.vec)
+        self._starting_total_energy = sum(self.get_energy(sync=True))
+        
         self.is_initialized = True
         return True
 
@@ -187,9 +196,11 @@ class SimController:
             self._cgroup(self._distance)
             self.q.finish()
 
-        self.compute_interaction_dt()
-        self.vec.defragment()
-        self._ledger.commit(self.pipeline_state.tick_id, self.pipeline_state.step_id) #.wait()
+        if self.cfg.COLLISION_MERGE_ENABLE or self.cfg.COLLISION_BOUNCE_ENABLE:
+            self.compute_interaction_dt()
+            self.vec.defragment()
+            self._ledger.commit(self.pipeline_state.tick_id, self.pipeline_state.step_id) #.wait()
+        
         return dt
     
     def single_step(self, dt_step):
@@ -222,21 +233,50 @@ class SimController:
             self._energy(self.vec)
             self.emit_metrics(float(dt_step))
             self.pipeline_state.tick_id += 1
-            self.pipeline_state.step_id = 0
-        return count, dt_unprocessed
+            self.pipeline_state.step_id = 0        
+        return count, dt_unprocessed        
+    
+    def get_energy(self, sync:bool=False):
+        kinetic_energy = self.vec.get_host_vector(self._energy.kinetic_energy, sync=sync)
+        grav_potential_energy = self.vec.get_host_vector(self._energy.grav_potential_energy, sync=sync)
+        
+        total_KE = float(np.sum(kinetic_energy))
+        total_GPE = float(np.sum(grav_potential_energy))
+    
+        return total_KE, total_GPE
+        
+    def get_cpu_utilization(self):
+        now = time.monotonic()
+        if now - self._cpu_last_sample >= 0.3:
+            self._cpu_utilization = psutil.cpu_percent(
+                interval=None,
+                percpu=True
+            )[self.cpu_num]
+            self._cpu_last_sample = now
+        return self._cpu_utilization
     
     def emit_metrics(self, dt_step_size:float):
-        with self.tr('emit_metrics (host)'):
+        #with self.tr('emit_metrics (host)'):
             if not self.cfg.ENABLE_PROFILING: return
             self.q.finish()
     
             timeline = self.tr.timeline()
             self.tr.clear()
         
-            self.metrics.emit_metric("tick", self.pipeline_state.tick_id, timeline=[
-                { "name":t.name, "duration_ms":round(t.duration_ns/1e6, 6)}
-                for t in timeline
-            ], dt_step=round(float(dt_step_size), 6))
+            gpu_status = self.device.gpu_status()
+            
+            total_KE, total_GPE = self.get_energy()
+            energy_error = ((total_KE + total_GPE) - self._starting_total_energy) / self._starting_total_energy
+            
+            self.metrics.emit_metric("tick", self.pipeline_state.tick_id,
+                timeline=[{ "name":t.name, "duration_ms":round(t.duration_ns/1e6, 6)} for t in timeline],
+                dt_step=round(float(dt_step_size), 6),
+                gpu_utilization=gpu_status.utilization,
+                cpu_utilization=self.get_cpu_utilization(),
+                energy_error=energy_error,
+                total_KE=total_KE,
+                total_GPE=total_GPE
+            )
 
     def sync(self):
         self.vec.sync(self.copy_queue)
