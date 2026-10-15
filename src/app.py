@@ -43,7 +43,7 @@ def on_activate(app: App):
     app.client.init_sim(
         coef_of_restitution=0.999,
         target_ticks_per_second=20,
-        enable_profiling=True,
+        enable_profiling=True
     
     )
     app.model.show_focused_history = True

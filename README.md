@@ -32,17 +32,80 @@ Each time step is broken down into three phases:
 
     During kick operations, position vector is read-only.
     And during drift operations, velocity vector is read-only.
-    The first `KICK` and `DRIFT` are performed here, and the final `KICK` is performed after the collision detection step.
 
  3. **Collision Detection** - Determine which bodies are touching, and apply collision operations. Based on the per-body feature flags, one of the following strategies will be enacted.
 
     - **_None_** : Bodies pass through each-other. In order to avoid asymptotes, overlapping bodies do not continue to impart force until they are no longer overlapping. This is the default strategy for bodies that do not have a `MERGE` or `BOUNCE` flag.
-    - **_Merge_** : Bodies are combined. Their velocities and positions are computed based on their center-of-mass.
-    - **_Bounce_** : Bodies deflect off of eachother. The strength is controlled by the [coefficient of restitution](https://en.wikipedia.org/wiki/Coefficient_of_restitution). Set via the config option, `COEF_OF_RESTITUTION`.
+    - **_Merge_** (coalesce): Bodies are combined. Their velocities and positions are computed based on their center-of-momentum frame.
+    - **_Bounce_** : Bodies deflect off of eachother. The strength is controlled by the [Coefficient of Restitution](#coefficient-of-restitution).
+
+## Velocity & Position at each stage
+
+| Stage       | Position | Velocity             |
+| ----------- | -------- | -------------------- |
+| Initial     | $r(t)$   | $v(t)$               |
+| First kick  | $r(t)$   | $v(t)+\frac h2a(t)$  |
+| Drift       | $r(t+h)$ | Half-kicked velocity |
+| Second kick | $r(t+h)$ | Approximate $v(t+h)$ |
+| Collision   | $r(t+h)$ | Post-impact velocity |
+
+## Velocity Update (Kick)
+
+- **Related kernel**: [`engine/velocity/*`](/src/orbitalengineer/engine/velocity/)
+- **More info**:
+  - [Newton's law of universal gravitation - Wikipedia](https://en.wikipedia.org/wiki/Newton's_law_of_universal_gravitation)
+  - [Gravitational softening as a smoothing operation - Oxford Academic](https://academic.oup.com/mnras/article/425/2/1104/1188012)
+- **Computational Complexity**: $O(N^2)$
+- **Time Step**: half
+
+### Velocity Formula
+
+$$
+\begin{align*}
+ \mathbf a_i &= G\sum_{j\ne i} m_j \frac{\mathbf r_j-\mathbf r_i} {(r_{ij}^2+\epsilon^2)^{3/2}}
+
+&& \text{acceleration}
+\\
+\\
+\mathbf v_{n+1/2} &= \mathbf v_n+\frac h2\mathbf a_i
+&& \text{first kick}
+\\
+\\
+\mathbf v_{n+1} &= \mathbf v_{n+1/2}+\frac h2\mathbf a(\mathbf r_{n+1})
+&&\text{second kick}
+
+\end{align*}
+$$
+
+Where,
+
+- $h$ is the time step
+- $\epsilon$ is the [Plumming softening length]((https://academic.oup.com/mnras/article/425/2/1104/1188012))
+
+
+## Position Update (Drift)
+
+- **Related kernel**: [`engine/position/*`](/src/orbitalengineer/engine/position/)
+- **Computational Complexity**: $O(N)$
+- **Time Step**: full
+
+### Position Formula
+
+$$
+\mathbf r_{n+1}=\mathbf r_n+h \mathbf v_{n+1/2}
+$$
+
+Where,
+
+- $h$ is the time step
+- $\mathbf r$ is the position
+- $\mathbf v$ is the [velocity](#velocity-formula)
 
 ## Elastic Collisions
 
-**Related kernel**: [`engine/bounce/*`](/src/orbitalengineer/engine/bounce/)
+- **Related kernel**: [`engine/bounce/*`](/src/orbitalengineer/engine/bounce/)
+- **More info**: [Elastic collision - Wikipedia](https://en.wikipedia.org/wiki/Elastic_collision)
+- **Computational complexity**: $O(N^2)$
 
 ### Coefficient of Restitution
 
@@ -55,33 +118,36 @@ Each time step is broken down into three phases:
 
 These steps are ran for each colliding pair $(i, j)$.
 
-1. Normalize the difference in position:
+1. Get relative position:
 
 $$
-r_{norm} = |r_j - r_i|
+r_{ij} = |\mathbf r_j - \mathbf r_i|
 $$
 
 2. Find the relative speed along normal:
 
 $$
-v_{nrel} = {Re}((v_i - v_j) \cdot \overline{r_{norm}})
+v_{nrel} = {Re}((\mathbf v_i - \mathbf v_j) \cdot \overline{r_{ij}})
 $$
 
 3. Get the scalar impulse magnitude
 
 $$
-\frac{1.0 + (e \cdot v_{nrel})}{
-   \frac{1}{M_i} + \frac{1}{M_j}
+\text{impulse} = \frac{1.0 + (e \cdot v_{nrel})}{
+   \frac{1}{m_i} + \frac{1}{m_j}
 }
 $$
 
 4. Apply the final impulse
 
 $$
-V_i = V_i + \frac{r_{norm} \cdot \text{scalar impulse}}{M_i}
+\mathbf v_i = \mathbf v_i + \frac{r_{norm} \cdot \text{impulse}}{m_i}
 $$
 
-## Coalescing (e.g. "merging")
+## Coalescence (merging)
+
+- Related kernel: [`engine/merge/*`](/src/orbitalengineer/engine/merge/)
+- More info: [Coalescence (physics) - Wikipedia](https://en.wikipedia.org/wiki/Coalescence_(physics))
 
 ### Algorithm for Coalescence
 
@@ -89,26 +155,25 @@ $$
 2. Compute the total momentum of the group
 
 $$
-\vec{p}_{\text{tot}} = \sum_{i=0}^{N} m_i \vec{v}_i
+\vec{p}_{\text{total}} = \sum_{i=0}^{N} m_i \vec{v}_i
 $$
 
 3. Compute the total mass of the group
 
 $$
-M = \sum_{i=0}^{N} m_i
+m_{\text{total}} = \sum_{i=0}^{N} m_i
 $$
 
 4. Apply those values to determine CoM velocity and CoM position
 
 $$
-   \vec{v}_{\text{cm}} = \frac{\vec{p}_{\text{tot}}}{M} = \frac{\sum_{i=0}^{N} m_i \vec{v}_i}{\sum_{i=0}^{N} m_i}
+   \vec{v}_{\text{cm}} = \frac{\vec{p}_{\text{total}}}{m_{\text{total}}} = \frac{\sum_{i=0}^{N} m_i \vec{v}_i}{\sum_{i=0}^{N} m_i}
 $$
 
    Where,
 
-   - $\vec{v}_{\text{cm}}$ is the center-of-mass velocity
-   - $\vec{p}_{\text{tot}}$ is the sum total of momentum
-   - $M$ is the sum total of mass
+   - $\vec{v}_{\text{cm}}$ is the [center-of-momentum](https://en.wikipedia.org/wiki/Center-of-momentum_frame) velocity
+   - $\vec{p}_{\text{total}}$ is the sum total of momentum
 
 $$
    \vec{r}_{\text{cm}} = \frac{\sum_{i=0}^{N} m_i \vec{r}_i}{\sum_{i=0}^{N} m_i}
@@ -116,8 +181,17 @@ $$
 
    Where,
 
-   - $\vec{r}_{\text{cm}}$ is the center-of-mass position
+- $\vec{r}_{\text{cm}}$ is the [center-of-momentum](https://en.wikipedia.org/wiki/Center-of-momentum_frame) position
 
+## Numerical Correctness
+
+Since the integrator is based on Leapfrog KDK, it is largely symplectic; however, there are cases where secular drift or general numerical error can be introduced.
+
+ 1. Collisions. Since an restitution coefficient less than 1 will simulate energy being radiated as heat, this will look like a net loss to the system.
+ 2. Unreasonably high `EPS_TIME` value. If it is too high, errors in position can begin to propagate, especially for fast-moving bodies. You should target the lowest value you can for your system.
+ 3. Enabling adaptive time stepping (required for collision or coalescence, and disabled otherwise).
+ 4. Floating-point precision. The CL kernels currently use `float32` and `complex64`. This will be updated to 64-bit in the future.
+ 5. Compilation settings. The config setting `USE_FAST_RELAXED_MATH` should be turned off if extra precision is necessary.
 
 ## Performance
 

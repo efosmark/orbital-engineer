@@ -160,11 +160,16 @@ class SimController:
             self._interaction.queue.finish()
     
     def substep(self, dt_step):
-        dt = self._interaction.minimum_viable_dt(dt_step, self.cfg.EPS_TIME)
         self.pipeline_state.step_id += 1
-
+        
+        if self.cfg.COLLISION_MERGE_ENABLE or self.cfg.COLLISION_BOUNCE_ENABLE:
+            dt = self._interaction.minimum_viable_dt(dt_step, self.cfg.EPS_TIME)
+        else:
+            dt = dt_step
+        
         self.kick(dt / 2.0)
         self.drift(dt)
+        self.kick(dt / 2.0)
 
         self._distance(self.vec)
         
@@ -182,7 +187,6 @@ class SimController:
             self._cgroup(self._distance)
             self.q.finish()
 
-        self.kick(dt / 2.0)
         self.compute_interaction_dt()
         self.vec.defragment()
         self._ledger.commit(self.pipeline_state.tick_id, self.pipeline_state.step_id) #.wait()

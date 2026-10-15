@@ -41,6 +41,7 @@ __kernel void compute_energy(
         if (i == j) continue;
         potential_energy += get_gravitational_potential_energy(mass[i], mass[j], position[i], position[j]);
     );
+    
     float total_potential_energy = work_group_reduce_add(potential_energy);
     if (lane == 0) {
         grav_potential_energy[i] = 0.5f * total_potential_energy;
