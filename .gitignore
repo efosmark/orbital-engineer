@@ -5,3 +5,9 @@ __pycache__/
 flatpak/dist/
 flatpak/python3-deps/wheels/
 .opencl_build/
+build/
+dist/
+*.egg-info/
+flatpak/build/
+flatpak/.flatpak-builder/
+flatpak/python3-deps/wheels.tmp/

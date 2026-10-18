@@ -35,13 +35,13 @@ Each time step has three phases:
 
 ## Velocity and Position at Each Stage
 
-| Stage       | Position             | Velocity                    |
-| ----------- | -------------------- | --------------------------- |
-| Initial     | $\mathbf r_i(t)$      | $\mathbf v_i(t)$             |
-| First kick  | $\mathbf r_i(t)$      | $\mathbf v_{i,\mathrm{half}}$       |
-| Drift       | $\mathbf r_i(t+h)$  | $\mathbf v_{i,\mathrm{half}}$       |
-| Second kick | $\mathbf r_i(t+h)$  | $\mathbf v_i(t+h)$         |
-| Collision   | $\mathbf r_i(t+h)$  | Post-impact velocity        |
+| Stage       | Position             | Velocity                      |
+| ----------- | -------------------- | ----------------------------- |
+| Initial     | $\mathbf r_i(t)$     | $\mathbf v_i(t)$              |
+| First kick  | $\mathbf r_i(t)$     | $\mathbf v_{i,\mathrm{half}}$ |
+| Drift       | $\mathbf r_i(t+h)$   | $\mathbf v_{i,\mathrm{half}}$ |
+| Second kick | $\mathbf r_i(t+h)$   | $\mathbf v_i(t+h)$            |
+| Collision   | $\mathbf r_i(t+h)$   | Post-impact velocity          |
 
 Subscript $i$ identifies a body; $t$ and $t+h$ mark the start and end of a step. The label “half” denotes the intermediate velocity after the first kick. Merging also updates the final position to the group's center of mass.
 
@@ -342,7 +342,7 @@ The UI builds scenarios, sends server commands, and displays orbital state from 
 The metrics app displays kernel timings and energy diagnostics. Start it from the repository root:
 
 ```bash
-./.venv/bin/python src/ui_metrics/metrics_app.py
+make metrics
 ```
 
 Set `ENABLE_PROFILING = True` (the default) to enable profiling and metrics. The engine sends metrics to `METRIC_SOCKET_PATH`. Profiling may add some overhead.
@@ -353,20 +353,31 @@ Client–engine messages use a binary header and a JSON payload with a defined s
 
 ## Development
 
-1. Install the system OpenCL dependencies. For AMD GPUs on Arch Linux:
+Use Python 3.13 or newer. Install a working OpenCL runtime and GPU driver for engine execution. On Arch Linux with an AMD GPU, for example:
 
-   ```bash
-   sudo pacman -Syu rocm-opencl-runtime
-   ```
+```bash
+sudo pacman -S rocm-opencl-runtime
+```
 
-2. Create the virtual environment:
+For the desktop client, also install GTK 4, libadwaita, GStreamer and its base plugins, Cairo, and the development libraries needed to build PyGObject and pycairo.
 
-   ```bash
-   make venv
-   ```
+```bash
+make dev
+```
 
-3. Install the engine in that environment:
+For an engine-only installation, use `make install`. Both tasks create `.venv` if needed. `requirements.txt` supplies the core dependencies for both the Python package metadata and Flatpak downloads; the `gtk` extra adds the client and metrics dependencies.
 
-   ```bash
-   ./.venv/bin/python -m pip install -e .
-   ```
+Run the server and client in separate terminals:
+
+```bash
+make server
+make run
+```
+
+- Run `make metrics` in a third terminal for timing and energy plots.
+- Use `make test-unit` for the CPU tests or `make test` for the full suite, which requires an OpenCL device.
+- Running `make wheel` creates a distributable wheel, including the OpenCL kernels.
+
+### Flatpak
+
+See [Flatpak development builds](flatpak/README.md) for packaging and sandbox driver requirements.

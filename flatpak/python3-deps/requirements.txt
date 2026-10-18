@@ -1,2 +1,4 @@
-numba==0.61.2
-numpy==2.2.6
+# Core requirements are shared with the Python package.
+-r ../../requirements.txt
+# PyGObject and Cairo are supplied by the GNOME runtime.
+matplotlib>=3.10

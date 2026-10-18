@@ -2,10 +2,9 @@
   "name": "python3-deps",
   "buildsystem": "simple",
   "build-commands": [
-    "pip3 install --no-index --find-links=\"file://${PWD}/wheels\" --prefix=${FLATPAK_DEST} -r ${PWD}/requirements.txt"
+    "pip3 install --no-index --no-deps --ignore-installed --prefix=/app wheels/*.whl"
   ],
   "sources": [
-    {"type": "dir", "path": "wheels", "dest": "wheels"},
-    {"type": "file","path": "requirements.txt"}
+    {"type": "dir", "path": "wheels", "dest": "wheels"}
   ]
 }

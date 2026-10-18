@@ -53,6 +53,6 @@ class SimClock:
         r.last_time_ms = input["last_time_ms"]
         return r
 
-    def update(self, obj:SimClock):
+    def update(self, obj:Self):
         for f in fields(obj):
             setattr(self, f.name, getattr(obj, f.name))

@@ -3,24 +3,23 @@
   <id>com.qmew.OrbitalEngineer</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
-  <url type="homepage">https://qmew.com/orbital-engineer</url>
 
   <name>Orbital Engineer</name>
   <summary>Interactive orbital mechanics sandbox</summary>
 
   <description>
-    <p>Design and simulate orbits with live visualization, integrator choices (Euler, Leapfrog KDK), and export of elements/plots.</p>
+    <p>Simulate gravitational N-body systems with leapfrog KDK integration, live visualization, merging, and bouncing collisions.</p>
     <ul>
-      <li>N-body 2D with fast NumPy/Numba kernels</li>
-      <li>Adwaita/GTK4 UI with shortcuts and toasts</li>
-      <li>Import/export of scenarios</li>
+      <li>GPU-accelerated 2D N-body simulation with OpenCL kernels</li>
+      <li>GTK 4 and libadwaita client with keyboard controls</li>
+      <li>Kernel timing and energy diagnostics</li>
     </ul>
   </description>
 
   <launchable type="desktop-id">com.qmew.OrbitalEngineer.desktop</launchable>
 
   <developer id="com.qmew">
-    <name>Your Name or Org</name>
+    <name>Orbital Engineer contributors</name>
   </developer>
 
   <icon type="stock">com.qmew.OrbitalEngineer</icon>
@@ -38,7 +37,7 @@
 
   <url type="homepage">https://qmew.com/orbital-engineer</url>
   <url type="bugtracker">https://github.com/efosmark/orbital-engineer/issues</url>
-  <url type="vcs-browser">https://github.com/efosmark/orbital-engineer/repo</url>
+  <url type="vcs-browser">https://github.com/efosmark/orbital-engineer</url>
   <url type="donation">https://qmew.com/donate</url>
 
   <releases>
@@ -59,5 +58,4 @@
     <content_attribute id="money-purchasing">none</content_attribute>
   </content_rating>
 
-  <translation type="gettext">com.qmew.OrbitalEngineer</translation>
 </component>

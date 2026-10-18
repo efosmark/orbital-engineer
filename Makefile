@@ -1,71 +1,102 @@
+.DEFAULT_GOAL := help
 
-# ---------- config ----------
-APP_ID     := com.qmew.OrbitalEngineer
-FPK_DIR    := flatpak
-MANIFEST   := $(FPK_DIR)/$(APP_ID).yaml
-
-PYVER_TAG  := 312                    # GNOME 47 → CPython 3.12
-PLAT_TAG   := manylinux_2_17_x86_64  # (= manylinux2014 x86_64)
-
-VENV       := .venv
-DIST_DIR   := $(FPK_DIR)/dist
+PYTHON ?= python3
+VENV ?= .venv
+VENV_PYTHON := $(VENV)/bin/python
+APP_ID := com.qmew.OrbitalEngineer
+FPK_DIR := flatpak
+MANIFEST := $(FPK_DIR)/$(APP_ID).yaml
+DIST_DIR := $(FPK_DIR)/dist
 VENDOR_DIR := $(FPK_DIR)/python3-deps
-WHEELS     := $(VENDOR_DIR)/wheels
-REQ        := $(VENDOR_DIR)/requirements.txt
+WHEELS := $(VENDOR_DIR)/wheels
+# GNOME 49 uses CPython 3.13. Override both tags for another architecture/runtime.
+PYVER_TAG ?= 313
+PLAT_TAG ?= manylinux_2_27_x86_64 manylinux_2_28_x86_64 manylinux_2_17_x86_64 manylinux2014_x86_64
+STATE_DIR ?= $(FPK_DIR)/.flatpak-builder
+BUILD_DIR ?= $(FPK_DIR)/build
+ARGS ?=
 
-STATE_DIR  := /tmp/fb-state
-BUILD_DIR  := /tmp/build-dir
+.PHONY: help all venv install dev pipx-install run server metrics test test-unit \
+        wheel vendor-wheels flatpak-check flatpak-build flatpak-install \
+        flatpak-run flatpak-server clean dev-clean distclean
 
-.PHONY: dev pipx-install all wheel $(WHEELS) vendor-wheels flatpak-check flatpak-build flatpak-run clean distclean
+help:
+	@echo "Setup:     venv install (engine) dev (GTK UI + development tools) pipx-install"
+	@echo "Run:       server run metrics (start server before run; ARGS=... supported)"
+	@echo "Tests:     test (requires OpenCL) test-unit (CPU only)"
+	@echo "Packaging: wheel vendor-wheels flatpak-check flatpak-build flatpak-install"
+	@echo "Flatpak:   flatpak-server flatpak-run (start server first)"
+	@echo "Cleanup:   clean dev-clean distclean"
 
-dev: $(VENV)/bin/activate
-	$(VENV)/bin/pip install -e .[dev,gtk]
+all: wheel
 
-venv: $(VENV)/bin/activate
+venv: $(VENV)/bin/python
 
-$(VENV)/bin/activate:
-	python -m venv $(VENV)
-	$(VENV)/bin/pip install -U pip
+$(VENV)/bin/python:
+	$(PYTHON) -m venv $(VENV)
+
+install: venv
+	$(VENV_PYTHON) -m pip install -e .
+
+dev: venv
+	$(VENV_PYTHON) -m pip install -e '.[dev,gtk]'
 
 pipx-install:
-	pipx install .[gtk]
+	pipx install '.[gtk]'
 
-run: dev
-	$(VENV)/bin/python 
+run: venv
+	$(VENV_PYTHON) -m orbitalengineer $(ARGS)
 
-dev-clean:
-	rm -rf $(VENV) $(DIST_DIR)
+server: venv
+	$(VENV_PYTHON) -m orbitalengineer.ipc.server $(ARGS)
 
-wheel: $(DIST_DIR)/.built
+metrics: venv
+	$(VENV_PYTHON) -m ui_metrics.metrics_app $(ARGS)
 
-$(DIST_DIR)/.built: pyproject.toml
-	python3 -m pip install -U build
-	python3 -m build --wheel -o $(DIST_DIR)
-	touch $@
+test: venv
+	$(VENV_PYTHON) -m pytest $(ARGS)
 
-vendor-wheels: $(WHEELS)
+test-unit: venv
+	$(VENV_PYTHON) -m pytest src/orbitalengineer/twobody $(ARGS)
 
-$(WHEELS): 
-	@echo ">> Downloading wheels -> $(WHEELS)"
+# Always rebuild so source and kernel changes cannot leave a stale wheel.
+wheel: venv
+	rm -rf build $(DIST_DIR)
+	$(VENV_PYTHON) -m pip install 'build>=1.2'
+	$(VENV_PYTHON) -m build --wheel --outdir $(DIST_DIR)
+
+# Download into a fresh staging directory to avoid mixing incompatible wheels.
+vendor-wheels: venv
+	rm -rf $(WHEELS).tmp
+	mkdir -p $(WHEELS).tmp
+	$(VENV_PYTHON) -m pip download -r $(VENDOR_DIR)/requirements.txt \
+		--dest $(WHEELS).tmp --only-binary=:all: \
+		$(foreach platform,$(PLAT_TAG),--platform $(platform)) --implementation cp --python-version $(PYVER_TAG)
 	rm -rf $(WHEELS)
-	mkdir -p $(WHEELS)
-	python3 -m pip download --no-cache-dir -r $(REQ) -d $(WHEELS) \
-	  --only-binary=:all: --prefer-binary \
-	  --platform $(PLAT_TAG) --implementation cp --python-version $(PYVER_TAG)
+	mv $(WHEELS).tmp $(WHEELS)
 
 flatpak-check:
-	appstreamcli validate --pedantic $(FPK_DIR)/data/com.qmew.OrbitalEngineer.metainfo.xml
+	appstreamcli validate --no-net --pedantic $(FPK_DIR)/data/$(APP_ID).metainfo.xml
+	desktop-file-validate $(FPK_DIR)/data/$(APP_ID).desktop
+	flatpak-builder --show-manifest $(MANIFEST) > /dev/null
 
-flatpak-build: wheel vendor-wheels
-	flatpak-builder \
-		--user \
-		--install \
-		--force-clean \
-		--state-dir=$(STATE_DIR) \
-		$(BUILD_DIR) $(MANIFEST)
+flatpak-build: flatpak-check wheel vendor-wheels
+	flatpak-builder --force-clean --state-dir=$(STATE_DIR) $(BUILD_DIR) $(MANIFEST)
+
+flatpak-install: flatpak-build
+	flatpak-builder --user --install --finish-only --state-dir=$(STATE_DIR) $(BUILD_DIR) $(MANIFEST)
 
 flatpak-run:
-	flatpak run $(APP_ID)
+	flatpak run $(APP_ID) $(ARGS)
+
+flatpak-server:
+	flatpak run --command=python3 $(APP_ID) -m orbitalengineer.ipc.server $(ARGS)
+
+clean:
+	rm -rf build $(DIST_DIR) src/*.egg-info
+
+dev-clean: clean
+	rm -rf $(VENV)
 
 distclean: clean
-	rm -rf $(DIST_DIR) *.egg-info build
+	rm -rf $(WHEELS) $(WHEELS).tmp $(STATE_DIR) $(BUILD_DIR)

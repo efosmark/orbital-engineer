@@ -1,2 +1,6 @@
-numba==0.61.2
-numpy==2.2.6
+# Engine dependencies; also used as project metadata by setuptools.
+# Install the GTK client with: python -m pip install '.[gtk]'
+numpy>=2.2.6
+numba>=0.63.1
+pyopencl>=2026.1.2
+psutil>=7.0
