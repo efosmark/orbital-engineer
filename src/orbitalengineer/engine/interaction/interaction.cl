@@ -58,7 +58,7 @@ __kernel void compute_interaction(
         float curr_min = (t1 > 0.0f) ? t1 : ((t2 > 0.0f) ? t2 : dt_step);
         min_impact = fmin(min_impact, curr_min);
     
-        // float distance_edge_to_edge = fast_length(dP) - R;
+        // float distance_edge_to_edge = length(dP) - R;
 
         // bool in_contact = distance_edge_to_edge <= EPS_DIST;
         // if (in_contact) {

@@ -21,6 +21,8 @@ class TickController:
         self.clock = clock
         self.logic_thread = threading.Thread(target=self._logic_loop, daemon=True)
         self.logic_running = False
+        
+        self._last_metrics_emitted_time = 0
         atexit.register(self.stop)
         self.reset()
     
@@ -82,6 +84,7 @@ class TickController:
         tick_start = time.monotonic()
         count, dt_unprocessed = self.orbital.tick(self.dt_step)
         if count > 0:
+            self.emit_metrics(self.dt_step - dt_unprocessed)
             if os.environ.get(LOG_ENABLE_ENV_VAR):
                 logger.info(f"[count {count}]  [unprocessed {dt_unprocessed:.4f}]")
             t = time.monotonic()
@@ -102,3 +105,33 @@ class TickController:
     
     def stop(self):
         self.logic_running = False
+
+    def emit_metrics(self, dt_step_size:float):
+        t = self.clock.time()
+        if t - self._last_metrics_emitted_time < (self.orbital.cfg.DEFAULT_DT_BASE * 4.0):
+            return
+
+        if not self.orbital.cfg.ENABLE_PROFILING: return
+        self.orbital.q.finish()
+
+        timeline = self.orbital.tr.timeline()
+        self.orbital.tr.clear()
+    
+        gpu_status = self.orbital.device.gpu_status()
+        
+        total_KE, total_GPE = self.orbital.get_energy()
+        energy_error = ((total_KE + total_GPE) - self.orbital._starting_total_energy) / self.orbital._starting_total_energy
+        
+        self.orbital.metrics.emit_metric("tick", self.orbital.pipeline_state.tick_id,
+            timeline=[{ "name":t.name, "duration_ms":round(t.duration_ns/1e6, 6)} for t in timeline],
+            dt_step=round(float(dt_step_size), 6),
+            gpu_utilization=gpu_status.utilization,
+            gpu_temperature=gpu_status.temperature,
+            cpu_utilization=self.orbital.get_cpu_utilization(),
+            energy_error=energy_error,
+            total_KE=total_KE,
+            total_GPE=total_GPE,
+            sim_time=t,
+            virial_ratio=(total_KE * 2.0)/abs(total_GPE)
+        )
+        self._last_metrics_emitted_time = t

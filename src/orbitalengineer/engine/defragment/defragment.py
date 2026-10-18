@@ -17,8 +17,8 @@ class DefragBodies(PipelineComponent):
         self._id_to_index_intermediate = self.alloc(self.N, dtype=np.uint32)      
         self._body_id_intermediate = self.alloc(self.N, dtype=np.uint32)      
         self._flags_intermediate = self.alloc(self.N, dtype=np.uint32)      
-        self._position_intermediate = self.alloc(self.N, dtype=np.complex64)        
-        self._velocity_intermediate = self.alloc(self.N, dtype=np.complex64)        
+        self._position_intermediate = self.alloc(self.N, dtype=dtypes.COMPLEX)        
+        self._velocity_intermediate = self.alloc(self.N, dtype=dtypes.COMPLEX)        
         self._mass_intermediate = self.alloc(self.N, dtype=np.float32)
         self._radius_intermediate = self.alloc(self.N, dtype=np.float32)
     

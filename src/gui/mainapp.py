@@ -20,6 +20,7 @@ class App(Gtk.Application):
     platform_id = GObject.Property(type=int, default=-1)
     device_id = GObject.Property(type=int, default=-1)
     
+    tick = GObject.Signal(name='tick', arg_types=(int,),)
     bouncing = GObject.Signal(name='bouncing', arg_types=(object,),)
     merging = GObject.Signal(name='merging', arg_types=(object,),)
     
@@ -48,6 +49,11 @@ class App(Gtk.Application):
         self.platform_id = platform_id
         self.device_id = device_id
         self.client.set_device(platform_id, device_id)
+
+        self.model.engine.connect("notify::tick-id", self.on_sim_tick_changed)
+
+    def on_sim_tick_changed(self, m, tick_id):
+        self.emit("tick", self.model.engine.tick_id)
 
     def on_ledger_entry_added(self, m, le):
         if le.action&flags.BOUNCE:

@@ -6,7 +6,7 @@ import numpy as np
 
 EPS_DIST = 1e-3
 EPS_TIME = 1e-3
-EPS_SOFTENING = 50.0
+SOFTENING_LENGTH = 50.0
 
 DV_MAX = 1e10
 
@@ -34,7 +34,7 @@ TARGET_TICKS_PER_SECOND = 30
 
 COLLISION_MERGE_ENABLE = False
 COLLISION_BOUNCE_ENABLE = False
-NUDGE_ON_START_ENABLE = True
+NUDGE_ON_START_ENABLE = False
 
 #############################################
 # IPC Settings
@@ -54,10 +54,11 @@ SERIALIZED_VALUE_PRECISION = 6
 #############################################
 
 CGROUP_ASSIGN_MAX_ITERATIONS = 200
-USE_FAST_RELAXED_MATH = True
-
-###
-#
-###
-
 LEDGER_SIZE = 1000
+
+#############################################
+# Numerical Correctness
+#############################################
+
+USE_FAST_RELAXED_MATH = False
+USE_DOUBLE_PRECISION = True

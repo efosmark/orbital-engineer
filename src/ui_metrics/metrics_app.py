@@ -17,16 +17,21 @@ class MetricsApp(Gtk.Application):
     
     def __init__(self):
         super().__init__(application_id=ui_metrics_config.APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        self.durations = defaultdict(lambda:deque(maxlen=ui_metrics_config.MAX_DURATION_SAMPLES))
-        self._metric_limits = {
-            "gpu_utilization": ui_metrics_config.MAX_UTILIZATION_SAMPLES,
-            "cpu_utilization": ui_metrics_config.MAX_UTILIZATION_SAMPLES,
-            "energy_error": ui_metrics_config.MAX_ENERGY_SAMPLES,
-            "total_KE": ui_metrics_config.MAX_ENERGY_SAMPLES,
-            "total_GPE": ui_metrics_config.MAX_ENERGY_SAMPLES,
-            "dt_step": ui_metrics_config.MAX_DT_STEP_SAMPLES,
+        self.durations = defaultdict(deque)
+        self._history_seconds = {
+            "gpu_utilization": ui_metrics_config.UTILIZATION_HISTORY_SECONDS,
+            "cpu_utilization": ui_metrics_config.UTILIZATION_HISTORY_SECONDS,
+            "gpu_temperature": ui_metrics_config.GPU_TEMPERATURE_HISTORY_SECONDS,
+            "energy_error": ui_metrics_config.ENERGY_HISTORY_SECONDS,
+            "total_KE": ui_metrics_config.ENERGY_HISTORY_SECONDS,
+            "total_GPE": ui_metrics_config.ENERGY_HISTORY_SECONDS,
+            "dt_step": ui_metrics_config.DT_STEP_HISTORY_SECONDS,
+            "virial_ratio": ui_metrics_config.VIRIAL_RATIO_HISTORY_SECONDS,
         }
+        # Samples contain tick ID, simulation time, and value.
         self.metric_series = {}
+        self._last_tick_id = None
+        self._last_sim_time = None
         self.plot_win = None
         self._refresh_source_id = 0
         self._max_metrics_per_poll = ui_metrics_config.MAX_METRICS_PER_POLL
@@ -62,21 +67,41 @@ class MetricsApp(Gtk.Application):
                 continue
 
             received_metric = True
-            if tick_id == 0:
-                self.durations.clear()
-                self.metric_series.clear()
-            for name in self._metric_limits:
+            sim_time = metric.get("sim_time")
+            if (
+                tick_id == 0
+                or (self._last_tick_id is not None and tick_id < self._last_tick_id)
+                or (
+                    sim_time is not None
+                    and self._last_sim_time is not None
+                    and sim_time < self._last_sim_time
+                )
+            ):
+                self.clear_metrics()
+            self._last_tick_id = tick_id
+            if sim_time is not None:
+                self._last_sim_time = sim_time
+            for name in self._history_seconds:
                 value = metric.get(name)
-                if value is not None:
+                if value is not None and sim_time is not None:
                     if name not in self.metric_series:
-                        self.metric_series[name] = deque(maxlen=self._metric_limits[name])
-                    self.metric_series[name].append((tick_id, value))
-            for m in metric.get("timeline", []):
-                self.add_duration(m["name"], m["duration_ms"], tick_id)
-            self._expire_history(tick_id)
+                        self.metric_series[name] = deque()
+                    self.metric_series[name].append((tick_id, sim_time, value))
+            if sim_time is not None:
+                for m in metric.get("timeline", []):
+                    self.add_duration(m["name"], m["duration_ms"], tick_id, sim_time)
+                self._expire_history(sim_time)
         if received_metric and self.plot_win is not None:
             self.plot_win.queue_redraw()
         return True
+
+    def clear_metrics(self, *, force_redraw=False):
+        self.durations.clear()
+        self.metric_series.clear()
+        self._last_tick_id = None
+        self._last_sim_time = None
+        if self.plot_win is not None:
+            self.plot_win.reset_plot(force_redraw=force_redraw)
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
@@ -106,20 +131,20 @@ class MetricsApp(Gtk.Application):
     def _on_plot_window_destroyed(self, _window):
         self.plot_win = None
 
-    def add_duration(self, name, duration, tick_id):
-        self.durations[name].append((tick_id, duration))    
+    def add_duration(self, name, duration, tick_id, sim_time):
+        self.durations[name].append((tick_id, sim_time, duration))
 
-    def _expire_history(self, tick_id):
+    def _expire_history(self, sim_time):
         for history in (self.durations, self.metric_series):
             for name in list(history):
                 limit = (
-                    ui_metrics_config.MAX_DURATION_SAMPLES
+                    ui_metrics_config.DURATION_HISTORY_SECONDS
                     if history is self.durations
-                    else self._metric_limits[name]
+                    else self._history_seconds[name]
                 )
-                oldest_tick = tick_id - limit + 1
+                oldest_time = sim_time - limit
                 samples = history[name]
-                while samples and samples[0][0] < oldest_tick:
+                while samples and samples[0][1] < oldest_time:
                     samples.popleft()
                 if not samples:
                     del history[name]

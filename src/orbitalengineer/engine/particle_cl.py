@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Sequence
+from typing import Any
 import numpy as np
 
 from orbitalengineer.twobody import twobody
@@ -29,13 +29,13 @@ class ParticleCL(Particle):
         return self.ident
 
     def get_position(self):
-        return np.complex128(self.ctl.position[self.idx])
+        return self.ctl.position[self.idx]
     
     def get_xy(self) -> tuple[float,float]:
         return self.ctl.position[self.idx].real, self.ctl.position[self.idx].imag
 
     def get_velocity(self):
-        return np.complex128(self.ctl.velocity[self.idx])
+        return self.ctl.velocity[self.idx]
     
     def get_mass(self):
         return self.ctl.mass[self.idx]

@@ -8,7 +8,7 @@ import pyopencl as cl
 mf = cl.mem_flags
 DEFAULT_MEM_FLAGS = mf.READ_WRITE|mf.COPY_HOST_PTR
 
-from orbitalengineer import flags
+from orbitalengineer import dtypes, flags
 from orbitalengineer.engine import logger
 from orbitalengineer.engine.named_shared_memory import NamedSharedMemory
 from orbitalengineer.engine.tracer import EventTracer
@@ -104,8 +104,8 @@ class PrimaryStateVectors:
             id_host[i] = np.uint32(i)
             id_to_index_host[i] = np.uint32(i)
             flags_host[i] = np.uint32(p.flags)
-            velocity[i] = np.complex64(*p.velocity)
-            position[i] = np.complex64(*p.position)
+            velocity[i] = dtypes.COMPLEX(*p.velocity)
+            position[i] = dtypes.COMPLEX(*p.position)
             mass[i] = np.float32(p.mass)
             radius[i] = np.float32(p.radius)
 
@@ -123,18 +123,18 @@ class PrimaryStateVectors:
         self.id_to_index = self.alloc(self.N, np.uint32, shared_name='id_to_index')
         self.body_id = self.alloc(self.N, np.uint32, shared_name='body_id')
         self.flags = self.alloc(self.N, np.uint32, shared_name='flags')
-        self.velocity = self.alloc(self.N, np.complex64, shared_name='velocity')
-        self.position = self.alloc(self.N, np.complex64, shared_name='position')
+        self.velocity = self.alloc(self.N, dtypes.COMPLEX, shared_name='velocity')
+        self.position = self.alloc(self.N, dtypes.COMPLEX, shared_name='position')
         self.mass = self.alloc(self.N, np.float32, shared_name='mass')
         self.radius = self.alloc(self.N, np.float32, shared_name='radius')
     
     def apply_vector_offset(self, vector_name:str, ids:Sequence[int], op:str, offset:tuple[float,float]):
         if vector_name == "position":
             buffer = self.position
-            value = np.complex64(offset[0], offset[1])
+            value = dtypes.COMPLEX(offset[0], offset[1])
         elif vector_name == "velocity":
             buffer = self.velocity
-            value = np.complex64(offset[0], offset[1])
+            value = dtypes.COMPLEX(offset[0], offset[1])
         elif vector_name == "mass":
             buffer = self.mass
             value = np.float32(offset[0])

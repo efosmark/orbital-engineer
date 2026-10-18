@@ -2,14 +2,15 @@
 #include "flags.clh"
 #include "kernel/complex.clh" // needed for creal, cmul, cconj
 #include "kernel/ledger.clh"
+#include "dtype.clh"
 
-inline float relative_speed_along_normal(
+inline REAL relative_speed_along_normal(
     const uint i,
     const uint j,
-    const float2 r_norm,
-    const float2* velocity
+    const COMPLEX r_norm,
+    const COMPLEX* velocity
 ) {
-    float2 vr = velocity[i] - velocity[j]; // relative speed
+    COMPLEX vr = velocity[i] - velocity[j]; // relative speed
     return creal(cmul(vr, cconj(r_norm))); // along normal (scalar)
 }
 
@@ -17,14 +18,14 @@ inline float relative_speed_along_normal(
 __kernel void compute_center_of_mass(
              const uint    N,
     __global const uint*   restrict flags,
-    __global const float2* restrict position,
-    __global const float2* restrict velocity,
+    __global const COMPLEX* restrict position,
+    __global const COMPLEX* restrict velocity,
     __global const float*  restrict mass,
     __global const uint*   restrict ids,
     __global const uint*   restrict num_contacts,
     __global const uint*   restrict direct_contacts,
-    __global       float2* restrict mv_com,
-    __global       float2* restrict v_cm,
+    __global       COMPLEX* restrict mv_com,
+    __global       COMPLEX* restrict v_cm,
     __global       float*  restrict mass_cm
 ) {
     uint gid = get_group_id(0);
@@ -42,15 +43,15 @@ __kernel void compute_center_of_mass(
     //bool j_enabled = true; //(flags[j]&REMOVED) || (flags[j]&BOUNCE_AS_SECONDARY) == 0;
     //if (!j_enabled) return;
 
-    float2 mr_j = position[j] * mass[j];
-    float2 mr_contact = FLOAT2_WG_REDUCE_ADD(mr_j);
-    float2 mr_self = position[i] * mass[i];
-    float2 mr_total = mr_contact + mr_self;
+    COMPLEX mr_j = position[j] * mass[j];
+    COMPLEX mr_contact = COMPLEX_WG_REDUCE_ADD(COMPLEX, mr_j);
+    COMPLEX mr_self = position[i] * mass[i];
+    COMPLEX mr_total = mr_contact + mr_self;
     
-    float2 mv_j = velocity[j] * mass[j];
-    float2 mv_contact = FLOAT2_WG_REDUCE_ADD(mv_j);
-    float2 mv_self = velocity[i] * mass[i];
-    float2 mv_total = mv_contact + mv_self;
+    COMPLEX mv_j = velocity[j] * mass[j];
+    COMPLEX mv_contact = COMPLEX_WG_REDUCE_ADD(COMPLEX, mv_j);
+    COMPLEX mv_self = velocity[i] * mass[i];
+    COMPLEX mv_total = mv_contact + mv_self;
     
     float m_contact = work_group_reduce_add(mass[j]);
     float m_self = mass[i];
@@ -72,16 +73,16 @@ __kernel void compute_center_of_mass(
 __kernel void compute_impulse(
              const uint    N,
     __global const uint*   restrict flags,
-    __global const float2* restrict position,
-    __global const float2* restrict velocity,
+    __global const COMPLEX* restrict position,
+    __global const COMPLEX* restrict velocity,
     __global const float*  restrict mass,
     __global const uint*   restrict ids,
     __global const uint*   restrict num_contacts,
     __global const uint*   restrict direct_contacts,
-    __global const float2* restrict mv_com,
-    __global const float2* restrict v_cm,
+    __global const COMPLEX* restrict mv_com,
+    __global const COMPLEX* restrict v_cm,
     __global const float*  restrict mass_cm,
-    __global       float2* restrict impulse_out
+    __global       COMPLEX* restrict impulse_out
 ) {
     uint gid = get_group_id(0);
     uint lid = get_local_id(0);
@@ -99,36 +100,36 @@ __kernel void compute_impulse(
     //bool j_enabled = true; //(flags[j]&REMOVED) || (flags[j]&BOUNCE_AS_SECONDARY) == 0;
     //if (!j_enabled) return;
 
-    //float2 vj = velocity[j];
-    //float2 total_vj = FLOAT2_WG_REDUCE_ADD(vj);
-    //float2 total_v = velocity[i] + total_vj;
+    //COMPLEX vj = velocity[j];
+    //COMPLEX total_vj = FLOAT2_WG_REDUCE_ADD(vj);
+    //COMPLEX total_v = velocity[i] + total_vj;
 
-    //float2 vr = velocity[i] - velocity[j]; // relative speed
-    //float2 total_vr = FLOAT2_WG_REDUCE_ADD(vr);
-
-
-    //float2 ri_cm = position[i] - r_cm[i];
-    //float2 rj_cm = position[j] - r_cm[i];
-    float2 r_norm = normalize(position[j] - position[i]);
+    //COMPLEX vr = velocity[i] - velocity[j]; // relative speed
+    //COMPLEX total_vr = FLOAT2_WG_REDUCE_ADD(vr);
 
 
-    float2 mv_total = mv_com[i] + mv_com[j];
+    //COMPLEX ri_cm = position[i] - r_cm[i];
+    //COMPLEX rj_cm = position[j] - r_cm[i];
+    COMPLEX r_norm = normalize(position[j] - position[i]);
+
+
+    COMPLEX mv_total = mv_com[i] + mv_com[j];
 
     // geometric mean between the two CoM frames
     float m_total = (mass_cm[i] + mass_cm[j]);
 
 
-    float2 velocity_com = mv_total / m_total;
+    COMPLEX velocity_com = mv_total / m_total;
 
     // our speed in the com frame
-    float2 vi_cm = velocity[i] ;//- velocity_com;
-    float2 vj_cm = velocity[j] ;//- velocity_com;
+    COMPLEX vi_cm = velocity[i] ;//- velocity_com;
+    COMPLEX vj_cm = velocity[j] ;//- velocity_com;
 
-    float2 vdiff = vj_cm - vi_cm;
+    COMPLEX vdiff = vj_cm - vi_cm;
     //printf("(compute) [%u,%u] vdiff = %.2f %.2f", i, j, vdiff.x, vdiff.y);
 
 
-    //float2 total_r_norm = normalize(FLOAT2_WG_REDUCE_ADD(r_norm));
+    //COMPLEX total_r_norm = normalize(FLOAT2_WG_REDUCE_ADD(r_norm));
 
     //float inv_mass_i = 1.0f / mass[i];
     //float inv_mass_j = 1.0f / mass[j];
@@ -139,16 +140,16 @@ __kernel void compute_impulse(
     //float total_contact_mass = work_group_reduce_add(mass_j);
     //float total_mass = mass[i] + total_contact_mass;
 
-    //float2 total_contact_momentum = FLOAT2_WG_REDUCE_ADD(mass[j] * velocity[j]);
-    //float2 total_momentum = (mass[i] * velocity[i]) + total_momentum;
-    //float2 com_mv_j = (velocity[j] * mass[j]) / mass_cm[j];
-    //float2 com_mv_i = (velocity[i] * mass[i]) / mass_cm[i];
+    //COMPLEX total_contact_momentum = FLOAT2_WG_REDUCE_ADD(mass[j] * velocity[j]);
+    //COMPLEX total_momentum = (mass[i] * velocity[i]) + total_momentum;
+    //COMPLEX com_mv_j = (velocity[j] * mass[j]) / mass_cm[j];
+    //COMPLEX com_mv_i = (velocity[i] * mass[i]) / mass_cm[i];
 
-    //float2 combined_com = v_cm[i] + v_cm[j]
+    //COMPLEX combined_com = v_cm[i] + v_cm[j]
 
-    //float2 vdiff = ((v_cm[j] - com_mv_i)/ mass_cm[i] - (v_cm[i] - com_mv_j)/ mass_cm[i]) ;
-    //float2 vdiff = velocity[j] - velocity[i];
-    //float2 vdiff = v_cm[j]/ - v_cm[i];
+    //COMPLEX vdiff = ((v_cm[j] - com_mv_i)/ mass_cm[i] - (v_cm[i] - com_mv_j)/ mass_cm[i]) ;
+    //COMPLEX vdiff = velocity[j] - velocity[i];
+    //COMPLEX vdiff = v_cm[j]/ - v_cm[i];
 
 
 
@@ -159,11 +160,11 @@ __kernel void compute_impulse(
     //printf("(compute) [%u,%u] total_inv_mass   = %.10f", i, j, total_inv_mass);
 
 
-    //float2 v = (total_momentum + (mass[i] * (1.0f + COEF_OF_RESTITUTION) * vdiff)) / total_mass;
+    //COMPLEX v = (total_momentum + (mass[i] * (1.0f + COEF_OF_RESTITUTION) * vdiff)) / total_mass;
 
     float scalar_impulse_magnitude = ((1.0f + COEF_OF_RESTITUTION) * v_rel_along_norm) * (mass[j]);
 
-    float2 v = r_norm * scalar_impulse_magnitude / (mass[j] + mass[i]);
+    COMPLEX v = r_norm * scalar_impulse_magnitude / (mass[j] + mass[i]);
 
     //v_rel = relative_speed_along_normal(i, j, r_norm, velocity);
     //if (v_rel <= 0) return;
@@ -188,9 +189,9 @@ __kernel void compute_impulse(
 
     //scalar_impulse_magnitude *= (inv_mass_j)/total_inv_mass;
 
-    //float2 final_impulse = (r_norm * scalar_impulse_magnitude) / (mass_i+mass_j) ;//  *   (mass_j/(total_mass+mass_i));
-    float2 final_impulse = v;
-    //float2 final_impulse = (float2)(-v.x, -v.y) * r_norm;
+    //COMPLEX final_impulse = (r_norm * scalar_impulse_magnitude) / (mass_i+mass_j) ;//  *   (mass_j/(total_mass+mass_i));
+    COMPLEX final_impulse = v;
+    //COMPLEX final_impulse = (COMPLEX)(-v.x, -v.y) * r_norm;
 
     // Set the impulse_out in THEIR row
     uint idx = (N * i) + j;
@@ -205,8 +206,8 @@ __kernel void assign_impulse(
     __global const uint*   restrict ids,
     __global const uint*   restrict num_contacts,
     __global const uint*   restrict direct_contacts,
-    __global const float2* restrict impulse,
-    __global       float2* restrict velocity_intermediate
+    __global const COMPLEX* restrict impulse,
+    __global       COMPLEX* restrict velocity_intermediate
 ) {
     uint g0 = get_group_id(0);
     uint lid = get_local_id(0);
@@ -218,12 +219,12 @@ __kernel void assign_impulse(
     uint j = direct_contacts[(N * i) + lid];
 
     uint idx = (N * i) + j;
-    float2 impulse_from_j = impulse[idx];
+    COMPLEX impulse_from_j = impulse[idx];
     
     //if (impulse_from_j.x != 0 || impulse_from_j.y != 0)
     //    printf("(assign ) impulse[row:%u,col:%u] = %.2f %.2f", i, j, impulse_from_j.x, impulse_from_j.y);
 
-    float2 wg_total_impulse = FLOAT2_WG_REDUCE_ADD(impulse_from_j);
+    COMPLEX wg_total_impulse = COMPLEX_WG_REDUCE_ADD(COMPLEX, impulse_from_j);
     if (lid == 0) {
 
         //if (wg_total_impulse.x != 0 || wg_total_impulse.y != 0)
@@ -237,12 +238,12 @@ __kernel void compute_bouncing_collision_single(
              const uint    N_bodies_alloc,
              const uint    N_bodies_valid,
     __global const uint*   restrict flags,
-    __global const float2* restrict position,
-    __global const float2* restrict velocity,
+    __global const COMPLEX* restrict position,
+    __global const COMPLEX* restrict velocity,
     __global const float*  restrict mass,
     __global const float*  restrict radius,
-    __global const float2* restrict time_until_contact,
-    __global       float2* restrict velocity_intermediate,
+    __global const COMPLEX* restrict time_until_contact,
+    __global       COMPLEX* restrict velocity_intermediate,
     __global       atomic_uint* global_count,
     __global LedgerEntry*  restrict ledger
 ) {
@@ -257,7 +258,7 @@ __kernel void compute_bouncing_collision_single(
 
     float scalar_impulse_magnitude_max = 0.0f;
     uint j_max = i;
-    float2 r_norm_max = (float2)(0.0f, 0.0f);
+    COMPLEX r_norm_max = (COMPLEX)(0.0f, 0.0f);
     float inv_mass_i = 1.0f / mass[i];
 
     GRID_STRIDE_IJ(
@@ -266,22 +267,22 @@ __kernel void compute_bouncing_collision_single(
         if ((flags[j]&BOUNCE_AS_SECONDARY) == 0 || (flags[j]&REMOVED)) continue;
 
         // Limit to only contacting bodies
-        float2 toi = time_until_contact[IDX];
+        COMPLEX toi = time_until_contact[IDX];
         float t1 = toi.x;
         float t2 = toi.y;
         float curr_min = (t1 >= 0.0f) ? t1 : ((t2 >= 0.0f) ? t2 : EPS_TIME);
         if (curr_min > EPS_TIME) continue;
 
-        float2 dP = position[j] - position[i];
-        float edge_dist = fast_length(dP) - radius[i] - radius[j];
+        COMPLEX dP = position[j] - position[i];
+        float edge_dist = length(dP) - radius[i] - radius[j];
         if (edge_dist > EPS_DIST) continue;
 
-        float2 r_norm = normalize(dP);
+        COMPLEX r_norm = normalize(dP);
 
         float v_rel = relative_speed_along_normal(i, j, -r_norm, velocity);
         if (v_rel >= 0) continue;
 
-        // float edge_dist = fast_length(position[j] - position[i]) - radius[i] - radius[j];
+        // float edge_dist = length(position[j] - position[i]) - radius[i] - radius[j];
         // bool is_touching = edge_dist <= EPS_DIST;
         // if (!is_touching) continue;
 
@@ -323,7 +324,7 @@ __kernel void compute_bouncing_collision_single(
     //     ? work_group_broadcast(value_to_broadcast, (uint)src_lid)
     //     : 0.0f;  // or some neutral element
 
-    //float2 wg_max_impulse = FLOAT2_WG_REDUCE_MAX(scalar_impulse_magnitude_max);
+    //COMPLEX wg_max_impulse = FLOAT2_WG_REDUCE_MAX(scalar_impulse_magnitude_max);
     //if (i > 0 && src_lane != 0) {
     //    printf("i=%u  src_lane=%u", i, src_lane);
     //}
@@ -333,7 +334,7 @@ __kernel void compute_bouncing_collision_single(
     if (lane == src_lane) {
         //if (i == 2) printf("(%u) |si|_wg=%.2f  lane=%u  src_lane=%u", i, wg_scalar_impulse_magnitude_max, lane, src_lane);
         //if (wg_scalar_impulse_magnitude_max > 0) printf("%u %u", i, scalar_impulse_magnitude_max);
-        float2 final_impulse = r_norm_max * wg_scalar_impulse_magnitude_max * inv_mass_i;
+        COMPLEX final_impulse = r_norm_max * wg_scalar_impulse_magnitude_max * inv_mass_i;
         
         velocity_intermediate[i] = velocity[i] + final_impulse;
         //if (i == 0) {
@@ -350,14 +351,14 @@ __kernel void compute_bouncing_collision_simple(
              const uint    N_bodies_alloc,
              const uint    N_bodies_valid,
     __global const uint*   restrict flags,
-    __global const float2* restrict position,
-    __global const float2* restrict velocity,
+    __global const COMPLEX* restrict position,
+    __global const COMPLEX* restrict velocity,
     __global const float*  restrict mass,
     __global const float*  restrict radius,
-    __global const float2* restrict time_until_contact,
+    __global const COMPLEX* restrict time_until_contact,
     __global const float*  restrict edge_dist,
     __global const float*  restrict v_along_norm,
-    __global       float2* restrict velocity_intermediate
+    __global       COMPLEX* restrict velocity_intermediate
 ) {
     GRID_STRIDE_INIT();
 
@@ -376,7 +377,7 @@ __kernel void compute_bouncing_collision_simple(
         if ((flags[j]&BOUNCE_AS_SECONDARY) == 0 || (flags[j]&REMOVED)) continue;
 
         // Limit to only contacting bodies
-        //float2 toi = time_until_contact[IDX];
+        //COMPLEX toi = time_until_contact[IDX];
         //float t1 = toi.x;
         //float t2 = toi.y;
         //float curr_min = (t1 > 0.0f) ? t1 : ((t2 > 0.0f) ? t2 : INFINITY);
@@ -389,9 +390,9 @@ __kernel void compute_bouncing_collision_simple(
         float scalar_impulse_magnitude = ((1.0f + COEF_OF_RESTITUTION) * v_along_norm[IDX]) / inv_mass_sum;
 
 
-        float2 dP = position[j] - position[i];
-        float2 r_norm = normalize(dP);
-        float2 final_impulse = r_norm * scalar_impulse_magnitude * inv_mass_i;
+        COMPLEX dP = position[j] - position[i];
+        COMPLEX r_norm = normalize(dP);
+        COMPLEX final_impulse = r_norm * scalar_impulse_magnitude * inv_mass_i;
 
         velocity_intermediate[i] = velocity[i] + final_impulse;
     );

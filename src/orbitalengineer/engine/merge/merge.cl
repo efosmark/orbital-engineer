@@ -2,6 +2,7 @@
 #include "flags.clh"
 #include "kernel/debug.clh"
 #include "kernel/ledger.clh"
+#include "dtype.clh"
 
 /**
  * Find the center-of-mass for each merge_group and apply them to the group leader.
@@ -17,15 +18,15 @@ __kernel void compute_merging_collision_direct(
              const uint    N_bodies_alloc,
              const uint    N_bodies_valid,
     __global const uint*   restrict flags,
-    __global const float2* restrict position,
-    __global const float2* restrict velocity,
+    __global const COMPLEX* restrict position,
+    __global const COMPLEX* restrict velocity,
     __global const float*  restrict mass,
     __global const float*  restrict radius,
     __global const uint*   restrict num_contacts,
     __global const uint*   restrict direct_contacts,
     __global       uint*   restrict flags_out,
-    __global       float2* restrict position_out,
-    __global       float2* restrict velocity_out,
+    __global       COMPLEX* restrict position_out,
+    __global       COMPLEX* restrict velocity_out,
     __global       float*  restrict mass_out,
     __global       float*  restrict radius_out,
     __global       atomic_uint* global_count,
@@ -49,15 +50,15 @@ __kernel void compute_merging_collision_direct(
     
     bool is_merging = (j != i) && !(flags[j]&REMOVED) && (supports_ij || supports_ji);
     
-    float total_mass = is_merging ? mass[j] : 0;
-    float2 total_mv = is_merging ? (mass[j] * velocity[j]) : 0;
-    float2 total_mr = is_merging ? (mass[j] * position[j]) : 0;
+    float   total_mass = is_merging ? mass[j] : 0;
+    COMPLEX total_mv = is_merging ? (mass[j] * velocity[j]) : 0;
+    COMPLEX total_mr = is_merging ? (mass[j] * position[j]) : 0;
     
-    float wg_mass = work_group_reduce_add(total_mass);
-    float2 wg_mv = FLOAT2_WG_REDUCE_ADD(total_mv);
-    float2  wg_mr = FLOAT2_WG_REDUCE_ADD(total_mr);
-    bool wg_is_merging = work_group_any(is_merging);
-    uint wg_leader = work_group_reduce_min(wg_is_merging ? j : INT_MAX);
+    float   wg_mass = work_group_reduce_add(total_mass);
+    COMPLEX wg_mv = COMPLEX_WG_REDUCE_ADD(COMPLEX, total_mv);
+    COMPLEX wg_mr = COMPLEX_WG_REDUCE_ADD(COMPLEX, total_mr);
+    bool    wg_is_merging = work_group_any(is_merging);
+    uint    wg_leader = work_group_reduce_min(wg_is_merging ? j : INT_MAX);
 
     WRITE_LEDGER(is_merging, i, j, (i == wg_leader ? MERGE_AS_PRIMARY : (REMOVED|MERGE_AS_SECONDARY)));
 
@@ -66,11 +67,11 @@ __kernel void compute_merging_collision_direct(
         mass_out[i] += (flags[i]&FIXED_MASS) ? 0 : wg_mass;
 
         // Center-of-mass velocity
-        float2 velocity_center_of_mass = (wg_mv + (mass[i] * velocity[i])) / mass_out[i];
+        COMPLEX velocity_center_of_mass = (wg_mv + (mass[i] * velocity[i])) / mass_out[i];
         velocity_out[i] = (flags[i]&FIXED_VELOCITY) ? velocity[i] : velocity_center_of_mass;
         
         // Center-of-mass position
-        float2 position_center_of_mass = (wg_mr + (mass[i] * position[i])) / mass_out[i];
+        COMPLEX position_center_of_mass = (wg_mr + (mass[i] * position[i])) / mass_out[i];
         position_out[i] = (flags[i]&FIXED_POSITION) ? position[i] : position_center_of_mass;
 
         // New radius based on updated mass

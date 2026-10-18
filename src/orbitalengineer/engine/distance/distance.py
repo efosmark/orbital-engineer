@@ -1,5 +1,6 @@
 import pyopencl as cl
 import numpy as np
+from orbitalengineer import dtypes
 from orbitalengineer.engine.dimension import PipelineComponent
 from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
 
@@ -16,7 +17,7 @@ class DistancePipeline(PipelineComponent):
     
     def initialize(self):
         self._knl_edge_distance = self._load_kernel("edge_distance", KERNEL_FILE_LOCATION)
-        self.edge_to_edge = self.vec.alloc(self.vec.N * self.vec.N, dtype=np.float32)
+        self.edge_to_edge = self.vec.alloc(self.vec.N * self.vec.N, dtype=dtypes.COMPLEX)
         self.is_touching = self.vec.alloc(self.vec.N * self.vec.N, dtype=np.bool)
         self.is_nearby = self.vec.alloc(self.vec.N * self.vec.N, dtype=np.bool)
 

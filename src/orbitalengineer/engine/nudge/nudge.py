@@ -1,5 +1,6 @@
 import numpy as np
 import pyopencl as cl
+from orbitalengineer import dtypes
 from orbitalengineer.engine.dimension import PipelineComponent
 from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
 
@@ -9,7 +10,7 @@ class NudgePipeline(PipelineComponent):
     
     def initialize(self):
         self._apply_nudge = self._load_kernel("apply_nudge", KERNEL_FILE_LOCATION)
-        self._position_intermediate = self.vec.alloc(self.vec.N, dtype=np.complex64)
+        self._position_intermediate = self.vec.alloc(self.vec.N, dtype=dtypes.COMPLEX)
 
     def __call__(self, state:PrimaryStateVectors):
         self._apply_nudge(

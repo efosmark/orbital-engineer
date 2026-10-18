@@ -10,7 +10,7 @@ from dataclasses import asdict, fields
 import numpy as np
 from numpy.typing import NDArray
 
-from orbitalengineer import flags
+from orbitalengineer import dtypes, flags
 from orbitalengineer.engine import config, logger
 from orbitalengineer.engine.device import DeviceStatus
 from orbitalengineer.engine.particle_cl import ParticleCL
@@ -40,17 +40,17 @@ class ClientSocketConnection:
     id_to_index:NDArray[np.uint32]
     body_id:NDArray[np.uint32]
     flags:NDArray[np.uint32]
-    position:NDArray[np.complex64]
-    velocity:NDArray[np.complex64]
+    position:NDArray
+    velocity:NDArray
     mass:NDArray[np.float32]
     radius:NDArray[np.float32]
-    force:NDArray[np.complex64]
+    force:NDArray
     ledger:NDArray
     cgroup:NDArray[np.uint32]
     n_direct_contacts:NDArray
     direct_contacts:NDArray
-    kinetic_energy:NDArray[np.float32]
-    grav_potential_energy:NDArray[np.float32]
+    kinetic_energy:NDArray[np.float64]
+    grav_potential_energy:NDArray[np.float64]
     
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -88,7 +88,7 @@ class ClientSocketConnection:
 
         # Relative difference between the click and every location
         p = self.position[indices]
-        d = np.complex128(x, y) - p
+        d = dtypes.COMPLEX(x, y) - p
         
         # Create a mask indicating where there is crossover
         mask = (np.abs(d) <= radius)

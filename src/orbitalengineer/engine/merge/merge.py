@@ -1,5 +1,6 @@
 import numpy as np
 import pyopencl as cl
+from orbitalengineer import dtypes
 from orbitalengineer.engine import config
 from orbitalengineer.engine.contacting.contacting import FindContactingBodiesPipeline
 from orbitalengineer.engine.dimension import PipelineComponent
@@ -17,8 +18,8 @@ class MergePipeline(PipelineComponent):
     
         self._mass_intermediate = self.vec.alloc(self.vec.N, dtype=np.float32)
         self._radius_intermediate = self.vec.alloc(self.vec.N, dtype=np.float32)
-        self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=np.complex64)        
-        self._position_intermediate = self.vec.alloc(self.vec.N, dtype=np.complex64)        
+        self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=dtypes.COMPLEX)        
+        self._position_intermediate = self.vec.alloc(self.vec.N, dtype=dtypes.COMPLEX)        
         self._flags_intermediate = self.vec.alloc(self.vec.N, dtype=np.uint32)        
         
         self._groups = np.arange(self.vec.N, dtype=np.uint32) 

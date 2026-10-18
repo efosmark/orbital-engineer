@@ -1,6 +1,7 @@
 import pyopencl as cl
 import numpy as np
 
+from orbitalengineer import dtypes
 from orbitalengineer.engine.dimension import PipelineComponent
 from orbitalengineer.engine.distance.distance import DistancePipeline
 from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
@@ -13,8 +14,8 @@ class VelocityPipeline(PipelineComponent):
     
     def initialize(self):
         self._compute_velocity = self._load_kernel('compute_velocity', KERNEL_FILE)
-        self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=np.complex64)
-        self.force = self.vec.alloc(self.vec.N * self.vec.N, dtype=np.complex64, shared_name="force")
+        self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=dtypes.COMPLEX)
+        self.force = self.vec.alloc(self.vec.N * self.vec.N, dtype=dtypes.COMPLEX, shared_name="force")
 
     
     def compute_velocity(self, dt_step:float, state:PrimaryStateVectors, distance: DistancePipeline):
@@ -35,8 +36,8 @@ class VelocityPipeline(PipelineComponent):
             distance.is_touching,
             self._velocity_intermediate,
             self.force
-        )
-        cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
+        ).wait()
+        cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate).wait()
 
 
     def __call__(self, dt_step:float, state:PrimaryStateVectors, distance: DistancePipeline):

@@ -9,8 +9,7 @@ from gui.gtk4 import GObject, GLib
 SYNC_RATE_MS = int((1/30.0) * 1000.0)
 
 _TENTHS = [v/10.0 for v in range(10)]
-SPEED_SCALE = [
-    *[(v+1)/100.0 for v in range(9)],
+_TENS = [
     *[v for v in _TENTHS if v > 0],
     *[(1 + v) for v in _TENTHS],
     *[(2 + v) for v in _TENTHS],
@@ -22,6 +21,14 @@ SPEED_SCALE = [
     *[(8 + v) for v in _TENTHS],
     *[(9 + v) for v in _TENTHS],
 ]
+
+SPEED_SCALE = [
+    *[(v+1)/100.0 for v in range(9)],
+]
+
+for i in range(10):
+    SPEED_SCALE.extend([t + (i*10) for t in _TENS])
+
 
 class EngineModel(GObject.GObject): 
     props:Any

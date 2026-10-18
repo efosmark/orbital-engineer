@@ -22,7 +22,7 @@ class PositionPipeline(PipelineComponent):
             state.flags,
             state.velocity,
             state.position
-        )
+        ).wait()
 
     def __call__(self, dt_step, state:PrimaryStateVectors):
         self.compute_position(dt_step, state)

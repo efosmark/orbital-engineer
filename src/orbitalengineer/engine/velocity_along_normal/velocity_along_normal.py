@@ -1,4 +1,5 @@
 import numpy as np
+from orbitalengineer import dtypes
 from orbitalengineer.engine.dimension import PipelineComponent
 from orbitalengineer.engine.primary_vectors import PrimaryStateVectors
 
@@ -9,7 +10,7 @@ class VelocityAlongNormalPipeline(PipelineComponent):
     
     def initialize(self):
         self._knl_velocity_along_normal = self._load_kernel("velocity_along_normal", KERNEL_FILE_LOCATION)
-        self.velocity_along_normal = self.vec.alloc(self.vec.N * self.vec.N, dtype=np.float32)
+        self.velocity_along_normal = self.vec.alloc(self.vec.N * self.vec.N, dtype=dtypes.REAL)
     
     def compute_velocity_along_normal(self, state:PrimaryStateVectors):
         return self._knl_velocity_along_normal(

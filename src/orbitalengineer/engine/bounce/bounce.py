@@ -1,6 +1,7 @@
 import numpy as np
 import pyopencl as cl
 from pyopencl import array
+from orbitalengineer import dtypes
 from orbitalengineer.engine.cgroup.cgroup import CGroupPipeline
 from orbitalengineer.engine.contacting.contacting import FindContactingBodiesPipeline
 from orbitalengineer.engine.dimension import PipelineComponent
@@ -22,20 +23,20 @@ class BouncePipeline(PipelineComponent):
         self._compute_impulse = self._load_kernel("compute_impulse", KERNEL_FILE_LOCATION)
         self._assign_impulse = self._load_kernel("assign_impulse", KERNEL_FILE_LOCATION)
 
-        self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=np.complex64)
+        self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=dtypes.COMPLEX)
 
-        self._impulse = array.zeros(self.queue, self.vec.N * self.vec.N, dtype=np.complex64)
+        self._impulse = array.zeros(self.queue, self.vec.N * self.vec.N, dtype=dtypes.COMPLEX)
 
     def compute_impulse(self, state:PrimaryStateVectors, contacting: FindContactingBodiesPipeline, cgroup: cl.Buffer):
         # Clear out the impulse table
-        self._impulse.fill(np.complex64(0, 0))
+        self._impulse.fill(dtypes.COMPLEX(0, 0))
 
         ids, global_size, local_size = contacting.get_ids(state)        
         if ids is None:
             return
 
-        com_momentum = np.zeros(state.N, dtype=np.complex64)
-        com_velocity = np.zeros(state.N, dtype=np.complex64)
+        com_momentum = np.zeros(state.N, dtype=dtypes.COMPLEX)
+        com_velocity = np.zeros(state.N, dtype=dtypes.COMPLEX)
         com_total_mass = np.zeros(state.N, dtype=np.float32)
         
         com_momentum_cl = self.vec._create_buffer(com_momentum)
@@ -147,5 +148,5 @@ class BouncePipeline(PipelineComponent):
         cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
 
     def __call__(self, state:PrimaryStateVectors, interact:InteractionPipeline, cgroup:CGroupPipeline, distance: DistancePipeline, velocity_along_normal: VelocityAlongNormalPipeline, ledger:LedgerController):
-        cl.enqueue_copy(self.queue, self._velocity_intermediate, np.zeros(state.N, dtype=np.complex64))
+        cl.enqueue_copy(self.queue, self._velocity_intermediate, np.zeros(state.N, dtype=dtypes.COMPLEX))
         self.collide_bounce_single(state, interact, ledger)        

@@ -1,224 +1,314 @@
 # Orbital Engineer
 
-Orbital Engineer is a GPU-accelerated N-body simulation engine for modeling gravity-driven systems with stable Leapfrog KDK integration. It is built to handle dynamic interactions at scale, including swept collision detection, configurable body merging, and elastic bouncing for fast, expressive orbital experiments.
+Orbital Engineer is a GPU-accelerated N-body simulation engine with leapfrog KDK integration, swept collision detection, configurable merging, and bouncing.
 
-![screenshots/n-body-example-1.png](screenshots/n-body-example-1.png)
-
-![screenshots/n-body-example-2.png](screenshots/n-body-example-2.png)
+![N-body simulation](screenshots/n-body-example-1.png)
 
 ## Theory of Operation
 
-Fundamentally, the engine is split into a pipeline of several OpenCL kernels. The controller is executed on the host, and is responsible for initialization and kernel dispatching. The simulation is performed tick-by-tick, using [leapfrog KDK integration](https://en.wikipedia.org/wiki/Leapfrog_integration) in order to continually compute orbital state vectors for velocity and position.
+A host controller initializes the simulation and dispatches OpenCL kernels. Each tick updates positions and velocities using [leapfrog KDK integration](https://en.wikipedia.org/wiki/Leapfrog_integration).
 
 ### Clock Tick
 
-The tick receives the amount of real time that has passed since the last tick. If the dt is greater than the default `dt_base` (set by config option `DEFAULT_DT_BASE`), it will split the operation into several time steps (each using the value of `dt_base`).
+Each tick receives the elapsed time and splits it into steps capped by `DEFAULT_DT_BASE`. Collision handling can shorten these steps further.
 
 ### Time Step
 
-Each time step is broken down into three phases:
+Each time step has three phases:
 
- 1. **Swept Detection** - Compute the time-of-impact for each pair of bodies and track the minimum dt. If the minimum dt is smaller than the base dt for the tick, it is used as the input dt for future steps.
-    - By ensuring the dt is never larger than the earliest collision, the engine avoids having a body overlap or 'tunnel' through another body.
-    - Two bodies are considered to be in-contact when their edge-to-edge distance is less than the config value `EPS_DIST`.
+1. **Swept detection:** Estimate the earliest collision and shorten the step when needed to reduce overlap and tunneling. Contact is detected when the gap between body surfaces is at most `EPS_DIST`.
+2. **Leapfrog KDK:** Update velocity and position using the selected time step $h$.
 
- 2. **Leapfrog KDK** - Integrate position and velocity via three steps:
+   | Step | Operation | Duration | Updates  |
+   | ---- | --------- | -------- | -------- |
+   | 1    | `KICK`    | $h/2$    | Velocity |
+   | 2    | `DRIFT`   | $h$      | Position |
+   | 3    | `KICK`    | $h/2$    | Velocity |
 
-    |   | step       | dt input       | updates vector    |
-    | - | ---------- | -------------- | ----------------- |
-    | 1 | `KICK`     | $\frac{dt}{2}$ | velocity          |
-    | 2 | `DRIFT`    | $dt$           | position          |
-    | 3 | `KICK`     | $\frac{dt}{2}$ | velocity          |
+   Positions stay fixed during kicks; velocities stay fixed during the drift.
 
-    During kick operations, position vector is read-only.
-    And during drift operations, velocity vector is read-only.
+3. **Collision handling:** Apply the behavior selected by each body's flags:
 
- 3. **Collision Detection** - Determine which bodies are touching, and apply collision operations. Based on the per-body feature flags, one of the following strategies will be enacted.
+   - **None:** Bodies pass through each other. [Softening](#plummer-softening) limits gravitational forces at close range.
+   - **Merge:** Combine bodies at their center of mass with their combined momentum.
+   - **Bounce:** Apply a normal impulse controlled by the [coefficient of restitution](#coefficient-of-restitution).
 
-    - **_None_** : Bodies pass through each-other. In order to avoid asymptotes, overlapping bodies do not continue to impart force until they are no longer overlapping. This is the default strategy for bodies that do not have a `MERGE` or `BOUNCE` flag.
-    - **_Merge_** (coalesce): Bodies are combined. Their velocities and positions are computed based on their center-of-momentum frame.
-    - **_Bounce_** : Bodies deflect off of eachother. The strength is controlled by the [Coefficient of Restitution](#coefficient-of-restitution).
+## Velocity and Position at Each Stage
 
-## Velocity & Position at each stage
+| Stage       | Position             | Velocity                    |
+| ----------- | -------------------- | --------------------------- |
+| Initial     | $\mathbf r_i^n$      | $\mathbf v_i^n$             |
+| First kick  | $\mathbf r_i^n$      | $\mathbf v_i^{n+1/2}$       |
+| Drift       | $\mathbf r_i^{n+1}$  | $\mathbf v_i^{n+1/2}$       |
+| Second kick | $\mathbf r_i^{n+1}$  | $\mathbf v_i^{n+1}$         |
+| Collision   | $\mathbf r_i^{n+1}$  | Post-impact velocity        |
 
-| Stage       | Position | Velocity             |
-| ----------- | -------- | -------------------- |
-| Initial     | $r(t)$   | $v(t)$               |
-| First kick  | $r(t)$   | $v(t)+\frac h2a(t)$  |
-| Drift       | $r(t+h)$ | Half-kicked velocity |
-| Second kick | $r(t+h)$ | Approximate $v(t+h)$ |
-| Collision   | $r(t+h)$ | Post-impact velocity |
+Subscript $i$ identifies a body; superscripts $n$ and $n+1$ mark consecutive states. The intermediate velocity is labeled $n+1/2$. Merging also updates the final position to the group's center of mass.
 
 ## Velocity Update (Kick)
 
-- **Related kernel**: [`engine/velocity/*`](/src/orbitalengineer/engine/velocity/)
-- **More info**:
+- **Related kernel:** [`engine/velocity/*`](/src/orbitalengineer/engine/velocity/)
+- **References:**
   - [Newton's law of universal gravitation - Wikipedia](https://en.wikipedia.org/wiki/Newton's_law_of_universal_gravitation)
-  - [Gravitational softening as a smoothing operation - Oxford Academic](https://academic.oup.com/mnras/article/425/2/1104/1188012)
-- **Computational Complexity**: $O(N^2)$
-- **Time Step**: half
+  - [Plummer softening](#plummer-softening)
+- **Complexity:** $O(N^2)$
+- **Duration:** $h/2$ per kick
 
 ### Velocity Formula
 
 $$
-\begin{align*}
- \mathbf a_i &= G\sum_{j\ne i} m_j \frac{\mathbf r_j-\mathbf r_i} {(r_{ij}^2+\epsilon^2)^{3/2}}
-&& \text{acceleration}
-\\
-\\
-\mathbf v_{n+1/2} &= \mathbf v_n+\frac h2\mathbf a_i
-&& \text{first kick}
-\\
-\\
-\mathbf v_{n+1} &= \mathbf v_{n+1/2}+\frac h2\mathbf a(\mathbf r_{n+1})
-&&\text{second kick}
-\end{align*}
+\begin{aligned}
+\mathbf a_i^n &= G\sum_{j\ne i} m_j
+\frac{\mathbf r_j^n-\mathbf r_i^n}{\left((r_{ij}^n)^2+\epsilon^2\right)^{3/2}}
+&& \text{acceleration} \\
+\mathbf v_i^{n+1/2} &= \mathbf v_i^n+\frac{h}{2}\mathbf a_i^n
+&& \text{first kick} \\
+\mathbf v_i^{n+1} &= \mathbf v_i^{n+1/2}+\frac{h}{2}\mathbf a_i^{n+1}
+&& \text{second kick}
+\end{aligned}
 $$
 
-Where,
+Here:
 
-- $h$ is the time step
-- $\epsilon$ is the [Plumming softening length]((https://academic.oup.com/mnras/article/425/2/1104/1188012))
-
+- $h$ is the full time step.
+- $m_j$ is body $j$'s mass, and $G$ is `GRAV_CONSTANT`.
+- $r_{ij}^n$ is the distance between bodies $i$ and $j$ at state $n$.
+- $\epsilon$ is the [Plummer softening length](#plummer-softening), configured by `SOFTENING_LENGTH`.
+- $\mathbf a_i^{n+1}$ is recomputed using all bodies' positions after the drift.
 
 ## Position Update (Drift)
 
-- **Related kernel**: [`engine/position/*`](/src/orbitalengineer/engine/position/)
-- **Computational Complexity**: $O(N)$
-- **Time Step**: full
+- **Related kernel:** [`engine/position/*`](/src/orbitalengineer/engine/position/)
+- **Complexity:** $O(N)$
+- **Duration:** $h$
 
 ### Position Formula
 
 $$
-\mathbf r_{n+1}=\mathbf r_n+h \mathbf v_{n+1/2}
+\mathbf r_i^{n+1}=\mathbf r_i^n+h\mathbf v_i^{n+1/2}
 $$
 
-Where,
+The drift advances body $i$'s position by a full time step $h$, using the [half-kicked velocity](#velocity-formula).
 
-- $h$ is the time step
-- $\mathbf r$ is the position
-- $\mathbf v$ is the [velocity](#velocity-formula)
+## Bouncing Collisions
 
-## Elastic Collisions
-
-- **Related kernel**: [`engine/bounce/*`](/src/orbitalengineer/engine/bounce/)
-- **More info**: [Elastic collision - Wikipedia](https://en.wikipedia.org/wiki/Elastic_collision)
-- **Computational complexity**: $O(N^2)$
+- **Related kernel:** [`engine/bounce/*`](/src/orbitalengineer/engine/bounce/)
+- **References:** [Elastic collision - Wikipedia](https://en.wikipedia.org/wiki/Elastic_collision)
+- **Complexity:** $O(N^2)$
 
 ### Coefficient of Restitution
 
-- The coefficient of restitution (denoted as $e$ below), is a value between `0` and `1` that indicates how elastic the collision will be.
-- A value of `1` will make the collision fully repulsive (no energy loss), whereas a value of `0` will be attenuated (full energy loss) and "stick" together.
-- More information: [Coefficient of Restituion](https://en.wikipedia.org/wiki/Coefficient_of_restitution)
-- The default value is defined in the config via the field `COEF_OF_RESTITUTION`.
+The [coefficient of restitution](https://en.wikipedia.org/wiki/Coefficient_of_restitution), $0\le e\le1$, controls the bounce. Set it with `COEF_OF_RESTITUTION`.
+
+- $e=1$: Fully elastic; kinetic energy is conserved.
+- $e=0$: No remaining relative motion along the normal. Tangential motion remains, so bodies may slide apart.
 
 ### Algorithm
 
-These steps are ran for each colliding pair $(i, j)$.
+For a colliding pair $(i,j)$ with positive masses, primes denote velocities after the impulse.
 
-1. Get relative position:
+1. Compute the separation and unit contact normal, pointing from body $i$ to body $j$:
 
-$$
-r_{ij} = |\mathbf r_j - \mathbf r_i|
-$$
+   $$
+   \mathbf d_{ij}=\mathbf r_j-\mathbf r_i,\qquad
+   r_{ij}=\lVert\mathbf d_{ij}\rVert,\qquad
+   \hat{\mathbf n}_{ij}=\frac{\mathbf d_{ij}}{r_{ij}}
+   $$
 
-2. Find the relative speed along normal:
+   Coincident centers require a separately chosen normal.
 
-$$
-v_{nrel} = {Re}((\mathbf v_i - \mathbf v_j) \cdot \overline{r_{ij}})
-$$
+2. Compute the signed relative velocity along the normal:
 
-3. Get the scalar impulse magnitude
+   $$
+   v_{\mathrm{rel},n}=(\mathbf v_j-\mathbf v_i)\cdot\hat{\mathbf n}_{ij}
+   $$
 
-$$
-\text{impulse} = \frac{1.0 + (e \cdot v_{nrel})}{
-   \frac{1}{m_i} + \frac{1}{m_j}
-}
-$$
+   Apply an impulse only when $v_{\mathrm{rel},n}<0$ (approaching).
 
-4. Apply the final impulse
+3. Compute the nonnegative scalar impulse magnitude:
 
-$$
-\mathbf v_i = \mathbf v_i + \frac{r_{norm} \cdot \text{impulse}}{m_i}
-$$
+   $$
+   J=-\frac{(1+e)v_{\mathrm{rel},n}}{\frac{1}{m_i}+\frac{1}{m_j}}
+   $$
 
-## Coalescence (merging)
+4. Apply equal and opposite impulses:
 
-- Related kernel: [`engine/merge/*`](/src/orbitalengineer/engine/merge/)
-- More info: [Coalescence (physics) - Wikipedia](https://en.wikipedia.org/wiki/Coalescence_(physics))
+   $$
+   \begin{aligned}
+   \mathbf v_i' &= \mathbf v_i-\frac{J}{m_i}\hat{\mathbf n}_{ij} \\
+   \mathbf v_j' &= \mathbf v_j+\frac{J}{m_j}\hat{\mathbf n}_{ij}
+   \end{aligned}
+   $$
+
+For an unconstrained pair, this conserves linear momentum and gives $v_{\mathrm{rel},n}'=-e\,v_{\mathrm{rel},n}$, leaving tangential velocities unchanged.
+
+## Coalescence (Merging)
+
+- **Related kernel:** [`engine/merge/*`](/src/orbitalengineer/engine/merge/)
+- **References:** [Coalescence (physics) - Wikipedia](https://en.wikipedia.org/wiki/Coalescence_(physics))
 
 ### Algorithm for Coalescence
 
-1. Identify collision groups where coalescence is enabled (in this case, this is handled by the flags vector, where `i` and `j` must have the bits `MERGE_AS_PRIMARY` and `MERGE_AS_SECONDARY`)
-2. Compute the total momentum of the group
+A pair can merge when one body has `MERGE_AS_PRIMARY` and the other has `MERGE_AS_SECONDARY`.
+
+For a merging group $\mathcal C$, compute its mass, velocity, and position:
 
 $$
-\vec{p}_{\text{total}} = \sum_{i=0}^{N} m_i \vec{v}_i
+\begin{aligned}
+M_{\mathcal C} &= \sum_{i\in\mathcal C}m_i
+&& \text{combined mass} \\
+\mathbf v_{\mathrm{cm}} &= \frac{1}{M_{\mathcal C}}\sum_{i\in\mathcal C}m_i\mathbf v_i
+&& \text{combined velocity} \\
+\mathbf r_{\mathrm{cm}} &= \frac{1}{M_{\mathcal C}}\sum_{i\in\mathcal C}m_i\mathbf r_i
+&& \text{combined position}
+\end{aligned}
 $$
 
-3. Compute the total mass of the group
+Merging preserves mass and linear momentum unless fixed-property flags override these updates.
+
+## What Affects Numerical Correctness?
+
+- **Collisions:** Inelastic bounces and merging can reduce mechanical energy.
+- **Time step:** Large steps increase integration error, especially during close encounters. Compare smaller steps to check convergence.
+- **Adaptive stepping:** Collision handling shortens steps, which can affect long-term energy behavior.
+- **Precision:** `USE_DOUBLE_PRECISION` reduces rounding error but may be slower on some GPUs.
+- **Compiler settings:** Disable `USE_FAST_RELAXED_MATH` to favor accuracy over speed.
+
+## Measuring Numerical Correctness
+
+Use active bodies and sample positions and velocities after a complete step. Conservation checks assume an isolated system without fixed-body constraints or changes to its membership.
+
+| Symbol | Meaning |
+| ------ | ------- |
+| $m_i$ | Body mass |
+| $\mathbf r_i$ | Body position |
+| $\mathbf v_i$ | Body velocity |
+| $r_{ij}$ | $\lVert\mathbf r_j-\mathbf r_i\rVert$, Distance between bodies |
+| $G$ | `GRAV_CONSTANT` |
+| $\epsilon$ | [Plummer softening length](#plummer-softening), `SOFTENING_LENGTH` |
+
+### Kinetic energy
 
 $$
-m_{\text{total}} = \sum_{i=0}^{N} m_i
+K(t)=\frac{1}{2}\sum_i m_i |\mathbf v_i(t)|^2
 $$
 
-4. Apply those values to determine CoM velocity and CoM position
+Kinetic energy measures motion. It changes as gravity accelerates bodies and is not conserved on its own.
+
+### Gravitational potential energy
 
 $$
-   \vec{v}_{\text{cm}} = \frac{\vec{p}_{\text{total}}}{m_{\text{total}}} = \frac{\sum_{i=0}^{N} m_i \vec{v}_i}{\sum_{i=0}^{N} m_i}
+U(t)=-G\sum_{i<j}\frac{m_i m_j}{\sqrt{r_{ij}(t)^2+\epsilon^2}}
 $$
 
-   Where,
+The [Plummer-softened potential](#plummer-softening) counts each pair once and excludes self-interactions. Use the same [softening](#plummer-softening) as the [kick kernel](#velocity-update-kick); $\epsilon=0$ gives the Newtonian potential.
 
-   - $\vec{v}_{\text{cm}}$ is the [center-of-momentum](https://en.wikipedia.org/wiki/Center-of-momentum_frame) velocity
-   - $\vec{p}_{\text{total}}$ is the sum total of momentum
+### Total energy
+
+![Total energy](screenshots/measure-total-energy.png)
 
 $$
-   \vec{r}_{\text{cm}} = \frac{\sum_{i=0}^{N} m_i \vec{r}_i}{\sum_{i=0}^{N} m_i}
+E(t)=K(t)+U(t)
 $$
 
-   Where,
+Kinetic and potential energy exchange during an orbit. Their sum should stay approximately constant under conservative gravity.
 
-- $\vec{r}_{\text{cm}}$ is the [center-of-momentum](https://en.wikipedia.org/wiki/Center-of-momentum_frame) position
+> [!IMPORTANT]
+> Distinguish collision and merging losses from numerical drift.
 
-## Numerical Correctness
+### Energy error
 
-Since the integrator is based on Leapfrog KDK, it is largely symplectic; however, there are cases where secular drift or general numerical error can be introduced.
+![Energy error](screenshots/measure-energy-error.png)
 
- 1. Collisions. Since an restitution coefficient less than 1 will simulate energy being radiated as heat, this will look like a net loss to the system.
- 2. Unreasonably high `EPS_TIME` value. If it is too high, errors in position can begin to propagate, especially for fast-moving bodies. You should target the lowest value you can for your system.
- 3. Enabling adaptive time stepping (required for collision or coalescence, and disabled otherwise).
- 4. Floating-point precision. The CL kernels currently use `float32` and `complex64`. This will be updated to 64-bit in the future.
- 5. Compilation settings. The config setting `USE_FAST_RELAXED_MATH` should be turned off if extra precision is necessary.
+$$
+\Delta E(t)=E(t)-E_0,\qquad
+\delta_E(t)=\frac{E(t)-E_0}{E_0},\qquad E_0=E(0)
+$$
+
+The metrics display shows signed relative error $\delta_E$. Its magnitude measures fractional energy change; for $E_0<0$, a positive value means energy became more negative. If $E_0\approx0$, use $\Delta E$ or normalize by $K(0)+|U(0)|$.
+
+**Expected:** Small, bounded oscillations for smooth motion with fixed-step leapfrog. Growing error can indicate large steps, rounding error, or a bug.
+
+### Virial ratio
+
+![Virial ratio](screenshots/measure-virial-ratio.png)
+
+$$
+Q(t)=\frac{2K(t)}{|U(t)|}
+$$
+
+For a bound Newtonian system in equilibrium, $2\langle K\rangle+\langle U\rangle=0$. Use velocities relative to the center of mass to assess internal equilibrium. Values away from unity can reflect collapse or expansion rather than a numerical error.
+
+This ratio is undefined at $U=0$. Significant [softening](#plummer-softening) changes the virial relation, so equilibrium need not give $Q\approx1$.
+
+### Linear momentum
+
+> [!NOTE]
+> This metric is not currently tracked.
+
+$$
+\mathbf P(t)=\sum_i m_i\mathbf v_i(t),\qquad
+\Delta\mathbf P(t)=\mathbf P(t)-\mathbf P(0)
+$$
+
+Linear momentum should remain constant through gravity, bounces, and merges. Changes can reveal unbalanced forces or impulses.
+
+**Expected:** The center of mass moves at constant velocity $\mathbf P/\sum_i m_i$.
+
+### Angular momentum
+
+> [!NOTE]
+> This metric is not currently tracked. The engine will probably need to start tracking spin in order to leverage this.
+
+$$
+\mathbf L(t)=\sum_i \mathbf r_i(t)\times m_i\mathbf v_i(t)
+$$
+
+For the engine's planar motion, this reduces to the signed component perpendicular to the plane:
+
+$$
+L_z(t)=\sum_i m_i\left(x_i v_{y,i}-y_i v_{x,i}\right)
+$$
+
+**Expected**: Orbital angular momentum should remain constant under central forces when measuring about a fixed inertial origin.
+
+## Plummer Softening
+
+Plummer softening replaces the separation $r$ in the gravitational potential with $\sqrt{r^2+\epsilon^2}$, where $\epsilon$ is `SOFTENING_LENGTH`. This keeps gravity finite at coincident positions and reduces numerical errors during close encounters. Larger values smooth small-scale interactions more strongly; at distances much larger than $\epsilon$, gravity approaches the Newtonian result. Use the same value in force and energy calculations.
+
+See [gravitational softening as a smoothing operation](https://academic.oup.com/mnras/article/425/2/1104/1188012) for background.
 
 ## Performance
 
-Given the following criteria, a reasonable number between 5000-8000 individual bodies can be simulated.
+The following setup simulated roughly 5,000–8,000 bodies in real time:
 
-- **Hardware:** AMD Radeon 890M
-- **Integration**: `EPS_TIME=1e-3`, `DT_BASE=1/15`
-  - The tick controller starts with `DT_BASE`, but the `dt` is _adaptive_. After several ticks, will start to fall into place, between `DT_MIN` and `DT_MAX`, that allows for the highest performance.
-- **Elastic Collisions**: Enabled, restitution coefficient `0.98`
-- **Coalescence**: disabled (no "merging")
-- **Scenario**: 5000-8000 bodies, all configured as secondary, orbiting a central ultra-massive body
-- **Performance**: 1-1 wall-time to sim-time. 90% utilization on device (GPU). 20% utilization on host (CPU). No visible bottlenecks in any "hot path" code.
+| Setting | Value |
+| ------- | ----- |
+| Hardware | AMD Radeon 890M |
+| Integration | `EPS_TIME=1e-3`, base step of `1/15` |
+| Bouncing | Enabled; restitution coefficient `0.98` |
+| Merging | Disabled |
+| Scenario | 5,000–8,000 secondary bodies orbiting a massive central body |
+| Utilization | About 90% GPU and 20% host CPU |
+
+Collision handling adapts the time step. No kernel bottlenecks were observed in this setup.
 
 ## Apps
 
 ### Orbital Engineer Server
 
-The core app that manages the n-body engine. It is responsible for:
+The server manages the N-body engine:
 
-- Taking in commands via a socket connection from client apps
-- Dispatching ticks/steps to the kernels (either OpenCL or NumPy)
-- Syncing orbital state vectors from GPU memory to shared memory
-- Tracking & writing kernel metrics to an IPC socket
+- Receives client commands over a socket.
+- Dispatches simulation ticks and steps.
+- Copies orbital state from GPU memory to shared memory.
+- Sends kernel metrics over an IPC socket.
 
-It will not do anything "on its own" and needs a client to direct it.
+A client must send commands to run the simulation.
 
 ### User Interface Client App
 
-Companion app to the server. It builds scenarios, sends commands, and constructs the display based on the orbital state vectors within shared memory.
+The UI builds scenarios, sends server commands, and displays orbital state from shared memory.
 
 ### App Interactions
 
@@ -248,31 +338,36 @@ Companion app to the server. It builds scenarios, sends commands, and constructs
 
 ## Analyzing Metrics
 
-![UI Metrics](screenshots/ui-metrics-app.png)
+![Metrics app](screenshots/ui-metrics-app.png)
 
-There's a companion app in `src/ui_metrics` that will display kernel runtime durations.
+The metrics app displays kernel timings and energy diagnostics. Start it from the repository root:
 
-It can be started via:
+```bash
+./.venv/bin/python src/ui_metrics/metrics_app.py
+```
 
-    ./.venv/bin/python src/ui_metrics/metrics_app.py
-
-Metrics are enabled via:
-
-   orbitalengineer.engine.config.EMIT_METRICS
-
-When set to `True` (default), pyopencl will enable profiling (which may slightly affect kernel speed), and the orbital-engine will emit the kernel metrics to the socket specified  by `METRIC_SOCKET_PATH`.
+Set `ENABLE_PROFILING = True` (the default) to enable profiling and metrics. The engine sends metrics to `METRIC_SOCKET_PATH`. Profiling may add some overhead.
 
 ## IPC Message Transport Protocol
 
-The IPC communication between client and the engine is governed by a simple protocol consisting of a binary header and a JSON payload. Each payload follows a strict schema.
-
-The full reference is outlined in this document:
-
-- [Reference](/docs/transport-protocol.md)
+Client–engine messages use a binary header and a JSON payload with a defined schema. See the [protocol reference](docs/transport-protocol.md).
 
 ## Development
 
- 1. Install system-level OpenCL requirements
-    - For AMD GPUs: `sudo pacman -Syu rocm-opencl-runtime`
- 2. Set up the virtualenv: `make venv`
- 3. Install the engine: `pip install -e .`
+1. Install the system OpenCL dependencies. For AMD GPUs on Arch Linux:
+
+   ```bash
+   sudo pacman -Syu rocm-opencl-runtime
+   ```
+
+2. Create the virtual environment:
+
+   ```bash
+   make venv
+   ```
+
+3. Install the engine in that environment:
+
+   ```bash
+   ./.venv/bin/python -m pip install -e .
+   ```
