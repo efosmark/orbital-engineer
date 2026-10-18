@@ -37,13 +37,13 @@ Each time step has three phases:
 
 | Stage       | Position             | Velocity                    |
 | ----------- | -------------------- | --------------------------- |
-| Initial     | $\mathbf r_i^n$      | $\mathbf v_i^n$             |
-| First kick  | $\mathbf r_i^n$      | $\mathbf v_i^{n+1/2}$       |
-| Drift       | $\mathbf r_i^{n+1}$  | $\mathbf v_i^{n+1/2}$       |
-| Second kick | $\mathbf r_i^{n+1}$  | $\mathbf v_i^{n+1}$         |
-| Collision   | $\mathbf r_i^{n+1}$  | Post-impact velocity        |
+| Initial     | $\mathbf r_i(t)$      | $\mathbf v_i(t)$             |
+| First kick  | $\mathbf r_i(t)$      | $\mathbf v_{i,\mathrm{half}}$       |
+| Drift       | $\mathbf r_i(t+h)$  | $\mathbf v_{i,\mathrm{half}}$       |
+| Second kick | $\mathbf r_i(t+h)$  | $\mathbf v_i(t+h)$         |
+| Collision   | $\mathbf r_i(t+h)$  | Post-impact velocity        |
 
-Subscript $i$ identifies a body; superscripts $n$ and $n+1$ mark consecutive states. The intermediate velocity is labeled $n+1/2$. Merging also updates the final position to the group's center of mass.
+Subscript $i$ identifies a body; $t$ and $t+h$ mark the start and end of a step. The label “half” denotes the intermediate velocity after the first kick. Merging also updates the final position to the group's center of mass.
 
 ## Velocity Update (Kick)
 
@@ -58,12 +58,12 @@ Subscript $i$ identifies a body; superscripts $n$ and $n+1$ mark consecutive sta
 
 $$
 \begin{aligned}
-\mathbf a_i^n &= G\sum_{j\ne i} m_j
-\frac{\mathbf r_j^n-\mathbf r_i^n}{\left((r_{ij}^n)^2+\epsilon^2\right)^{3/2}}
+\mathbf a_i(t) &= G\sum_{j\ne i} m_j
+\frac{\mathbf r_j(t)-\mathbf r_i(t)}{\left(r_{ij}(t)^2+\epsilon^2\right)^{3/2}}
 && \text{acceleration} \\
-\mathbf v_i^{n+1/2} &= \mathbf v_i^n+\frac{h}{2}\mathbf a_i^n
+\mathbf v_{i,\mathrm{half}} &= \mathbf v_i(t)+\frac{h}{2}\mathbf a_i(t)
 && \text{first kick} \\
-\mathbf v_i^{n+1} &= \mathbf v_i^{n+1/2}+\frac{h}{2}\mathbf a_i^{n+1}
+\mathbf v_i(t+h) &= \mathbf v_{i,\mathrm{half}}+\frac{h}{2}\mathbf a_i(t+h)
 && \text{second kick}
 \end{aligned}
 $$
@@ -72,9 +72,9 @@ Here:
 
 - $h$ is the full time step.
 - $m_j$ is body $j$'s mass, and $G$ is `GRAV_CONSTANT`.
-- $r_{ij}^n$ is the distance between bodies $i$ and $j$ at state $n$.
+- $r_{ij}(t)$ is the distance between bodies $i$ and $j$ at time $t$.
 - $\epsilon$ is the [Plummer softening length](#plummer-softening), configured by `SOFTENING_LENGTH`.
-- $\mathbf a_i^{n+1}$ is recomputed using all bodies' positions after the drift.
+- $\mathbf a_i(t+h)$ is recomputed using all bodies' positions after the drift.
 
 ## Position Update (Drift)
 
@@ -85,7 +85,7 @@ Here:
 ### Position Formula
 
 $$
-\mathbf r_i^{n+1}=\mathbf r_i^n+h\mathbf v_i^{n+1/2}
+\mathbf r_i(t+h)=\mathbf r_i(t)+h\mathbf v_{i,\mathrm{half}}
 $$
 
 The drift advances body $i$'s position by a full time step $h$, using the [half-kicked velocity](#velocity-formula).
@@ -109,36 +109,35 @@ For a colliding pair $(i,j)$ with positive masses, primes denote velocities afte
 
 1. Compute the separation and unit contact normal, pointing from body $i$ to body $j$:
 
-   $$
-   \mathbf d_{ij}=\mathbf r_j-\mathbf r_i,\qquad
-   r_{ij}=\lVert\mathbf d_{ij}\rVert,\qquad
-   \hat{\mathbf n}_{ij}=\frac{\mathbf d_{ij}}{r_{ij}}
-   $$
+$$
+\mathbf d_{ij}=\mathbf r_j-\mathbf r_i,\qquad
+r_{ij}=\lVert\mathbf d_{ij}\rVert,\qquad
+\hat{\mathbf n}_{ij}=\frac{\mathbf d_{ij}}{r_{ij}}
+$$
 
-   Coincident centers require a separately chosen normal.
 
 2. Compute the signed relative velocity along the normal:
 
-   $$
-   v_{\mathrm{rel},n}=(\mathbf v_j-\mathbf v_i)\cdot\hat{\mathbf n}_{ij}
-   $$
+$$
+v_{\mathrm{rel},n}=(\mathbf v_j-\mathbf v_i)\cdot\hat{\mathbf n}_{ij}
+$$
 
-   Apply an impulse only when $v_{\mathrm{rel},n}<0$ (approaching).
+Apply an impulse only when $v_{\mathrm{rel},n}<0$ (approaching).
 
 3. Compute the nonnegative scalar impulse magnitude:
 
-   $$
-   J=-\frac{(1+e)v_{\mathrm{rel},n}}{\frac{1}{m_i}+\frac{1}{m_j}}
-   $$
+$$
+J=-\frac{(1+e)v_{\mathrm{rel},n}}{\frac{1}{m_i}+\frac{1}{m_j}}
+$$
 
 4. Apply equal and opposite impulses:
 
-   $$
-   \begin{aligned}
-   \mathbf v_i' &= \mathbf v_i-\frac{J}{m_i}\hat{\mathbf n}_{ij} \\
-   \mathbf v_j' &= \mathbf v_j+\frac{J}{m_j}\hat{\mathbf n}_{ij}
-   \end{aligned}
-   $$
+$$
+\begin{aligned}
+\mathbf v_i' &= \mathbf v_i-\frac{J}{m_i}\hat{\mathbf n}_{ij} \\
+\mathbf v_j' &= \mathbf v_j+\frac{J}{m_j}\hat{\mathbf n}_{ij}
+\end{aligned}
+$$
 
 For an unconstrained pair, this conserves linear momentum and gives $v_{\mathrm{rel},n}'=-e\,v_{\mathrm{rel},n}$, leaving tangential velocities unchanged.
 
@@ -198,7 +197,7 @@ Kinetic energy measures motion. It changes as gravity accelerates bodies and is 
 ### Gravitational potential energy
 
 $$
-U(t)=-G\sum_{i<j}\frac{m_i m_j}{\sqrt{r_{ij}(t)^2+\epsilon^2}}
+U(t)=-G\sum_{i \lt j}\frac{m_i m_j}{\sqrt{r_{ij}(t)^2+\epsilon^2}}
 $$
 
 The [Plummer-softened potential](#plummer-softening) counts each pair once and excludes self-interactions. Use the same [softening](#plummer-softening) as the [kick kernel](#velocity-update-kick); $\epsilon=0$ gives the Newtonian potential.
@@ -214,7 +213,7 @@ $$
 Kinetic and potential energy exchange during an orbit. Their sum should stay approximately constant under conservative gravity.
 
 > [!IMPORTANT]
-> Distinguish collision and merging losses from numerical drift.
+> Distinguish collision and merging losses from numerical drift. See: [What Affects Numerical Correctness?](#what-affects-numerical-correctness)
 
 ### Energy error
 
@@ -225,7 +224,7 @@ $$
 \delta_E(t)=\frac{E(t)-E_0}{E_0},\qquad E_0=E(0)
 $$
 
-The metrics display shows signed relative error $\delta_E$. Its magnitude measures fractional energy change; for $E_0<0$, a positive value means energy became more negative. If $E_0\approx0$, use $\Delta E$ or normalize by $K(0)+|U(0)|$.
+The metrics display shows signed relative error $\delta_E$. Its magnitude measures fractional energy change; for $E_0<0$, a positive value means energy became more negative. 
 
 **Expected:** Small, bounded oscillations for smooth motion with fixed-step leapfrog. Growing error can indicate large steps, rounding error, or a bug.
 
