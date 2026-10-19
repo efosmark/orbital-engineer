@@ -1,9 +1,7 @@
 import numpy as np
 import pyopencl as cl
-from pyopencl import array
 from orbitalengineer import dtypes
 from orbitalengineer.engine.cgroup.cgroup import CGroupPipeline
-from orbitalengineer.engine.contacting.contacting import FindContactingBodiesPipeline
 from orbitalengineer.engine.dimension import PipelineComponent
 from orbitalengineer.engine.distance.distance import DistancePipeline
 from orbitalengineer.engine.interaction.interaction import InteractionPipeline
@@ -19,90 +17,8 @@ class BouncePipeline(PipelineComponent):
     def initialize(self):
         self._collide_bounce_simple = self._load_kernel("compute_bouncing_collision_simple", KERNEL_FILE_LOCATION)
         self._collide_bounce_single = self._load_kernel("compute_bouncing_collision_single", KERNEL_FILE_LOCATION)
-        self._compute_center_of_mass = self._load_kernel("compute_center_of_mass", KERNEL_FILE_LOCATION)
-        self._compute_impulse = self._load_kernel("compute_impulse", KERNEL_FILE_LOCATION)
-        self._assign_impulse = self._load_kernel("assign_impulse", KERNEL_FILE_LOCATION)
 
         self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=dtypes.COMPLEX)
-
-        self._impulse = array.zeros(self.queue, self.vec.N * self.vec.N, dtype=dtypes.COMPLEX)
-
-    def compute_impulse(self, state:PrimaryStateVectors, contacting: FindContactingBodiesPipeline, cgroup: cl.Buffer):
-        # Clear out the impulse table
-        self._impulse.fill(dtypes.COMPLEX(0, 0))
-
-        ids, global_size, local_size = contacting.get_ids(state)        
-        if ids is None:
-            return
-
-        com_momentum = np.zeros(state.N, dtype=dtypes.COMPLEX)
-        com_velocity = np.zeros(state.N, dtype=dtypes.COMPLEX)
-        com_total_mass = np.zeros(state.N, dtype=np.float32)
-        
-        com_momentum_cl = self.vec._create_buffer(com_momentum)
-        com_velocity_cl = self.vec._create_buffer(com_velocity)
-        com_total_mass_cl = self.vec._create_buffer(com_total_mass)
-    
-        self._compute_center_of_mass(
-            self.queue,
-            (global_size, ),  # global work size
-            (local_size, ),                           # local work size
-            
-            # Args
-            np.uint32(self.vec.N_bodies_alloc),
-            np.uint32(self.vec.N_bodies_valid),
-            state.flags,
-            state.position,
-            state.velocity,
-            state.mass,
-            ids,
-            contacting.n_direct_contacts,
-            contacting.direct_contacts,
-            com_momentum_cl,
-            com_velocity_cl,
-            com_total_mass_cl
-        )
-        
-        self._compute_impulse(
-            self.queue,
-            (global_size, ),  # global work size
-            (local_size, ),                           # local work size
-            
-            # Args
-            np.uint32(state.N),
-            state.flags,
-            state.position,
-            state.velocity,
-            state.mass,
-            ids,
-            contacting.n_direct_contacts,
-            contacting.direct_contacts,
-            #total_momentum_cl,
-            com_momentum_cl,
-            com_velocity_cl,
-            com_total_mass_cl,
-            self._impulse.data
-        )
-
-        cl.enqueue_copy(self.queue, self._velocity_intermediate, state.velocity)
-        
-        if self._impulse.data is None:
-            return
-        
-        self._assign_impulse(
-            self.queue,
-            (global_size, ),  # global work size
-            (local_size, ),                           # local work size
-            
-            # Args
-            np.uint32(state.N),
-            ids,
-            contacting.n_direct_contacts,
-            contacting.direct_contacts,
-            self._impulse.data,
-            self._velocity_intermediate
-        )
-        cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
 
     def collide_bounce_single(self,  state:PrimaryStateVectors, interact:InteractionPipeline, ledger:LedgerController):
         self._collide_bounce_single(
