@@ -57,26 +57,10 @@ __kernel void compute_interaction(
         float t2 = dt_until_collision_ij.y;
         float curr_min = (t1 > 0.0f) ? t1 : ((t2 > 0.0f) ? t2 : dt_step);
         min_impact = fmin(min_impact, curr_min);
-    
-        // float distance_edge_to_edge = length(dP) - R;
-
-        // bool in_contact = distance_edge_to_edge <= EPS_DIST;
-        // if (in_contact) {
-        //     uint offset = atomic_fetch_add(&local_num_contacts, 1);
-        //     if (offset < MAX_NUM_CONTACTS_PER_BODY)
-        //         contacting_i[offset] = j;
-        // }
-
-        // bool is_near = distance_edge_to_edge <= R * 0.1;
-        // if (is_near) {
-        //     uint offset = atomic_fetch_add(&local_num_nearby, 1);
-        //     if (offset < MAX_NUM_CONTACTS_PER_BODY)
-        //         nearby_i[offset] = j;
-        // }
-
-        // is_touching[IDX] = in_contact;
-        // is_nearby[IDX] = is_near;
-        // edge_distance[IDX] = distance_edge_to_edge;
-    
     );
+
+    float wg_min_impact = work_group_reduce_min(min_impact);
+    if (lane == 0) {
+        min_dt_per_body[i] = wg_min_impact;
+    }
 }
