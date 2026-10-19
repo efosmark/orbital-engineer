@@ -61,11 +61,11 @@ class MoveParticleController:
     def _update_selection(self):
         x_start, x_end, y_start, y_end = self._get_selection_box()
         self.app.selected_particles = np.where(
-             (self.orbital.position.real <= x_end)
-            &(self.orbital.position.real >  x_start)
-            &(self.orbital.position.imag <= y_end)
-            &(self.orbital.position.imag >  y_start)
-            &((self.orbital.flags & flags.REMOVED) != flags.REMOVED)
+             (self.app.engine.position.real <= x_end)
+            &(self.app.engine.position.real >  x_start)
+            &(self.app.engine.position.imag <= y_end)
+            &(self.app.engine.position.imag >  y_start)
+            &((self.app.engine.flags & flags.REMOVED) != flags.REMOVED)
         )[0].tolist()
 
     def on_drag_begin(self, gesture, start_x, start_y):
@@ -225,9 +225,8 @@ class OrbitalCanvas(Gtk.DrawingArea):
         
         try:
             if self.app.secondary_body is not None and self.app.follow_tracked_body:
-                f = self.orbital.get_particle(self.app.secondary_body)
-                fpos = f.get_position()
-                self.camera.offset = [fpos.real, fpos.imag]
+                fpos = self.app.engine.position[self.app.secondary_body]
+                self.camera.offset = [float(fpos.real), float(fpos.imag)]
 
             cr = snapshot.append_cairo(Graphene.Rect().init(0, 0, width, height))
             

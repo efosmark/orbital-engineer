@@ -1,5 +1,4 @@
-import os
-from typing import Sequence
+from typing import Literal, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -25,11 +24,14 @@ class PrimaryStateVectors:
     N:int
     Lx:int
     
+    buffer_id:Literal['A']|Literal['B'] = 'A'
+    vec_position_A:np.typing.NDArray
+    vec_position_B:np.typing.NDArray
+    
     body_id:cl.Buffer
     id_to_index:cl.Buffer
     flags:cl.Buffer
     velocity:cl.Buffer
-    position:cl.Buffer
     mass:cl.Buffer
     radius:cl.Buffer
     
@@ -60,7 +62,7 @@ class PrimaryStateVectors:
     def get_host_vector(self, buffer: cl.Buffer, sync:bool=False) -> NDArray:
         vec = self._host_vector[buffer]
         if sync:
-            self.sync_to_host(buffer).wait()
+            self.sync_to_host(buffer)
         return vec
     
     def sync_to_host(self, buffer: cl.Buffer, queue:cl.CommandQueue|None=None) -> cl.Event:
@@ -96,7 +98,6 @@ class PrimaryStateVectors:
         id_to_index_host = self.get_host_vector(self.id_to_index)
         flags_host = self.get_host_vector(self.flags)
         velocity = self.get_host_vector(self.velocity)
-        position = self.get_host_vector(self.position)
         mass = self.get_host_vector(self.mass)
         radius = self.get_host_vector(self.radius)
         
@@ -105,26 +106,30 @@ class PrimaryStateVectors:
             id_to_index_host[i] = np.uint32(i)
             flags_host[i] = np.uint32(p.flags)
             velocity[i] = dtypes.COMPLEX(*p.velocity)
-            position[i] = dtypes.COMPLEX(*p.position)
             mass[i] = np.float32(p.mass)
             radius[i] = np.float32(p.radius)
+            self.vec_position_A[i] = dtypes.COMPLEX(*p.position)
+            self.vec_position_B[i] = self.vec_position_A[i]
 
         cl.enqueue_copy(self.queue, self.body_id, id_host)
         cl.enqueue_copy(self.queue, self.flags, flags_host)
         cl.enqueue_copy(self.queue, self.velocity, velocity)
-        cl.enqueue_copy(self.queue, self.position, position)
         cl.enqueue_copy(self.queue, self.mass, mass)
         cl.enqueue_copy(self.queue, self.radius, radius)
+        cl.enqueue_copy(self.queue, self.position, self.vec_position_A)
         
         self.initialized = True
         logger.info("Populated %s bodies", len(particles))
 
     def _allocate_primary_vectors(self):
+        self.vec_position_A = self.shm.create_shared_memory('position_A', self.N, dtypes.COMPLEX)
+        self.vec_position_B = self.shm.create_shared_memory('position_B', self.N, dtypes.COMPLEX)
+        self.position = self._create_buffer(self.vec_position_A)
+
         self.id_to_index = self.alloc(self.N, np.uint32, shared_name='id_to_index')
         self.body_id = self.alloc(self.N, np.uint32, shared_name='body_id')
         self.flags = self.alloc(self.N, np.uint32, shared_name='flags')
         self.velocity = self.alloc(self.N, dtypes.COMPLEX, shared_name='velocity')
-        self.position = self.alloc(self.N, dtypes.COMPLEX, shared_name='position')
         self.mass = self.alloc(self.N, np.float32, shared_name='mass')
         self.radius = self.alloc(self.N, np.float32, shared_name='radius')
     
@@ -161,14 +166,23 @@ class PrimaryStateVectors:
         
         return True
 
-    def sync(self, queue):
+    def sync(self, queue, current_buffer):
         self.sync_to_host(self.id_to_index, queue=queue)
         self.sync_to_host(self.body_id, queue=queue)
         self.sync_to_host(self.flags, queue=queue)
         self.sync_to_host(self.velocity, queue=queue)
-        self.sync_to_host(self.position, queue=queue)
         self.sync_to_host(self.mass, queue=queue)
         self.sync_to_host(self.radius, queue=queue)
+
+        if current_buffer == 'B':
+            cl.enqueue_copy(queue, self.vec_position_A, self.position)
+            self.buffer_id = 'A'
+        elif current_buffer == 'A':
+            cl.enqueue_copy(queue, self.vec_position_B, self.position)
+            self.buffer_id = 'B'
+        else:
+            raise Exception('Invalid buffer')
+        
     
     def defragment(self):
         return

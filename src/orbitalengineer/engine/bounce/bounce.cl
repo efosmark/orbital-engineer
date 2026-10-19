@@ -22,7 +22,7 @@ __kernel void compute_bouncing_collision_single(
     __global const COMPLEX* restrict velocity,
     __global const float*  restrict mass,
     __global const float*  restrict radius,
-    __global const COMPLEX* restrict time_until_contact,
+    __global const float*  restrict time_until_contact,
     __global       COMPLEX* restrict velocity_intermediate,
     __global       atomic_uint* global_count,
     __global LedgerEntry*  restrict ledger

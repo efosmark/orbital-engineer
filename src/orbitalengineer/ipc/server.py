@@ -119,7 +119,8 @@ class OrbitalControlServer:
             body_id=self._get_shared_memory_info('body_id'),
             flags=self._get_shared_memory_info('flags'),
             velocity=self._get_shared_memory_info('velocity'),
-            position=self._get_shared_memory_info('position'),
+            position_A=self._get_shared_memory_info('position_A'),
+            position_B=self._get_shared_memory_info('position_B'),
             mass=self._get_shared_memory_info('mass'),
             radius=self._get_shared_memory_info('radius'),
             force=self._get_shared_memory_info('force'),
@@ -147,7 +148,8 @@ class OrbitalControlServer:
             next_tick_at=self.tick_ctl.next_tick_at,
             dt_step=self.tick_ctl.dt_step,
             device_status=gpu_status,
-            host_status=self.get_cpu_status()
+            host_status=self.get_cpu_status(),
+            buffer=self.orbital.vec.buffer_id if self.orbital.is_initialized else 'A'
         )
     
     def _get_state_response(self):
@@ -167,13 +169,10 @@ class OrbitalControlServer:
                     logger.error("Connection error: %s", e)
                     break
                 
-                #with self.orbital.tr(f"server.handle_request({message.MessageType(message_type).name})"):
                 r = self._handle_request(conn, message.MessageType(message_type), payload)
-                #if r == False:
-                #    break
+                if r == False: break
         except KeyboardInterrupt:
             print("Shutting down server.")
-        #self.pause()
 
     def _handle_request(self, conn:socket.socket, message_type:message.MessageType, payload):
         if message_type == message.MessageType.INIT_REQ:
@@ -190,10 +189,9 @@ class OrbitalControlServer:
             transport.send_message(conn, message.MessageType.STATUS_RESP, self._get_status_response())
         
         elif message_type == message.MessageType.SYNC_REQ:
-            self.orbital.sync()
+            req = message.SyncRequest(**payload)
+            self.orbital.sync(req.current_buffer)
             status_resp = self._get_status_response()
-            # TODO: send status payload to the metrics socket as well
-            # TODO: add total momentum, total energy, etc, to status response
             transport.send_message(conn, message.MessageType.STATUS_RESP, status_resp)
 
         elif message_type == message.MessageType.STATUS_REQ:

@@ -3,10 +3,10 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from gui.ui_config import SYNC_RATE_MS
 from orbitalengineer.ipc.client import ClientSocketConnection
 from gui.gtk4 import GObject, GLib
 
-SYNC_RATE_MS = int((1/30.0) * 1000.0)
 
 _TENTHS = [v/10.0 for v in range(10)]
 _TENS = [
@@ -52,7 +52,7 @@ class EngineModel(GObject.GObject):
     id_to_index:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
     body_id:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
     flags:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
-    position:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
+    position:NDArray[np.complex64|np.complex128] = GObject.Property(type=object) #type:ignore
     velocity:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
     mass:NDArray[np.float32] = GObject.Property(type=object) #type:ignore
     radius:NDArray[np.float32] = GObject.Property(type=object) #type:ignore
@@ -63,6 +63,8 @@ class EngineModel(GObject.GObject):
     direct_contacts:NDArray = GObject.Property(type=object) #type:ignore
     kinetic_energy:NDArray = GObject.Property(type=object) #type:ignore
     grav_potential_energy:NDArray = GObject.Property(type=object) #type:ignore
+    
+    buffer_id = GObject.Property(type=str)
 
     def increase_speed(self):
         idx = SPEED_SCALE.index(self.clock_speed) + 1
@@ -115,11 +117,19 @@ class ClientSyncController(GObject.GObject):
         self.model.props.valid_indices = self.client.get_valid_indices()
         self.model.notify('valid-indices')
         
+        if self.model.buffer_id != self.client.buffer_id:
+            self.model.buffer_id = self.client.buffer_id
+            if self.client.buffer_id == 'A':
+                self.model.props.position = self.client.position_A
+            elif self.client.buffer_id == 'B':
+                self.model.props.position = self.client.position_B
+            else:
+                raise Exception("Invalid buffer ID")
+        
         # Vectors
         self.model.id_to_index = self.client.id_to_index
         self.model.body_id = self.client.body_id
         self.model.flags = self.client.flags
-        self.model.position = self.client.position
         self.model.velocity = self.client.velocity
         self.model.mass = self.client.mass
         self.model.radius = self.client.radius

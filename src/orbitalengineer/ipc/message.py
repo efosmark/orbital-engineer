@@ -77,6 +77,15 @@ class ShiftVectorsRequest:
     def from_dict(cls, d:dict) -> Self:
         return cls(**d)
 
+
+@dataclass
+class SyncRequest:
+    current_buffer: str
+    
+    @classmethod
+    def from_dict(cls, d:dict) -> Self:
+        return cls(**d)
+
 @dataclass
 class SharedMemoryInfo:
     name:str
@@ -96,7 +105,8 @@ class SharedMemoryResponse:
     id_to_index: SharedMemoryInfo
     body_id: SharedMemoryInfo
     flags: SharedMemoryInfo
-    position: SharedMemoryInfo
+    position_A: SharedMemoryInfo
+    position_B: SharedMemoryInfo
     velocity: SharedMemoryInfo
     mass: SharedMemoryInfo
     radius: SharedMemoryInfo
@@ -149,6 +159,7 @@ class StatusResponse:
     dt_step: float
     device_status: DeviceStatus|None
     host_status: HostStatus
+    buffer:Literal['A']|Literal['B']
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:
@@ -163,7 +174,8 @@ class StatusResponse:
             next_tick_at=d['next_tick_at'],
             dt_step=d['dt_step'],
             device_status=DeviceStatus(**d['device_status']) if d['device_status'] is not None else None,
-            host_status=HostStatus(**d['host_status'])
+            host_status=HostStatus(**d['host_status']),
+            buffer=d['buffer']
         )
 
 @dataclass

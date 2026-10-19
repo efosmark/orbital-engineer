@@ -22,7 +22,7 @@ MAX_NUM_CONTACTS_PER_BODY = 8
 # Tick-rate Settings
 #############################################
 
-DEFAULT_DT_BASE =  1/10.0
+DEFAULT_DT_BASE =  1/20.0
 DEFAULT_SPEED = 1.0
 MAX_STEPS_PER_TICK = int(1.0/np.sqrt(DEFAULT_DT_BASE))
 MAX_SUB_STEPS = 60

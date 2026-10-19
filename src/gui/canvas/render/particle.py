@@ -8,20 +8,18 @@ DEFAULT_PARTICLE_COLOR = (1, 1, 1)
 class ParticleRenderer(renderer.Renderer):
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        
         for b in self.orbital:
             try:
-                radius = b.get_radius()
-            except AttributeError:
-                raise SystemExit
-            if b.get_mass() == 0:
-               continue
+                body_id = b.idx
+                radius = self.app.engine.radius[body_id]
+                position = self.app.engine.position[body_id]
+                if self.app.engine.mass[body_id] == 0: continue
+            except AttributeError:  raise SystemExit
+            except TypeError:       return
             
-            x,y = b.get_xy()
-            
+            x, y = position.real,position.imag
             radius = max(radius, MIN_DISPLAY_RADIUS/self.camera.zoom)
             
-            body_id = b.get_body_id()
             color = self.app.props.particle_colors.get(body_id, (1, 1, 1, 1))
             cr.set_source_rgba(*color)
             cr.arc(x, y, radius, 0, 2*math.pi)

@@ -174,8 +174,6 @@ class SimController:
             self._interaction.queue.finish()
     
     def substep(self, dt_step):
-        self.pipeline_state.step_id += 1
-        
         if self.cfg.COLLISION_MERGE_ENABLE or self.cfg.COLLISION_BOUNCE_ENABLE:
             dt = self._interaction.minimum_viable_dt(dt_step, self.cfg.EPS_TIME)
         else:
@@ -269,8 +267,8 @@ class SimController:
             self._cpu_last_sample = now
         return self._cpu_utilization
 
-    def sync(self):
-        self.vec.sync(self.q)
+    def sync(self, current_buffer):
+        self.vec.sync(self.q, current_buffer)
         self.vec.sync_to_host(self._ledger.ledger, queue=self.q)
         self.vec.sync_to_host(self._cgroup.group, queue=self.q)
         self.vec.sync_to_host(self._distance.direct_contacts, queue=self.q)

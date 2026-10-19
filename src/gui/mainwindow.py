@@ -28,12 +28,12 @@ class MainWindow(Gtk.ApplicationWindow):
         self.canvas.set_valign(Gtk.Align.FILL)
         
         self.set_default_size(*ui_config.WINDOW_DEFAULT_SIZE)
-        #self.set_child(self.canvas)
+        self.set_child(self.canvas)
 
-        box = Gtk.Box(spacing=0, orientation=Gtk.Orientation.VERTICAL)
-        box.append(self.canvas)
-        box.append(self._init_status_bar())
-        self.set_child(box)
+        #box = Gtk.Box(spacing=0, orientation=Gtk.Orientation.VERTICAL)
+        #box.append(self.canvas)
+        #box.append(self._init_status_bar())
+        #self.set_child(box)
 
         header = Gtk.HeaderBar()
         self.set_titlebar(header)

@@ -4,8 +4,8 @@ os.sched_setaffinity(0, {CPU_NUM})
 
 import socket
 from multiprocessing import shared_memory
-from typing import Any, Sequence, cast
-from dataclasses import asdict, fields
+from typing import Any, Literal, Sequence, cast
+from dataclasses import fields
 
 import numpy as np
 from numpy.typing import NDArray
@@ -37,10 +37,20 @@ class ClientSocketConnection:
     gpu_status:DeviceStatus|None
     cpu_status:message.HostStatus
     
+    buffer_id:Literal['A']|Literal['B']
+    position_A:NDArray[np.complex64|np.complex128]
+    position_B:NDArray[np.complex64|np.complex128]
+    
+    @property
+    def position(self):
+        if self.buffer_id == 'A':
+            return self.position_A
+        else:
+            return self.position_B
+    
     id_to_index:NDArray[np.uint32]
     body_id:NDArray[np.uint32]
     flags:NDArray[np.uint32]
-    position:NDArray
     velocity:NDArray
     mass:NDArray[np.float32]
     radius:NDArray[np.float32]
@@ -131,6 +141,7 @@ class ClientSocketConnection:
         self.gpu_status = status.device_status
         self.cpu_status = status.host_status
         self.clock.update(status.clock)
+        self.buffer_id = status.buffer
 
     def _connect_shared_memory(self, shared: message.SharedMemoryResponse):
         for f in fields(message.SharedMemoryResponse):
@@ -239,7 +250,7 @@ class ClientSocketConnection:
     def sync(self):
         if not self.is_initialized:
             return False
-        return self.send_message(message.MessageType.SYNC_REQ)
+        return self.send_message(message.MessageType.SYNC_REQ, message.SyncRequest(self.buffer_id))
 
     def rel_move(self, ids:Sequence[int], offset:complex):
         if not self.is_initialized:

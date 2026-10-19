@@ -40,6 +40,10 @@ __kernel void compute_interaction(
     __global       float*  restrict min_dt_per_body
 ) {
     GRID_STRIDE_INIT();
+    if (lane == 0) {
+        min_dt_per_body[i] = INFINITY;
+    }
+
     if (flags[i]&REMOVED) return;
 
     float min_impact = dt_step;

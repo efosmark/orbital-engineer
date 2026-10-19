@@ -21,12 +21,15 @@ class InteractionPipeline(PipelineComponent):
                 min_toi = np.min(min_dt_per_body[min_dt_per_body > 0])
             except ValueError:
                 min_toi = dt_step
-            result = max(min(dt_step, min_toi), eps_time)
+            result = min_toi if min_toi > eps_time else dt_step
+            #result = max(min(dt_step, min_toi), eps_time)
+        #print(min_dt_per_body[min_dt_per_body > 0].size, np.min(min_dt_per_body[min_dt_per_body > 0]))
+        #print(f"minimum_viable_dt {result:.6f} {dt_step=:.6f} {min_toi=:.20f}")
         return result      
 
     def compute_interaction(self, dt_step:float, state:PrimaryStateVectors):
         min_dt_per_body = self.vec.get_host_vector(self.min_dt_per_body)
-        min_dt_per_body[:] = 0.0
+        min_dt_per_body[:] = np.inf
         self.vec.sync_to_device(self.min_dt_per_body)
         
         return self._knl_compute_interaction(

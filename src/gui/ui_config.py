@@ -12,6 +12,8 @@ DEFAULT_PARTICLE_COLOR_RGBA = (1, 1, 1, 1)
 DEFAULT_FONT_FAMILY = "Monospace"
 DEFAULT_FONT_SIZE  = 10
 
+SYNC_RATE_MS = int((1/20.0) * 1000.0)
+
 #############################################
 # Audio Settings
 #############################################

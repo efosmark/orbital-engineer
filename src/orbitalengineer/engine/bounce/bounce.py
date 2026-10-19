@@ -61,7 +61,7 @@ class BouncePipeline(PipelineComponent):
             velocity_along_normal.velocity_along_normal,
             self._velocity_intermediate
         )
-        cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate)
+        cl.enqueue_copy(self.queue, state.velocity, self._velocity_intermediate).wait()
 
     def __call__(self, state:PrimaryStateVectors, interact:InteractionPipeline, cgroup:CGroupPipeline, distance: DistancePipeline, velocity_along_normal: VelocityAlongNormalPipeline, ledger:LedgerController):
         cl.enqueue_copy(self.queue, self._velocity_intermediate, np.zeros(state.N, dtype=dtypes.COMPLEX))
