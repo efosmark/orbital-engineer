@@ -122,7 +122,9 @@ class OrbitalTest:
             self._initialize()
         if dt_step is None:
             dt_step = self.config.DEFAULT_DT_BASE
-            
+        
+        self.orbital.cfg = self.config
+        
         dt_remaining = run_time
         
         tick_states = []
