@@ -26,6 +26,7 @@ class MetricsApp(Gtk.Application):
             "total_KE": ui_metrics_config.ENERGY_HISTORY_SECONDS,
             "total_GPE": ui_metrics_config.ENERGY_HISTORY_SECONDS,
             "dt_step": ui_metrics_config.DT_STEP_HISTORY_SECONDS,
+            "num_steps": ui_metrics_config.NUM_STEPS_HISTORY_SECONDS,
             "virial_ratio": ui_metrics_config.VIRIAL_RATIO_HISTORY_SECONDS,
         }
         # Samples contain tick ID, simulation time, and value.

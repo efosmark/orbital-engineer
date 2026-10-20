@@ -9,7 +9,9 @@ from gi.repository import Gtk, GLib # type:ignore
 
 import matplotlib
 from matplotlib.figure import Figure
-from matplotlib.font_manager import FontProperties
+from matplotlib.lines import Line2D
+from matplotlib.layout_engine import ConstrainedLayoutEngine
+from matplotlib.ticker import MaxNLocator
 from matplotlib.backends.backend_gtk4agg import FigureCanvasGTK4Agg as FigureCanvas
 matplotlib.use("GTK4Agg")
 
@@ -20,7 +22,7 @@ class PlotWindow(Gtk.ApplicationWindow):
         self,
         app,
         durations: dict[str, deque[tuple[int, float, float]]],
-        metric_series=None,
+        metric_series: dict[str, deque[tuple[int, float, float]]] | None = None,
     ):
         super().__init__(application=app, title=ui_metrics_config.WINDOW_TITLE)
         self.set_default_size(*ui_metrics_config.WINDOW_DEFAULT_SIZE)
@@ -45,8 +47,10 @@ class PlotWindow(Gtk.ApplicationWindow):
         self.title_font_size = 10
         self.label_font_size = 9
         self.tick_font_size = 8
-        self.value_font_size = 7
         self.figure_bg = "#0f1117"
+        background_css = Gtk.CssProvider()
+        background_css.load_from_data(f"window {{ background-color: {self.figure_bg}; }}".encode())
+        self.get_style_context().add_provider(background_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.axes_bg = "#181c24"
         self.text_color = "#e6edf3"
         self.grid_color = "#2f3642"
@@ -63,62 +67,78 @@ class PlotWindow(Gtk.ApplicationWindow):
         ]
 
         window_width, window_height = ui_metrics_config.WINDOW_DEFAULT_SIZE
-        fig = Figure(figsize=(window_width / 100, window_height / 100), dpi=100, facecolor=self.figure_bg)
-        metrics_gs = fig.add_gridspec(
-            1, 3, left=0.08, right=0.98, bottom=0.77, top=0.95, wspace=0.20,
+        fig = Figure(
+            figsize=(window_width / 100, window_height / 100), dpi=100,
+            facecolor=self.figure_bg,
         )
+        # Give each row 12px above and below its labels, leaving a visible 24px gap.
+        self._layout_engine = ConstrainedLayoutEngine(w_pad=8 / fig.dpi, h_pad=12 / fig.dpi, hspace=0)
+        fig.set_layout_engine(self._layout_engine)
+        rows = fig.add_gridspec(3, 1, height_ratios=[1, 1, 1.6])
+        metrics_gs = rows[0].subgridspec(1, 4)
         self.ax_utilization = fig.add_subplot(metrics_gs[0, 0])
         self.ax_gpu_temperature = fig.add_subplot(metrics_gs[0, 1])
         self.ax_dt_step = fig.add_subplot(metrics_gs[0, 2])
-        energy_gs = fig.add_gridspec(
-            1, 3, left=0.08, right=0.98, bottom=0.49, top=0.67, wspace=0.20,
-        )
+        self.ax_num_steps = fig.add_subplot(metrics_gs[0, 3])
+        energy_gs = rows[1].subgridspec(1, 3)
         self.ax_energy_error = fig.add_subplot(energy_gs[0, 0])
         self.ax_total_ke = fig.add_subplot(energy_gs[0, 1])
         self.ax_total_gpe = self.ax_total_ke.twinx()
         self.ax_virial_ratio = fig.add_subplot(energy_gs[0, 2])
-        gs = fig.add_gridspec(
-            1, 3,
-            left=0.26, right=0.98, bottom=0.08, top=0.39, wspace=0.08,
-            width_ratios=[1.0, 1.0, 0.4],
-        )
-        self.ax_avg_individual = fig.add_subplot(gs[0, 0])
-        self.ax_avg = fig.add_subplot(gs[0, 1], sharey=self.ax_avg_individual)
-        self.ax_count = fig.add_subplot(gs[0, 2], sharey=self.ax_avg_individual)
-        self._row_grids = (metrics_gs, energy_gs, gs)
+        self.ax_avg_individual = fig.add_subplot(rows[2])
         self._graph_groups = [
-            ("All graphs", tuple(fig.axes)),
             ("Utilization", (self.ax_utilization,)),
             ("GPU temperature", (self.ax_gpu_temperature,)),
             ("Step duration", (self.ax_dt_step,)),
+            ("Steps per tick", (self.ax_num_steps,)),
             ("Energy error", (self.ax_energy_error,)),
             ("Total energy", (self.ax_total_ke, self.ax_total_gpe)),
             ("Virial ratio", (self.ax_virial_ratio,)),
             ("Average duration per sample", (self.ax_avg_individual,)),
-            ("Average duration per tick", (self.ax_avg,)),
-            ("Average count", (self.ax_count,)),
         ]
-        self._default_positions = {axis: axis.get_position().frozen() for axis in fig.axes}
-        self.graph_selector = Gtk.DropDown.new_from_strings([name for name, _axes in self._graph_groups])
-        self.graph_selector.set_tooltip_text("Choose a graph to expand, or show all graphs")
-        self.graph_selector.connect("notify::selected", self._on_graph_selected)
+        self._layout_selection = None
+        self._empty_graphs_message = fig.text(
+            0.5, 0.5, "Select graphs from the Graphs menu", ha="center", va="center",
+            color=self.text_color, fontsize=self.title_font_size, visible=False,
+        )
+        self.graph_selector = Gtk.MenuButton(label="Graphs")
+        self.graph_selector.set_tooltip_text("Choose which graphs to show")
+        popover = Gtk.Popover()
+        graph_options = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        graph_options.set_margin_start(12)
+        graph_options.set_margin_end(12)
+        graph_options.set_margin_top(12)
+        graph_options.set_margin_bottom(12)
+        self._graph_toggles = []
+        for name, _axes in self._graph_groups:
+            toggle = Gtk.CheckButton(label=name)
+            toggle.set_active(True)
+            toggle.connect("toggled", self._on_graph_toggled)
+            graph_options.append(toggle)
+            self._graph_toggles.append(toggle)
+        popover.set_child(graph_options)
+        self.graph_selector.set_popover(popover)
         header.pack_end(self.graph_selector)
         self.canvas = FigureCanvas(fig)
         self.canvas.set_hexpand(True)
         self.canvas.set_vexpand(True)
+        self._duration_layout_names: tuple[str, ...] | None = None
+        self.canvas.mpl_connect("draw_event", self._on_canvas_draw)
         self.canvas.mpl_connect("resize_event", self._on_canvas_resize)
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        root.set_margin_start(12)
+        root.set_margin_end(12)
+        root.set_margin_top(12)
+        root.set_margin_bottom(12)
         root.set_hexpand(True)
         root.set_vexpand(True)
         root.append(self.canvas)
         self.set_child(root)
 
-        self.line_artists = []
         self._closed = False
         self._redraw_queued = False
         self._refresh_source_id = 0
-        self._last_redraw_tick = -1
 
         self.prop_to_color = {}
         self._next_color_idx = 0
@@ -127,67 +147,76 @@ class PlotWindow(Gtk.ApplicationWindow):
         self.redraw_plot()
         self.connect("close-request", self.on_close_request)
 
-    def _on_graph_selected(self, _selector, _param):
+    def _on_graph_toggled(self, _toggle):
         self._apply_graph_layout()
         self.canvas.draw_idle()
+
+    def _request_layout(self):
+        self.canvas.figure.set_layout_engine(self._layout_engine)
+
+    def _on_canvas_draw(self, _event):
+        # Keep automatic layout's result until something structural changes.
+        # Scrolling tick labels must not resize the plotting areas on each frame.
+        if self.canvas.figure.get_layout_engine() is self._layout_engine:
+            self.canvas.figure.set_layout_engine("none")
 
     def _on_canvas_resize(self, _event):
-        self._apply_graph_layout()
+        self._request_layout()
         self.canvas.draw_idle()
 
-    def _layout_margins(self):
-        fig = self.canvas.figure
-        width, height = fig.bbox.width, fig.bbox.height
-        unit = fig.dpi / 72
-        font = FontProperties(family="monospace", size=self.tick_font_size)
+    def _ensure_y_tick_space(self):
+        if self.canvas.figure.get_layout_engine() is self._layout_engine:
+            return
         renderer = self.canvas.get_renderer()
-        label_width = max(
-            (renderer.get_text_width_height_descent(name, font, False)[0] for name in self.durations),
-            default=0,
-        )
-        left = min(36 * unit / width, 0.20)
-        bar_left = min(max(16 * unit + label_width, 36 * unit) / width, 0.45)
-        right = 1 - min(16 * unit / width, 0.10)
-        bottom = min(38 * unit / height, 0.12)
-        top = 1 - min(28 * unit / height, 0.10)
-        gap = min(58 * unit / height, 0.14)
-        row_height = (top - bottom - 2 * gap) / 3.7
-        row_top = top
-        for grid, weight, row_left, gap_points in zip(
-            self._row_grids, (1, 1, 1.7), (left, left, bar_left), (84, 84, 14),
-        ):
-            row_bottom = row_top - weight * row_height
-            # Keep label space in physical units instead of wasting a percentage of wide windows.
-            gap_width = min(gap_points * unit / width, (right - row_left) / 4)
-            avg_width = (right - row_left - 2 * gap_width) / 3
-            grid.update(left=row_left, right=right, bottom=row_bottom, top=row_top, wspace=gap_width / avg_width)
-            row_top = row_bottom - gap
-        self._default_positions = {
-            axis: axis.get_subplotspec().get_position(fig).frozen()
-            for axis in fig.axes
-        }
-        return left, bar_left, right, bottom, top
+        previous = None
+        for _name, axes in self._graph_groups:
+            if not axes[0].get_visible():
+                continue
+            position = axes[0].get_position()
+            left = axes[0].get_window_extent(renderer).x0
+            right = axes[0].get_window_extent(renderer).x1
+            for axis in axes:
+                bounds = axis.yaxis.get_tightbbox(renderer)
+                if bounds is not None:
+                    left = min(left, bounds.x0)
+                    right = max(right, bounds.x1)
+            # Reflow only when y-axis text outgrows its space. Ignore scrolling x labels.
+            if (
+                left < 4
+                or right > self.canvas.figure.bbox.width - 4
+                or (previous is not None and abs(previous[0] - position.y0) < 1e-6 and left < previous[1] + 4)
+            ):
+                self._request_layout()
+                return
+            previous = position.y0, right
 
     def _apply_graph_layout(self):
-        left, bar_left, right, bottom, top = self._layout_margins()
-        selected = self.graph_selector.get_selected()
-        _name, axes = self._graph_groups[selected]
-        for axis, position in self._default_positions.items():
-            axis.set_visible(selected == 0 or axis in axes)
-            axis.set_position(position)
-        for axis in (self.ax_avg, self.ax_count):
-            axis.tick_params(axis="y", left=False, labelleft=False)
-        if selected:
-            duration_axes = (self.ax_avg_individual, self.ax_avg, self.ax_count)
+        selection = tuple(toggle.get_active() for toggle in self._graph_toggles)
+        for visible, (_name, axes) in zip(selection, self._graph_groups):
             for axis in axes:
-                if axis in duration_axes:
-                    axis.set_position((bar_left, bottom, right - bar_left, top - bottom))
-                    axis.tick_params(axis="y", left=True, labelleft=True)
-                else:
-                    plot_right = right
-                    if self.ax_total_gpe in axes:
-                        plot_right = 1 - left
-                    axis.set_position((left, bottom, plot_right - left, top - bottom))
+                axis.set_visible(visible)
+                axis.set_in_layout(visible)
+        self._empty_graphs_message.set_visible(not any(selection))
+        if selection == self._layout_selection:
+            return
+        self._layout_selection = selection
+        self._request_layout()
+        self.graph_selector.set_label(f"Graphs ({sum(selection)}/{len(selection)})")
+        visible_rows = []
+        for indices, weight in ((range(4), 1), (range(4, 7), 1), (range(7, 8), 1.6)):
+            groups = [self._graph_groups[index] for index in indices if selection[index]]
+            if groups:
+                visible_rows.append((groups, weight))
+        if not visible_rows:
+            return
+        rows = self.canvas.figure.add_gridspec(
+            len(visible_rows), 1, height_ratios=[weight for _groups, weight in visible_rows],
+        )
+        for row, (groups, _weight) in enumerate(visible_rows):
+            columns = rows[row].subgridspec(1, len(groups))
+            for column, (_name, axes) in enumerate(groups):
+                for axis in axes:
+                    axis.set_subplotspec(columns[0, column])
 
     def _on_pause_toggled(self, button):
         self._paused = button.get_active()
@@ -198,23 +227,21 @@ class PlotWindow(Gtk.ApplicationWindow):
     def reset_plot(self, *, force_redraw=False):
         self.prop_to_color.clear()
         self._next_color_idx = 0
-        self._last_redraw_tick = -1
+        self._request_layout()
         if force_redraw or not self._paused:
             self.redraw_plot()
 
     def redraw_plot(self):
-        self.ax_avg.clear()
-        self.ax_count.clear()
         self.ax_avg_individual.clear()
         self.ax_utilization.clear()
         self.ax_gpu_temperature.clear()
         self.ax_energy_error.clear()
         self.ax_dt_step.clear()
+        self.ax_num_steps.clear()
         self.ax_virial_ratio.clear()
         self.ax_total_ke.clear()
         self.ax_total_gpe.clear()
         self._style_axes()
-        self._update_energy_error_scale()
 
         for name, axis, color in (
             ("gpu_utilization", self.ax_utilization, self.default_colors[0]),
@@ -222,6 +249,7 @@ class PlotWindow(Gtk.ApplicationWindow):
             ("gpu_temperature", self.ax_gpu_temperature, self.default_colors[3]),
             ("energy_error", self.ax_energy_error, self.default_colors[1]),
             ("dt_step", self.ax_dt_step, self.default_colors[2]),
+            ("num_steps", self.ax_num_steps, self.default_colors[5]),
             ("virial_ratio", self.ax_virial_ratio, self.default_colors[4]),
             ("total_KE", self.ax_total_ke, self.default_colors[0]),
             ("total_GPE", self.ax_total_gpe, self.default_colors[4]),
@@ -229,6 +257,8 @@ class PlotWindow(Gtk.ApplicationWindow):
             data = self.metric_series.get(name)
             if data:
                 _tick_ids, x_vals, y_vals = zip(*data)
+                if name == "energy_error":
+                    self._set_energy_error_range(y_vals)
                 if name == "dt_step":
                     y_vals = [value * 1000 for value in y_vals]
                 label = {
@@ -236,6 +266,17 @@ class PlotWindow(Gtk.ApplicationWindow):
                     "total_KE": "KE", "total_GPE": "GPE",
                 }.get(name)
                 axis.plot(x_vals, y_vals, color=color, linewidth=1.2, label=label)
+
+        steps = self.metric_series.get("num_steps", [])
+        max_steps = max((value for _, _, value in steps if math.isfinite(value)), default=0)
+        self.ax_num_steps.set_ylim(0, max(5, math.ceil(max_steps) + 1))
+
+        for axis, reference in ((self.ax_energy_error, 0), (self.ax_virial_ratio, 1)):
+            # Artists do not contribute to data limits; off-screen references are clipped.
+            axis.add_artist(Line2D(
+                [0, 1], [reference, reference], transform=axis.get_yaxis_transform(),
+                color=self.text_color, linestyle=":", linewidth=1, alpha=0.7,
+            ))
 
         if self.ax_utilization.lines:
             self.ax_utilization.legend(
@@ -247,105 +288,34 @@ class PlotWindow(Gtk.ApplicationWindow):
         energy_lines = list(self.ax_total_ke.lines) + list(self.ax_total_gpe.lines)
         if energy_lines:
             self.ax_total_ke.legend(
-                energy_lines, [line.get_label() for line in energy_lines],
+                energy_lines, [line.get_label() for line in energy_lines], #type:ignore
                 loc="upper left", fontsize=self.tick_font_size,
                 facecolor=self.axes_bg, edgecolor=self.spine_color,
                 labelcolor=self.text_color,
             )
 
-        line_x_min = None
-        line_x_max = None
+        self._draw_duration_bars()
 
-        self.line_artists = []
-        avg_names = []
-        avg_values = []
-        avg_counts = []
-        avg_values_individual = []
-        line_y_values = []
-        fields_to_plot = list(self.durations.keys())
-        for name in fields_to_plot:
-            series = self._get_series(name)
-            if series is None:
-                continue
-
-            x_vals, y_vals, counts = series
-            color = self._ensure_field_color(name)
-            if x_vals:
-                if line_x_min is None:
-                    line_x_min = x_vals[0]
-                    line_x_max = x_vals[-1]
-                else:
-                    line_x_min = min(line_x_min, x_vals[0])
-                    line_x_max = max(line_x_max, x_vals[-1]) # type: ignore
-
-            y_list = [y for y in y_vals]
-            line_y_values.extend(y_list)
-            if y_list:
-                avg_names.append(name)
-                avg_values.append(sum(y_list) / len(y_list))
-                avg_counts.append(sum(counts) / len(counts))
-                raw_data = self.durations.get(name, [])
-                raw_y_ms = [y for _, _, y in raw_data]
-                avg_values_individual.append(sum(raw_y_ms) / len(raw_y_ms))
-
-        if avg_names:
-            rows = sorted(
-                zip(avg_names, avg_values, avg_counts, avg_values_individual),
-                key=lambda row: row[3],
-                reverse=True,
-            )
-            avg_names, avg_values, avg_counts, avg_values_individual = map(list, zip(*rows))
-            bar_colors = [self.prop_to_color[name] for name in avg_names]
-            y_pos = list(range(len(avg_names)))
-            duration_bars = self.ax_avg.barh(y_pos, avg_values, color=bar_colors)
-            count_bars = self.ax_count.barh(y_pos, avg_counts, color=bar_colors)
-            duration_individual_bars = self.ax_avg_individual.barh(y_pos, avg_values_individual, color=bar_colors)
-
-            self.ax_avg_individual.set_yticks(y_pos, labels=avg_names)
-            self.ax_count.tick_params(axis="y", left=False, labelleft=False)
-            self.ax_avg.tick_params(axis="y", left=False, labelleft=False)
-            self.ax_avg_individual.invert_yaxis()
-
-            self.ax_avg.margins(y=0.05)
-            self.ax_count.margins(y=0.05)
-            self.ax_avg_individual.margins(y=0.05)
-            self._set_bar_axis_xlim_for_labels(self.ax_avg, avg_values)
-            self._set_bar_axis_xlim_for_labels(self.ax_count, avg_counts)
-            self._set_bar_axis_xlim_for_labels(self.ax_avg_individual, avg_values_individual)
-
-            for bar, value in zip(duration_bars, avg_values):
-                self.ax_avg.text(
-                    bar.get_width(),
-                    bar.get_y() + (bar.get_height() / 2.0),
-                    f"{value:.1f}",
-                    ha="left",
-                    va="center",
-                    fontsize=self.value_font_size,
-                    color=self.text_color,
-                )
-            for bar, value in zip(count_bars, avg_counts):
-                self.ax_count.text(
-                    bar.get_width(),
-                    bar.get_y() + (bar.get_height() / 2.0),
-                    f"{value:.1f}",
-                    ha="left",
-                    va="center",
-                    fontsize=self.value_font_size,
-                    color=self.text_color,
-                )
-            for bar, value in zip(duration_individual_bars, avg_values_individual):
-                self.ax_avg_individual.text(
-                    bar.get_width(),
-                    bar.get_y() + (bar.get_height() / 2.0),
-                    f"{value:.1f}",
-                    ha="left",
-                    va="center",
-                    fontsize=self.value_font_size,
-                    color=self.text_color,
-                )
-        
         self._apply_graph_layout()
+        self._ensure_y_tick_space()
         self.canvas.draw_idle()
+
+    def _set_energy_error_range(self, values):
+        finite_values = [value for value in values if math.isfinite(value)]
+        if not finite_values:
+            return
+        low, high = min(finite_values), max(finite_values)
+        peak = max(abs(low), abs(high))
+        if peak == 0:
+            self.ax_energy_error.set_ylim(-1, 1)
+            return
+        magnitude = 10 ** math.floor(math.log10(peak))
+        lower = math.floor(low / magnitude) * magnitude
+        upper = math.ceil(high / magnitude) * magnitude
+        if lower == upper:
+            lower -= magnitude
+            upper += magnitude
+        self.ax_energy_error.set_ylim(lower, upper)
 
     def _ensure_field_color(self, name):
         color = self.prop_to_color.get(name)
@@ -356,17 +326,50 @@ class PlotWindow(Gtk.ApplicationWindow):
         self.prop_to_color[name] = color
         return color
 
-    def _update_energy_error_scale(self):
-        samples = self.metric_series.get("energy_error", [])
-        magnitudes = sorted(abs(value) for _, _, value in samples if math.isfinite(value))
-        peak = 0.0
-        if len(magnitudes) >= ui_metrics_config.ENERGY_ERROR_SCALE_MIN_SAMPLES:
-            # Use an observed percentile without interpolating toward an isolated spike.
-            index = math.floor((len(magnitudes) - 1) * ui_metrics_config.ENERGY_ERROR_SCALE_QUANTILE)
-            peak = magnitudes[index]
-        limit = peak if peak > 0 else ui_metrics_config.ENERGY_ERROR_ZERO_RANGE
-        self.ax_energy_error.set_ylim(-limit, limit)
-        self.ax_energy_error.ticklabel_format(axis="y", style="sci", scilimits=(-3, 3), useOffset=False)
+    def _draw_duration_bars(self):
+        rows: list[tuple[str, float, float]] = []
+        for name, samples in self.durations.items():
+            if not samples:
+                continue
+            average_ms = sum(value for _, _, value in samples) / len(samples)
+            if average_ms <= 0:
+                continue
+            tick_count = len({tick for tick, _, _ in samples})
+            average_count = len(samples) / tick_count
+            rows.append((name, average_ms, average_count))
+        rows.sort(key=lambda row: row[1], reverse=True)
+        layout_names = tuple(sorted(name for name, _average, _count in rows))
+        if layout_names != self._duration_layout_names:
+            self._duration_layout_names = layout_names
+            self._request_layout()
+        axis = self.ax_avg_individual
+        if not rows:
+            axis.set_yticks([])
+            axis.set_xlim(0, 1)
+            axis.text(
+                0.5, 0.5, "Waiting for timing samples", transform=axis.transAxes,
+                ha="center", va="center", fontsize=self.label_font_size, color=self.text_color,
+            )
+            return
+
+        names = [name for name, _average, _count in rows]
+        averages = [average for _name, average, _count in rows]
+        counts = [count for _name, _average, count in rows]
+        bars = axis.barh(
+            range(len(rows)), averages, height=0.65,
+            color=[self._ensure_field_color(name) for name in names],
+        )
+        axis.set_yticks(range(len(rows)), labels=names)
+        axis.invert_yaxis()
+        axis.margins(y=0.04)
+        axis.set_xlim(0, max(averages) * 1.4 if max(averages) > 0 else 1)
+        for bar, average, count in zip(bars, averages, counts):
+            axis.annotate(
+                f"{average:.3g} ms  ·  avg count {count:.1f}/tick",
+                xy=(bar.get_width(), bar.get_y() + bar.get_height() / 2),
+                xytext=(6, 0), textcoords="offset points", ha="left", va="center",
+                fontsize=self.tick_font_size, color=self.text_color,
+            )
 
     def _style_axes(self):
         for axis, title in (
@@ -374,6 +377,7 @@ class PlotWindow(Gtk.ApplicationWindow):
             (self.ax_gpu_temperature, "GPU temperature (°C)"),
             (self.ax_energy_error, "Energy error (ΔE / E₀)"),
             (self.ax_dt_step, "dt_step (ms)"),
+            (self.ax_num_steps, "Steps per tick"),
             (self.ax_virial_ratio, "Virial ratio"),
             (self.ax_total_ke, "Total energy"),
         ):
@@ -385,7 +389,11 @@ class PlotWindow(Gtk.ApplicationWindow):
             axis.tick_params(axis="both", labelsize=self.tick_font_size, colors=self.text_color)
 
         self.ax_utilization.set_ylim(0, 100)
+        self.ax_energy_error.ticklabel_format(
+            axis="y", style="sci", scilimits=(-3, 3), useOffset=False, useMathText=False,
+        )
         self.ax_gpu_temperature.set_ylim(25, 100)
+        self.ax_num_steps.yaxis.set_major_locator(MaxNLocator(nbins=5, integer=True))
 
         self._style_axis(self.ax_total_gpe)
         self.ax_total_gpe.margins(x=0)
@@ -402,20 +410,11 @@ class PlotWindow(Gtk.ApplicationWindow):
         self.ax_total_ke.tick_params(axis="y", colors=self.default_colors[0])
         self.ax_total_ke.yaxis.get_offset_text().set_color(self.default_colors[0])
 
-        self._style_axis(self.ax_avg, show_grid=True)
-        self._style_axis(self.ax_count, show_grid=True)
         self._style_axis(self.ax_avg_individual, show_grid=True)
-
-        self.ax_avg.set_title("Average duration per tick (summed)", fontsize=self.title_font_size, color=self.text_color)
-        self.ax_avg.set_xlabel("Average (ms)", fontsize=self.label_font_size, color=self.text_color)
-        self.ax_avg.set_ylabel("")
-        self.ax_avg.tick_params(axis="x", labelsize=self.tick_font_size, colors=self.text_color)
-        self.ax_avg.tick_params(axis="y", left=False, labelleft=False, colors=self.text_color)
-
-        self.ax_count.set_title("Average count", fontsize=self.title_font_size, color=self.text_color)
-        self.ax_count.set_xlabel("Count", fontsize=self.label_font_size, color=self.text_color)
-        self.ax_count.tick_params(axis="x", labelsize=self.tick_font_size, colors=self.text_color)
-        self.ax_count.tick_params(axis="y", left=False, labelleft=False, colors=self.text_color)
+        self.ax_avg_individual.set_axisbelow(True)
+        self.ax_avg_individual.grid(False, axis="y")
+        self.ax_avg_individual.spines["top"].set_visible(False)
+        self.ax_avg_individual.spines["right"].set_visible(False)
 
         self.ax_avg_individual.set_title("Average duration per sample", fontsize=self.title_font_size, color=self.text_color)
         self.ax_avg_individual.set_xlabel("Average (ms)", fontsize=self.label_font_size, color=self.text_color)
@@ -428,21 +427,6 @@ class PlotWindow(Gtk.ApplicationWindow):
             spine.set_color(self.spine_color)
         if show_grid:
             axis.grid(True, color=self.grid_color, linewidth=0.6, alpha=0.65)
-
-    def _set_bar_axis_xlim_for_labels(self, axis, values):
-        if not values:
-            return
-        max_value = max(values)
-        if max_value <= 0:
-            axis.set_xlim(right=1.0)
-            return
-        axis.set_xlim(right=max_value * 1.16)
-
-    def _quantile(self, sorted_values, q):
-        if len(sorted_values) == 1:
-            return sorted_values[0]
-        idx = math.floor((len(sorted_values) - 1) * q)
-        return sorted_values[idx]
 
     def _redraw_on_main_thread(self):
         self._redraw_queued = False
@@ -465,20 +449,3 @@ class PlotWindow(Gtk.ApplicationWindow):
             GLib.source_remove(self._refresh_source_id)
             self._refresh_source_id = 0
         return False
-
-    def _get_series(self, name):
-        data = self.durations.get(name)
-        if not data:
-            return None
-        summed_by_x = {}
-        counts_by_x = {}
-        for x, _sim_time, y in data:
-            summed_by_x[x] = summed_by_x.get(x, 0.0) + y
-            counts_by_x[x] = counts_by_x.get(x, 0) + 1
-
-        x_vals = list(summed_by_x.keys())
-        x_vals.sort()
-        y_vals = [summed_by_x[x] for x in x_vals]
-        count_vals = [counts_by_x[x] for x in x_vals]
-
-        return x_vals, y_vals, count_vals
