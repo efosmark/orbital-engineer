@@ -1,12 +1,13 @@
 #include "kernel/stride.clh"
 #include "flags.clh"
+#include "dtype.clh"
 
 __kernel void edge_distance(
              const uint    N_bodies_alloc,
              const uint    N_bodies_valid,
     __global const uint*   flags,
-    __global const float2* position,
-    __global const float2* velocity,
+    __global const COMPLEX* position,
+    __global const COMPLEX* velocity,
     __global const float*  radius,
     __global       float*  edge_distance,
     __global       bool*   is_touching,
@@ -39,12 +40,13 @@ __kernel void edge_distance(
     GRID_STRIDE_IJ(
         if (flags[j]&REMOVED) continue;
         float R = radius[j] + radius[i];
-        float2 dV = velocity[j] - velocity[i];
-        float2 dP = position[j] - position[i];
+        COMPLEX dV = velocity[j] - velocity[i];
+        COMPLEX dP = position[j] - position[i];
         float distance_edge_to_edge = length(dP) - R;
 
         bool in_contact = distance_edge_to_edge <= EPS_DIST;
         if (in_contact) {
+            printf("(%u,%u) in_contact", i, j);
             uint offset = atomic_fetch_add(&local_num_contacts, 1);
             if (offset < MAX_NUM_CONTACTS_PER_BODY)
                 contacting_i[offset] = j;

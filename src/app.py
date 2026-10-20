@@ -15,7 +15,7 @@ SOL_COLOR = (1.0, 0.98, 0.45, 1.0)
 def populate(app: App):
     N = 1024
     mass_min, mass_max =  1_000,   5_000
-    dist_min, dist_max =  8_000,  10_000
+    dist_min, dist_max =  2_000,  300_000
     
     sol = create_primary(mass=1e9, radius=300)
     app.insert_particle(sol, color=SOL_COLOR)
@@ -29,7 +29,7 @@ def populate(app: App):
             position=pos,
             mass=mass,
             radius=math.sqrt(mass/math.pi),
-            flags=flags.BOUNCE
+            flags=flags.MERGE
         ), color=cmap(1-dist_norm(abs(pos))))
 
 def on_activate(app: App):
@@ -40,7 +40,8 @@ def on_activate(app: App):
         DEFAULT_DT_BASE=1/10.0,
         TARGET_TICKS_PER_SECOND=120,
         SOFTENING_LENGTH=100.0,
-        COEF_OF_RESTITUTION=1.0
+        COEF_OF_RESTITUTION=1.0,
+        COLLISION_MERGE_ENABLE=True
     ))
     app.model.show_focused_history = True
     app.model.show_debug_info = True

@@ -32,6 +32,7 @@ class PrimaryStateVectors:
     id_to_index:cl.Buffer
     flags:cl.Buffer
     velocity:cl.Buffer
+    position:cl.Buffer
     mass:cl.Buffer
     radius:cl.Buffer
     
