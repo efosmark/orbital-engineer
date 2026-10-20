@@ -15,7 +15,7 @@ SOL_COLOR = (1.0, 0.98, 0.45, 1.0)
 def populate(app: App):
     N = 1024
     mass_min, mass_max =  1_000,   5_000
-    dist_min, dist_max =  2_000,  300_000
+    dist_min, dist_max =  2_000,  35_000
     
     sol = create_primary(mass=1e9, radius=300)
     app.insert_particle(sol, color=SOL_COLOR)
@@ -29,7 +29,7 @@ def populate(app: App):
             position=pos,
             mass=mass,
             radius=math.sqrt(mass/math.pi),
-            flags=flags.MERGE
+            flags=flags.BOUNCE
         ), color=cmap(1-dist_norm(abs(pos))))
 
 def on_activate(app: App):
@@ -37,11 +37,12 @@ def on_activate(app: App):
     populate(app)
     
     app.client.init_sim(SimConfig(
-        DEFAULT_DT_BASE=1/10.0,
+        DEFAULT_DT_BASE=1/30.0,
         TARGET_TICKS_PER_SECOND=120,
         SOFTENING_LENGTH=100.0,
         COEF_OF_RESTITUTION=1.0,
-        COLLISION_MERGE_ENABLE=True
+        COLLISION_MERGE_ENABLE=True,
+        COLLISION_BOUNCE_ENABLE=True
     ))
     app.model.show_focused_history = True
     app.model.show_debug_info = True
@@ -60,8 +61,7 @@ def run():
     app.connect("merging", on_body_merged)
     
     def on_tick(inst, tick_id):
-       if app.model.engine.clock_time >= 120:
-           app.model.engine.paused = True
+       ...
     app.connect("tick", on_tick)
     
     app.run(None)

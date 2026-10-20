@@ -63,7 +63,6 @@ class SimController:
         header_path = build_dir / "flags.clh"
         header_path.write_text(flags.generate_cl_flag_file())
         
-        
         header_path = build_dir / "dtype.clh"
         header_path.write_text(dtypes.generate_cl_dtype_file())
         return build_dir

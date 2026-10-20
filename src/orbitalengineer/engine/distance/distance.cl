@@ -1,23 +1,24 @@
 #include "kernel/stride.clh"
+#include "kernel/debug.clh"
 #include "flags.clh"
 #include "dtype.clh"
 
 __kernel void edge_distance(
-             const uint    N_bodies_alloc,
-             const uint    N_bodies_valid,
-    __global const uint*   flags,
+             const uint     N_bodies_alloc,
+             const uint     N_bodies_valid,
+    __global const uint*    flags,
     __global const COMPLEX* position,
     __global const COMPLEX* velocity,
-    __global const float*  radius,
-    __global       float*  edge_distance,
-    __global       bool*   is_touching,
-    __global       bool*   is_nearby,
+    __global const float*   radius,
+    __global       float*   edge_distance,
+    __global       bool*    is_touching,
+    __global       bool*    is_nearby,
     __global       atomic_uint* n_all_colliding_ids,
-    __global       uint*   all_colliding_ids,
-    __global       uint*   num_contacts,
-    __global       uint*   contacts,
-    __global       uint*   num_nearby,
-    __global       uint*   nearby
+    __global       uint*    all_colliding_ids,
+    __global       uint*    num_contacts,
+    __global       uint*    contacts,
+    __global       uint*    num_nearby,
+    __global       uint*    nearby
 ) {
     GRID_STRIDE_INIT();
     if (i >= N_bodies_valid) return;
@@ -46,7 +47,7 @@ __kernel void edge_distance(
 
         bool in_contact = distance_edge_to_edge <= EPS_DIST;
         if (in_contact) {
-            printf("(%u,%u) in_contact", i, j);
+            DEBUG_PRINTF("[distance] (%u,%u) in_contact", i, j);
             uint offset = atomic_fetch_add(&local_num_contacts, 1);
             if (offset < MAX_NUM_CONTACTS_PER_BODY)
                 contacting_i[offset] = j;
@@ -54,6 +55,7 @@ __kernel void edge_distance(
 
         bool is_near = distance_edge_to_edge <= R * 0.1;
         if (is_near) {
+            DEBUG_PRINTF("[distance] (%u,%u) is_near", i, j);
             uint offset = atomic_fetch_add(&local_num_nearby, 1);
             if (offset < MAX_NUM_CONTACTS_PER_BODY)
                 nearby_i[offset] = j;

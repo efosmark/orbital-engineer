@@ -10,21 +10,21 @@ __kernel void defrag_orbital_vectors(
              const uint    N_curr,
     __global atomic_uint*  global_count,
 
-    __global const uint*   id_to_index,
-    __global const uint*   body_id,
-    __global const uint*   flags,
-    __global const float2* position,
-    __global const float2* velocity,
-    __global const float*  mass,
-    __global const float*  radius,
+    __global const uint*    id_to_index,
+    __global const uint*    body_id,
+    __global const uint*    flags,
+    __global const COMPLEX* position,
+    __global const COMPLEX* velocity,
+    __global const float*   mass,
+    __global const float*   radius,
 
-    __global       uint*   id_to_index_out,
-    __global       uint*   body_id_out,
-    __global       uint*   flags_out,
-    __global       float2* position_out,
-    __global       float2* velocity_out,
-    __global       float*  mass_out,
-    __global       float*  radius_out
+    __global       uint*    id_to_index_out,
+    __global       uint*    body_id_out,
+    __global       uint*    flags_out,
+    __global       COMPLEX* position_out,
+    __global       COMPLEX* velocity_out,
+    __global       float*   mass_out,
+    __global       float*   radius_out
 ) {
     uint i = get_global_id(0);
     uint lane = get_local_id(0);
@@ -82,10 +82,6 @@ __kernel void defrag_orbital_vectors(
     // Every emitting lane now has a unique global destination.
     if (emit && count) {
         uint j = (N_curr - base) + offset;
-
-
-
-
         if (j <= i || (flags[j]&REMOVED)) {
             return;
         }
@@ -93,7 +89,6 @@ __kernel void defrag_orbital_vectors(
 
         if ((flags[j]&REMOVED))
            DEBUG_PRINTF("[g0=%u, l0=%u] Swapping %u -> %u FAILED", (uint)get_global_id(0), (uint)get_local_id(0), i, j);
-
 
         //Move j values to slot i
         id_to_index_out[j] = i;

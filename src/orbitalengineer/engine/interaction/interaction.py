@@ -22,9 +22,6 @@ class InteractionPipeline(PipelineComponent):
             except ValueError:
                 min_toi = dt_step
             result = min_toi if min_toi > eps_time else dt_step
-            #result = max(min(dt_step, min_toi), eps_time)
-        #print(min_dt_per_body[min_dt_per_body > 0].size, np.min(min_dt_per_body[min_dt_per_body > 0]))
-        #print(f"minimum_viable_dt {result:.6f} {dt_step=:.6f} {min_toi=:.20f}")
         return result      
 
     def compute_interaction(self, dt_step:float, state:PrimaryStateVectors):
