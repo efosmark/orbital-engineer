@@ -20,11 +20,10 @@ make flatpak-server
 make flatpak-run
 ```
 
-The metrics UI can run in a third terminal:
-
-```sh
-flatpak run --command=python3 com.qmew.OrbitalEngineer -m ui_metrics.metrics_app
-```
+The metrics monitor is packaged separately in the
+[Orbital Engineer Metrics repository](https://github.com/efosmark/orbital-engineer-ui-metrics).
+It is not included in this Flatpak. See that repository's socket-sharing instructions
+when connecting a sandboxed producer or monitor.
 
 The manifest shares the network namespace for the TCP connection between the UI and server, IPC for shared memory, and the audio socket for GStreamer.
 

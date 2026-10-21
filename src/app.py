@@ -13,13 +13,14 @@ cmap = plt.colormaps['gist_rainbow']
 SOL_COLOR = (1.0, 0.98, 0.45, 1.0)
 
 def populate(app: App):
-    N = 1024
-    mass_min, mass_max =  1_000,   5_000
-    dist_min, dist_max =  2_000,  35_000
+    N = 128
+    mass_min, mass_max =  10_000, 50_000
+    dist_min, dist_max =   4_000,  5_000
     
-    sol = create_primary(mass=1e9, radius=300)
+    sol = create_primary(mass=1e7, flags=flags.MERGE|flags.FIXED_RADIUS)
     app.insert_particle(sol, color=SOL_COLOR)
     
+    dist_min, dist_max = dist_min + sol.get_radius(), dist_max + sol.get_radius()
     dist_norm = colors.Normalize(dist_min, dist_max)
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)
@@ -29,7 +30,7 @@ def populate(app: App):
             position=pos,
             mass=mass,
             radius=math.sqrt(mass/math.pi),
-            flags=flags.BOUNCE
+            #flags=flags.BOUNCE|flags.MERGE_AS_SECONDARY
         ), color=cmap(1-dist_norm(abs(pos))))
 
 def on_activate(app: App):

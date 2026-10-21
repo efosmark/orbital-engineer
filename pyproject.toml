@@ -33,7 +33,7 @@ include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["orbitalengineer*", "gui*", "ui_metrics*"]
+include = ["orbitalengineer*", "gui*"]
 exclude = ["*.tests", "*.tests.*"]
 
 [tool.setuptools.package-data]

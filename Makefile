@@ -16,13 +16,13 @@ STATE_DIR ?= $(FPK_DIR)/.flatpak-builder
 BUILD_DIR ?= $(FPK_DIR)/build
 ARGS ?=
 
-.PHONY: help all venv install dev pipx-install run server metrics test test-unit \
+.PHONY: help all venv install dev pipx-install run server test test-unit \
         wheel vendor-wheels flatpak-check flatpak-build flatpak-install \
         flatpak-run flatpak-server clean dev-clean distclean
 
 help:
 	@echo "Setup:     venv install (engine) dev (GTK UI + development tools) pipx-install"
-	@echo "Run:       server run metrics (start server before run; ARGS=... supported)"
+	@echo "Run:       server run (start server before run; ARGS=... supported)"
 	@echo "Tests:     test (requires OpenCL) test-unit (CPU only)"
 	@echo "Packaging: wheel vendor-wheels flatpak-check flatpak-build flatpak-install"
 	@echo "Flatpak:   flatpak-server flatpak-run (start server first)"
@@ -49,9 +49,6 @@ run: venv
 
 server: venv
 	$(VENV_PYTHON) -m orbitalengineer.ipc.server $(ARGS)
-
-metrics: venv
-	$(VENV_PYTHON) -m ui_metrics.metrics_app $(ARGS)
 
 test: venv
 	$(VENV_PYTHON) -m pytest $(ARGS)

@@ -337,13 +337,9 @@ The UI builds scenarios, sends server commands, and displays orbital state from 
 
 ## Analyzing Metrics
 
-![Metrics app](screenshots/ui-metrics-app.png)
-
-The metrics app displays kernel timings and energy diagnostics. Start it from the repository root:
-
-```bash
-make metrics
-```
+Kernel timing and energy plots are provided by the separate
+[Orbital Engineer Metrics application](https://github.com/efosmark/orbital-engineer-ui-metrics).
+Install and launch it from its own repository before starting the simulation.
 
 Set `ENABLE_PROFILING = True` (the default) to enable profiling and metrics. The engine sends metrics to `METRIC_SOCKET_PATH`. Profiling may add some overhead.
 
@@ -365,7 +361,7 @@ For the desktop client, also install GTK 4, libadwaita, GStreamer and its base p
 make dev
 ```
 
-For an engine-only installation, use `make install`. Both tasks create `.venv` if needed. `requirements.txt` supplies the core dependencies for both the Python package metadata and Flatpak downloads; the `gtk` extra adds the client and metrics dependencies.
+For an engine-only installation, use `make install`. Both tasks create `.venv` if needed. `requirements.txt` supplies the core dependencies for both the Python package metadata and Flatpak downloads; the `gtk` extra adds the desktop client dependencies.
 
 Run the server and client in separate terminals:
 
@@ -374,7 +370,7 @@ make server
 make run
 ```
 
-- Run `make metrics` in a third terminal for timing and energy plots.
+- For timing and energy plots, launch the separate [metrics monitor](https://github.com/efosmark/orbital-engineer-ui-metrics).
 - Use `make test-unit` for the CPU tests or `make test` for the full suite, which requires an OpenCL device.
 - Running `make wheel` creates a distributable wheel, including the OpenCL kernels.
 
