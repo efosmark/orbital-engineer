@@ -194,9 +194,9 @@ class SimController:
         with self.tr('wait-for-collisions (host)'):
             self.q.finish()
 
-        with self.tr('wait-for-cgroup (host)'):
-            self._cgroup(self._distance)
-            self.q.finish()
+        # with self.tr('wait-for-cgroup (host)'):
+        #     self._cgroup(self._distance)
+        #     self.q.finish()
 
         if self.cfg.COLLISION_MERGE_ENABLE or self.cfg.COLLISION_BOUNCE_ENABLE:
             self.compute_interaction_dt()
@@ -269,7 +269,7 @@ class SimController:
     def sync(self, current_buffer):
         self.vec.sync(self.q, current_buffer)
         self.vec.sync_to_host(self._ledger.ledger, queue=self.q)
-        self.vec.sync_to_host(self._cgroup.group, queue=self.q)
+        #self.vec.sync_to_host(self._cgroup.group, queue=self.q)
         self.vec.sync_to_host(self._distance.direct_contacts, queue=self.q)
         self.vec.sync_to_host(self._energy.kinetic_energy, queue=self.q)
         self.vec.sync_to_host(self._energy.grav_potential_energy, queue=self.q)

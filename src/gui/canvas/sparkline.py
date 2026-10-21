@@ -1,6 +1,6 @@
 import cairo
 from gui import ui_config
-from gui.color import set_source_hex
+from gui.util.color import set_source_hex
 
 FONT_SIZE = 8
 LABEL_PADDING = 2

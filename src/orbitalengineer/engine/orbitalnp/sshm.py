@@ -10,7 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from orbitalengineer.engine import logger
-from gui.fmt import mag_format
+from gui.util.fmt import mag_format
 
 N = -1
 

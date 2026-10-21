@@ -3,7 +3,7 @@ import numpy as np
 import cairo
 from gui import ui_config
 from gui.canvas import renderer
-from gui.fmt import positive_angle
+from gui.util.fmt import positive_angle
 
 DEFAULT_RETICLE_COLOR = (1, 1, 1, 0.3)
 

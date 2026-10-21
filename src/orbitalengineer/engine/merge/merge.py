@@ -2,7 +2,6 @@ import numpy as np
 import pyopencl as cl
 from orbitalengineer import dtypes
 from orbitalengineer.engine import config
-from orbitalengineer.engine.contacting.contacting import FindContactingBodiesPipeline
 from orbitalengineer.engine.dimension import PipelineComponent
 from orbitalengineer.engine.distance.distance import DistancePipeline
 from orbitalengineer.engine.ledger.ledger import LedgerController
@@ -20,10 +19,7 @@ class MergePipeline(PipelineComponent):
         self._radius_intermediate = self.vec.alloc(self.vec.N, dtype=np.float32)
         self._velocity_intermediate = self.vec.alloc(self.vec.N, dtype=dtypes.COMPLEX)        
         self._position_intermediate = self.vec.alloc(self.vec.N, dtype=dtypes.COMPLEX)        
-        self._flags_intermediate = self.vec.alloc(self.vec.N, dtype=np.uint32)        
-        
-        self._groups = np.arange(self.vec.N, dtype=np.uint32) 
-        self._groups_prev = np.arange(self.vec.N, dtype=np.uint32)
+        self._flags_intermediate = self.vec.alloc(self.vec.N, dtype=np.uint32)
 
     def compute_merging_collision_direct(self, state:PrimaryStateVectors, distance:DistancePipeline, ledger:LedgerController):
         return self._compute_merging_collision_direct(

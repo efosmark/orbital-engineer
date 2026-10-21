@@ -5,7 +5,7 @@ import cairo
 
 from orbitalengineer.twobody import twobody
 from gui.canvas import renderer
-from gui.fmt import format_time, mag_format, positive_angle
+from gui.util.fmt import format_time, mag_format, positive_angle
 
 X_PADDING = 10
 X_SPACING = 30

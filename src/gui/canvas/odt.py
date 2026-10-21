@@ -3,7 +3,7 @@ import math
 from typing import Sequence
 import cairo
 from orbitalengineer.twobody import twobody
-from gui.color import hex_to_rgba
+from gui.util.color import hex_to_rgba
 
 DEBUG_ELLIPSE_COLOR_RGBA = (0.3, 0.3, 0.5, 0.9)
 DEBUG_ELLIPSE_COLOR_RGBA_2 = (0.5, 0.3, 0.3, 0.3)

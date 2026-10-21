@@ -3,7 +3,7 @@ import cairo
 from gui import ui_config
 from gui.gtk4 import Gtk, Graphene, Gdk
 from gui.canvas import renderer
-from gui.fmt import mag_format
+from gui.util.fmt import mag_format
 
 LABELS_RGB = (0.2, 0.2, 0.2)
 LINES_RGB =  (0.08, 0.08, 0.1)

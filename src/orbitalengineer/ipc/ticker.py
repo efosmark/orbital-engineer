@@ -52,7 +52,7 @@ class TickController:
     
     def _logic_loop(self):
         while self.logic_running:
-            self.dt_step = self._compute_dt_step()
+            #self.dt_step = self._compute_dt_step()
             self._run_tick()
 
     def _compute_dt_step(self) -> float:
@@ -62,7 +62,7 @@ class TickController:
         return clamp(
             dt_step,
             self.orbital.cfg.EPS_TIME,
-            1.0
+            self.orbital.cfg.DEFAULT_DT_BASE
         )
 
     def _run_tick(self):
@@ -84,7 +84,7 @@ class TickController:
         tick_start = time.monotonic()
         count, dt_unprocessed = self.orbital.tick(self.dt_step)
         if count > 0:
-            self.emit_metrics(self.dt_step - dt_unprocessed)
+            self.emit_metrics(self.dt_step + dt_unprocessed, count)
             if os.environ.get(LOG_ENABLE_ENV_VAR):
                 logger.info(f"[count {count}]  [unprocessed {dt_unprocessed:.4f}]")
             t = time.monotonic()
@@ -106,7 +106,7 @@ class TickController:
     def stop(self):
         self.logic_running = False
 
-    def emit_metrics(self, dt_step_size:float):
+    def emit_metrics(self, dt_step_size:float, count:int):
         t = self.clock.time()
         if t - self._last_metrics_emitted_time < (self.orbital.cfg.DEFAULT_DT_BASE * 4.0):
             return
@@ -132,6 +132,7 @@ class TickController:
             total_KE=total_KE,
             total_GPE=total_GPE,
             sim_time=t,
-            virial_ratio=(total_KE * 2.0)/abs(total_GPE)
+            virial_ratio=(total_KE * 2.0)/abs(total_GPE),
+            num_steps=count
         )
         self._last_metrics_emitted_time = t

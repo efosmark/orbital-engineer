@@ -1,8 +1,8 @@
 import cairo
 
 from gui.canvas import renderer
-from gui.color import set_source_hex
-from gui.fmt import mag_format
+from gui.util.color import set_source_hex
+from gui.util.fmt import mag_format
 
 MARGIN = 0
 X_PADDING = 10

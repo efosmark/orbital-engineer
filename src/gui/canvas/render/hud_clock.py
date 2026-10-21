@@ -4,8 +4,8 @@ import math
 import cairo
 
 from gui.canvas import renderer
-from gui.color import set_source_hex
-from gui.fmt import format_time
+from gui.util.color import set_source_hex
+from gui.util.fmt import format_time
 
 X_PADDING = 10
 X_MARGIN = 5

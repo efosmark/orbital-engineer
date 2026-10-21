@@ -41,7 +41,7 @@ class OrbitalKernel(cl.Kernel):
                 allow_empty_ndrange=allow_empty_ndrange,
                 global_offset=global_offset
             )
-        ) #.wait()
+        )
 
 class PipelineComponent:
     debug_flag:str = '_'    
