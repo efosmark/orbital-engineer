@@ -33,11 +33,11 @@ class SelectionRenderer(renderer.Renderer):
         for idx in self.app.selected_particles:
             if idx not in valid_ids: continue
             b = self.orbital.get_particle(idx)
-            radius = b.get_radius()
+            radius = b.radius
             radius = max(radius, MIN_DISPLAY_RADIUS/self.camera.zoom)
             
             cr.set_source_rgba(1,1,1,0.8)
-            x,y = b.get_xy()
+            x,y = b.position.real, b.position.imag
             cr.arc(x, y, radius * 1.1, 0, 2*math.pi)
             cr.fill()        
                 

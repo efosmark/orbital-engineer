@@ -53,7 +53,7 @@ class EngineModel(GObject.GObject):
     body_id:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
     flags:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
     position:NDArray[np.complex64|np.complex128] = GObject.Property(type=object) #type:ignore
-    velocity:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore
+    velocity:NDArray[np.complex64|np.complex128] = GObject.Property(type=object) #type:ignore
     mass:NDArray[np.float32] = GObject.Property(type=object) #type:ignore
     radius:NDArray[np.float32] = GObject.Property(type=object) #type:ignore
     force:NDArray[np.complex64] = GObject.Property(type=object) #type:ignore

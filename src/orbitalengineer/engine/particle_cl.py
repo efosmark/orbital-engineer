@@ -3,7 +3,6 @@ import numpy as np
 
 from orbitalengineer.twobody import twobody
 from orbitalengineer import flags
-from orbitalengineer.engine.particle import Particle
 
 
 class ParticleCL(Particle):

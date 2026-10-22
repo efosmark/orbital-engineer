@@ -69,7 +69,7 @@ class ReticleRenderer(renderer.Renderer):
             cr.rotate(angle)
             total_angle += angle
 
-        velocity = body.get_velocity()
+        velocity = body.velocity
         angle = positive_angle(np.atan2(velocity.imag, velocity.real))
 
         cr.save()
@@ -90,9 +90,9 @@ class ReticleRenderer(renderer.Renderer):
 
         cr.set_line_width(1/self.camera.zoom)
         cr.set_source_rgba(*DEFAULT_RETICLE_COLOR)
-        radius = body.get_radius()
+        radius = body.radius
         
-        pos = body.get_position()
+        pos = body.position
         x, y = pos.real, pos.imag
         
         try:

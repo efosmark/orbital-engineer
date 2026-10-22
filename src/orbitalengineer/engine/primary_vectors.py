@@ -1,4 +1,4 @@
-from typing import Literal, Sequence
+from typing import Literal, Protocol, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -7,14 +7,31 @@ import pyopencl as cl
 mf = cl.mem_flags
 DEFAULT_MEM_FLAGS = mf.READ_WRITE|mf.COPY_HOST_PTR
 
-from orbitalengineer import dtypes, flags
+from orbitalengineer import dtypes, flags, body
 from orbitalengineer.engine import logger
 from orbitalengineer.engine.named_shared_memory import NamedSharedMemory
 from orbitalengineer.engine.tracer import EventTracer
-from orbitalengineer.helpers import r_from_mass
-from orbitalengineer.ipc import message
 
 DEFAULT_LOCAL_SIZE = 256
+
+class HasStateVectors(Protocol):
+    flags:NDArray[np.uint32]
+    position:NDArray[np.complex64|np.complex128]
+    velocity:NDArray[np.complex64|np.complex128]
+    mass:NDArray[np.float32]
+    radius:NDArray[np.float32]
+
+
+class HostVectorProxy(HasStateVectors):
+    
+    def __init__(self, vec:'PrimaryStateVectors'):
+        self.vec = vec
+        self.flags = self.vec._host_vector[self.vec.flags]
+        self.position = self.vec._host_vector[self.vec.position]
+        self.velocity = self.vec._host_vector[self.vec.velocity]
+        self.mass = self.vec._host_vector[self.vec.mass]
+        self.radius = self.vec._host_vector[self.vec.radius]
+
 
 class PrimaryStateVectors:
     initialized:bool = False
@@ -91,7 +108,7 @@ class PrimaryStateVectors:
         self.grid_stride_global_size = (self.N_bodies_valid * self.Lx, )
         self.grid_stride_local_size = (self.Lx, )
     
-    def populate(self, particles:Sequence[message.ParticleInit]):
+    def populate(self, particles:Sequence[body.Body]):
         if self.initialized:
             logger.warning("PrimaryStateVectors was already initialized and populated. Recreating.")
                 
@@ -106,10 +123,11 @@ class PrimaryStateVectors:
             id_host[i] = np.uint32(i)
             id_to_index_host[i] = np.uint32(i)
             flags_host[i] = np.uint32(p.flags)
-            velocity[i] = dtypes.COMPLEX(*p.velocity)
+            print(p.velocity)
+            velocity[i] = dtypes.COMPLEX(p.velocity.real, p.velocity.imag)
             mass[i] = np.float32(p.mass)
             radius[i] = np.float32(p.radius)
-            self.vec_position_A[i] = dtypes.COMPLEX(*p.position)
+            self.vec_position_A[i] = dtypes.COMPLEX(p.position)
             self.vec_position_B[i] = self.vec_position_A[i]
 
         cl.enqueue_copy(self.queue, self.body_id, id_host)
@@ -121,11 +139,13 @@ class PrimaryStateVectors:
         
         self.initialized = True
         logger.info("Populated %s bodies", len(particles))
+        
 
     def _allocate_primary_vectors(self):
         self.vec_position_A = self.shm.create_shared_memory('position_A', self.N, dtypes.COMPLEX)
         self.vec_position_B = self.shm.create_shared_memory('position_B', self.N, dtypes.COMPLEX)
         self.position = self._create_buffer(self.vec_position_A)
+        self._host_vector[self.position] = self.vec_position_A
 
         self.id_to_index = self.alloc(self.N, np.uint32, shared_name='id_to_index')
         self.body_id = self.alloc(self.N, np.uint32, shared_name='body_id')
@@ -133,6 +153,7 @@ class PrimaryStateVectors:
         self.velocity = self.alloc(self.N, dtypes.COMPLEX, shared_name='velocity')
         self.mass = self.alloc(self.N, np.float32, shared_name='mass')
         self.radius = self.alloc(self.N, np.float32, shared_name='radius')
+        self.host = HostVectorProxy(self)
     
     def apply_vector_offset(self, vector_name:str, ids:Sequence[int], op:str, offset:tuple[float,float]):
         if vector_name == "position":
@@ -162,7 +183,7 @@ class PrimaryStateVectors:
         if vector_name == "mass":
             radius = self.get_host_vector(self.radius)
             mass = self.get_host_vector(self.mass)
-            radius[ids] = np.vectorize(r_from_mass)(mass[ids])
+            #radius[ids] = np.vectorize(r_from_mass)(mass[ids])
             cl.enqueue_copy(self.queue, self.radius, mass) 
         
         return True

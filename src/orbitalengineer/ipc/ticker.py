@@ -4,7 +4,7 @@ import os
 import threading
 import time
 
-from orbitalengineer.engine import config, logger
+from orbitalengineer.engine import logger
 from orbitalengineer.engine.controller import SimController
 from orbitalengineer.ipc.clock import SimClock
 

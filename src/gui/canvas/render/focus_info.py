@@ -3,7 +3,8 @@ from typing import cast
 import numpy as np
 import cairo
 
-from orbitalengineer.twobody import twobody
+from orbitalengineer import body
+from orbitalengineer.twobody import twobody, orbit
 from gui.canvas import renderer
 from gui.util.fmt import format_time, mag_format, positive_angle
 
@@ -125,63 +126,68 @@ class FocusInfoRenderer(renderer.Renderer):
         else:
             return
         
-        if b.idx is None: return
+        b = cast(body.Body, b)
         
-        xy = b.get_xy()
+        if b.index is None: return
+        
+        xy = [float(b.position.real), float(b.position.imag)]
         disp = [
             ("Poition",  f"({xy[0]:.0f}, {xy[1]:.0f})"),
-            ("Mass",     f"{mag_format(b.get_mass())} kg"),
-            ("Radius",   f"{mag_format(b.get_radius())} m"),
+            ("Mass",     f"{mag_format(b.mass)} kg"),
+            ("Radius",   f"{mag_format(b.radius)} m"),
          ]
         
-        velocity = b.get_velocity()
+        velocity = b.velocity
         mag, angle = polar(velocity)
         angle_degrees = np.degrees(positive_angle(angle))
         
         disp.extend([
             ("Velocity",  f"{mag_format(mag)} m/s"),
             ("Heading",   f"{angle_degrees:.1f}°"),
-            ("Group",     f"{self.orbital.cgroup[b.idx]}"),
-            ("KE",        f"{mag_format(self.orbital.kinetic_energy[b.idx])}J"),
-            ("Grav. PE",  f"{mag_format(self.orbital.grav_potential_energy[b.idx])}J")
+            ("Group",     f"{self.orbital.cgroup[b.index]}"),
+            ("KE",        f"{mag_format(self.orbital.kinetic_energy[b.index])}J"),
+            ("Grav. PE",  f"{mag_format(self.orbital.grav_potential_energy[b.index])}J")
         ])
         
-        n_contacting = self.orbital.n_direct_contacts[b.idx]
-        offset = self.orbital.N * b.idx
+        n_contacting = self.orbital.n_direct_contacts[b.index]
+        offset = self.orbital.N * b.index
         contacting = sorted(self.orbital.direct_contacts[offset:offset+n_contacting])
         if n_contacting > 0:
             disp.append(("In Contact", ",".join([str(c) for c in contacting])))
         
         cr.translate(20, 20)
         
-        name = self.app.particle_names.get(b.idx, f"{b.idx}")
-        w, h = create_panel(cr, f"{name} [{b.idx}]", [
+        name = self.app.particle_names.get(b.index, f"{b.index}")
+        w, h = create_panel(cr, f"{name} [{b.index}]", [
             f"{label:<14} {value:>14}"
             for label, value in disp
         ])
         
-        orbit = b.get_orbit_info() # type:ignore
-        if orbit is None:
-            return
+        focus = orbit.get_focus(b.index, self.orbital.N, self.orbital.force, self.app.engine)
+        if focus is None: return
         
-        orbit = cast(twobody.TwoBody, orbit)
+        primary, influence = focus
+        
+        # TODO: Don't run this in the rendering code. Only run once per tick.
+        o = orbit.get_orbit_info(b.index, primary, self.app.engine)
+        if not o: return
         
         cr.translate(0, 20 + h)
         
         fields = [
-            ('Orbital Energy',   f"{mag_format(orbit.orbital_energy)}"),
-            ('Eccentricity',     f"{orbit.eccentricity:.1f}"),
-            ('Grav. Param.',     f"{mag_format(orbit.standard_grav_param)}"),
-            ('True Anomaly',     f"{np.degrees(orbit.true_anomaly):.1f}°"),
-            ('Arg. of Peri.',    f"{np.degrees(orbit.argument_of_periapsis):.1f}°"),
-            ('Semi-Major Axis',  f"{mag_format(orbit.semi_major_axis)} m"),
-            ('Escape Velocity',  f"{mag_format(orbit.v_esc)} m/s"),
-            ('Orbital Time',     format_time(orbit.time_periapsis)),
-            ('Orbital Period',   format_time(orbit.orbital_period)),
-            ('Mean Anomaly',     f"{np.degrees(orbit.mean_anomaly):.1f}°"),
-            ('Direction',        f"{orbit.direction}"),
-            ('Distance',         f"{mag_format(orbit.distance)} m"),
-            ('Bodies',           f"{orbit.body_1} -> {orbit.body_2}"),
+            ('Orbital Energy',   f"{mag_format(o.orbital_energy)}"),
+            ('Eccentricity',     f"{o.eccentricity:.1f}"),
+            ('Grav. Param.',     f"{mag_format(o.standard_grav_param)}"),
+            ('True Anomaly',     f"{np.degrees(o.true_anomaly):.1f}°"),
+            ('Arg. of Peri.',    f"{np.degrees(o.argument_of_periapsis):.1f}°"),
+            ('Semi-Major Axis',  f"{mag_format(o.semi_major_axis)} m"),
+            ('Escape Velocity',  f"{mag_format(o.v_esc)} m/s"),
+            ('Orbital Time',     format_time(o.time_periapsis)),
+            ('Orbital Period',   format_time(o.orbital_period)),
+            ('Mean Anomaly',     f"{np.degrees(o.mean_anomaly):.1f}°"),
+            ('Direction',        f"{o.direction}"),
+            ('Distance',         f"{mag_format(o.distance)} m"),
+            ('Bodies',           f"{o.body_1} -> {o.body_2}"),
         ]
         
         a_max, b_max = 0,0

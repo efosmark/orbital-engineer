@@ -61,4 +61,4 @@ LEDGER_SIZE = 1000
 #############################################
 
 USE_FAST_RELAXED_MATH = False
-USE_DOUBLE_PRECISION = True
+USE_DOUBLE_PRECISION = False

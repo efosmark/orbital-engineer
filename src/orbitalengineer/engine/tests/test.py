@@ -5,74 +5,17 @@ from orbitalengineer.engine.controller import SimController
 from orbitalengineer.engine.sim_config import SimConfig
 from orbitalengineer.helpers import r_from_mass, vis_viva
 from orbitalengineer.ipc.clock import SimClock
-from orbitalengineer.ipc.message import ParticleInit
 from orbitalengineer.ipc.ticker import TickController
 from orbitalengineer.twobody import twobody
+from orbitalengineer import body
 
 _Device = tuple[int,int]
 DEFAULT_DEVICE:_Device = (0,0)
 
 class OrbitalTestFixtureException(Exception):...
 
-class BodyTest:
-    """A proxy to initialize and procure body vector values."""
-    def __init__(
-        self,
-        ctl:  'OrbitalTest',
-        index:    int,
-        position: complex,
-        velocity: complex,
-        mass:     float,
-        radius:   float,
-        flags:    int
-    ):
-        self.ctl = ctl
-        self._orbital = ctl.orbital
-        self.index = index
-        self._position = position
-        self._radius = radius
-        self._velocity = velocity
-        self._radius = radius
-        self._mass = mass
-        self._flags = flags
 
-    @property
-    def radius(self) -> float:
-        if self._orbital.is_initialized:
-            return self.ctl.orbital.vec.get_host_vector(self.ctl.orbital.vec.radius)[self.index]
-        return self._radius
-
-    @property
-    def mass(self) -> float:
-        if self._orbital.is_initialized:
-            return self.ctl.orbital.vec.get_host_vector(self.ctl.orbital.vec.mass)[self.index]
-        return self._mass
-
-    @property
-    def position(self) -> complex:
-        if self._orbital.is_initialized:
-            return self.ctl.orbital.vec.get_host_vector(self.ctl.orbital.vec.position)[self.index]
-        return self._position
-
-    @property
-    def velocity(self) -> complex:
-        if self._orbital.is_initialized:
-            return self.ctl.orbital.vec.get_host_vector(self.ctl.orbital.vec.velocity)[self.index]
-        return self._velocity
-
-    def as_init(self):
-        """The sim controller requires a slightly different format to initialize."""
-        # TODO: Consolidate the implementation of ParticleInit, BodyProxy, ParticleCL, etc.
-        #       Protocol class with requisite fields is probably the best option.
-        return ParticleInit(
-            flags=self._flags,
-            position=(self._position.real, self._position.imag),
-            velocity=(self._velocity.real, self._velocity.imag),
-            mass=self._mass,
-            radius=self._radius,
-        )
-
-def orbital_period(primary:BodyTest, secondary:BodyTest, G:float):
+def orbital_period(primary:body.Body, secondary:body.Body, G:float):
     a = abs(secondary._position - primary._position)
     mu = twobody.standard_grav_param(primary.mass, secondary.mass, G=G)
     return twobody.orbital_period(a, mu)
@@ -92,7 +35,7 @@ class TickResult:
 
 class OrbitalTest:
     config:SimConfig
-    _bodies:list[BodyTest]
+    _bodies:list[body.Body]
     _configured:bool = False
     _initialized:bool = False
     _executed:bool = False
@@ -114,7 +57,7 @@ class OrbitalTest:
         self._bodies = []
     
     def _initialize(self):
-        self.orbital.init_sim([b.as_init() for b in self._bodies])
+        self.orbital.init_sim([b for b in self._bodies])
         self._initialized = True
 
     def run_for(self, run_time:float, dt_step:float|None=None):
@@ -138,7 +81,7 @@ class OrbitalTest:
             num_sub_steps += c
             num_ticks += 1
             
-            self.orbital.sync()
+            self.orbital.sync('A')
             tick_states.append(TickResult(
                 num_ticks,
                 num_sub_steps,
@@ -157,13 +100,21 @@ class OrbitalTest:
     def add_body(self, *, position, velocity, radius, mass, flags=0):
         if self._executed:
             raise OrbitalTestFixtureException("Cannot add_body after the fixture has been executed.")
-        b = BodyTest(self, len(self._bodies), position, velocity, mass, radius, flags)
+        b = body.Body(
+            position=position,
+            velocity=velocity,
+            mass=mass,
+            radius=radius,
+            flags=flags,
+            vec=self.orbital.vec.host,
+            index=len(self._bodies)
+        )
         self._bodies.append(b)
         return b
 
     def add_orbiting_body(
         self,
-        primary_body:BodyTest,
+        primary_body:body.Body,
         *,
         position:complex,
         mass:float=0,
@@ -181,14 +132,14 @@ class OrbitalTest:
             prograde=prograde
         )
         
-        b = BodyTest(
-            self,
-            len(self._bodies),
+        b = body.Body(
             position=primary_body._position + position,
             velocity=primary_body._velocity + velocity,
             mass=mass,
             radius=r_from_mass(mass) if radius is None else radius,
-            flags=flags
+            flags=flags,
+            vec=self.orbital.vec.host,
+            index=len(self._bodies),
         )
         self._bodies.append(b)
         return b

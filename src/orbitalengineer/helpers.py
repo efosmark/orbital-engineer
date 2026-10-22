@@ -1,8 +1,8 @@
 import math
 import numpy as np
 
+from orbitalengineer import body
 from orbitalengineer.engine import config
-from orbitalengineer.engine.particle import Particle, ParticleRaw
 
 seed = 0xf00d11
 rng = np.random.default_rng(seed)
@@ -45,8 +45,8 @@ def random_position(min_distance, max_distance) -> complex:
     y = r * math.sin(theta)
     return complex(x, y)
 
-def create_primary(*, mass:float = 332000, radius:float|None=None, flags=0) -> Particle:
-    return ParticleRaw(
+def create_primary(*, mass:float = 332000, radius:float|None=None, flags=0) -> body.Body:
+    return body.Body(
         position=0+0j,
         velocity=0+0j,
         mass=mass,
@@ -55,7 +55,7 @@ def create_primary(*, mass:float = 332000, radius:float|None=None, flags=0) -> P
     )
 
 def create_secondary(
-    primary_body:Particle,
+    primary_body:body.Body,
     *,
     dist:float|tuple[float,float]|None=None,
     position:complex|None=None,
@@ -70,7 +70,7 @@ def create_secondary(
             min_dist, max_dist = dist[0], dist[1]
         elif dist is not None:
             min_dist = max_dist = dist
-        position = random_position(primary_body.get_radius() + min_dist, primary_body.get_radius() + max_dist)
+        position = random_position(primary_body.radius + min_dist, primary_body.radius + max_dist)
     
     elif position is not None:
         dist = abs(position)
@@ -80,14 +80,14 @@ def create_secondary(
     dist = abs(position)
     velocity = vis_viva(
         position=position,
-        mu=(config.GRAV_CONSTANT * (primary_body.get_mass() + mass)),
+        mu=(config.GRAV_CONSTANT * (primary_body.mass + mass)),
         a=dist if ecc is None else dist * ecc,
         prograde=prograde
     )
     
-    return ParticleRaw(
-        position=primary_body.get_position() + position,
-        velocity=primary_body.get_velocity() + velocity,
+    return body.Body(
+        position=primary_body.position + position,
+        velocity=primary_body.velocity + velocity,
         mass=mass,
         radius=r_from_mass(np.float64(mass)) if radius is None else radius,
         flags=flags

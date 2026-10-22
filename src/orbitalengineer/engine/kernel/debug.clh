@@ -1,5 +1,4 @@
-#ifndef DEBUG_CLH_
-#define DEBUG_CLH_
+#pragma once
 
 #ifdef DEBUG
 #define DEBUG_PRINTF(fmt, ...) printf(fmt, ##__VA_ARGS__);
@@ -8,5 +7,3 @@
 #ifndef DEBUG
 #define DEBUG_PRINTF(fmt, ...) ;
 #endif
-
-#endif // DEBUG_CLH_

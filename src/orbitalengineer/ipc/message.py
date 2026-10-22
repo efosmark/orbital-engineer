@@ -2,6 +2,7 @@ from dataclasses import dataclass, fields
 from enum import IntEnum
 from typing import Literal, Self, Sequence, Protocol
 
+from orbitalengineer import body
 from orbitalengineer.engine.device import DeviceStatus
 from orbitalengineer.engine.sim_config import SimConfig
 from orbitalengineer.ipc.clock import SimClock
@@ -20,18 +21,6 @@ class ErrorResponse:
         return cls(**d)
 
 @dataclass
-class ParticleInit:
-    flags: int
-    position: tuple[float,float]
-    velocity: tuple[float,float]
-    mass: float
-    radius: float
-    
-    @classmethod
-    def from_dict(cls, d:dict) -> Self:
-        return cls(**d)
-
-@dataclass
 class Device:
     platform_id: int
     device_id: int
@@ -43,7 +32,7 @@ class Device:
 @dataclass
 class InitRequest:
     device: Device
-    particles: list
+    particles: list[body.Body]
     config: SimConfig|None
 
     @classmethod
@@ -51,7 +40,7 @@ class InitRequest:
         return cls(
             device=Device.from_dict(d["device"]),
             particles=[
-                ParticleInit.from_dict(p)
+                body.Body.from_dict(p)
                 for p in d["particles"]
             ],
             config=SimConfig.from_dict(d["config"]) if d["config"] is not None else None

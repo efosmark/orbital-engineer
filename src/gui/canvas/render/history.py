@@ -16,8 +16,8 @@ class HistoryRenderer(renderer.Renderer):
         #cr.set_line_join(cairo.LineJoin.MITER)        
         
         num_positions = float(len(self.history_positions[sb_id]))
-        current_position = particle.get_position()
-        radius = particle.get_radius() / 2.0
+        current_position = particle.position
+        radius = particle.radius / 2.0
         last_position = None
         for i,position in enumerate([*self.history_positions[sb_id], current_position]):
             if last_position is None:
@@ -44,6 +44,6 @@ class HistoryRenderer(renderer.Renderer):
     def draw(self, cr:cairo.Context, width:int, height:int):
         if self.app.show_all_history:
             for b in self.orbital:
-                self.draw_history(cr, b.idx)
+                self.draw_history(cr, b.index)
         elif self.app.show_focused_history and self.app.secondary_body is not None:
             self.draw_history(cr, self.app.secondary_body)

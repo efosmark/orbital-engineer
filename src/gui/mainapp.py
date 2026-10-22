@@ -1,4 +1,4 @@
-from orbitalengineer import flags
+from orbitalengineer import flags, body
 from gui import ui_config
 from gui.audio.synth import ToneSynthController
 from gui.client_sync import ClientSyncController
@@ -12,7 +12,6 @@ from gui.gtk4 import Gtk, Gio, GObject, GLib
 from gui.keyinput import KeyInput
 
 from orbitalengineer.engine import logger
-from orbitalengineer.engine.particle import Particle
 from orbitalengineer.ipc.client import ClientSocketConnection
 
 
@@ -109,13 +108,13 @@ class App(Gtk.Application):
         else:
             self.client.start()
 
-    def insert_particle(self, particle:Particle, color:tuple[float, float, float, float]=(1,1,1,1)) -> int:
+    def insert_particle(self, particle:body.Body, color:tuple[float, float, float, float]=(1,1,1,1)) -> int:
         idx = self.client.add_particle(
-            position=particle.get_position(),
-            velocity=particle.get_velocity(),
-            mass=particle.get_mass(),
-            radius=particle.get_radius(),
-            flags=particle.get_flags()
+            position=particle.position,
+            velocity=particle.velocity,
+            mass=particle.mass,
+            radius=particle.radius,
+            flags=particle.flags
         )
         self.model.particle_colors[idx] = random_color() if color is None else color
         self.model.particle_names[idx] = f"body-{idx}"

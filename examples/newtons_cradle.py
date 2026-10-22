@@ -1,5 +1,4 @@
-from orbitalengineer import flags
-from orbitalengineer.engine.particle import ParticleRaw
+from orbitalengineer import flags, body
 from orbitalengineer.helpers import random_color
 from gui.mainapp import App
 
@@ -15,7 +14,7 @@ def on_activate(app: App):
     origin = 0 # (((N-1) * r) - (r*10))
 
     for i in range(N-1):
-        app.insert_particle(ParticleRaw(
+        app.insert_particle(body.Body(
             position=complex(origin + (i * r * 2), 0),
             mass=m,
             radius=r,
@@ -23,7 +22,7 @@ def on_activate(app: App):
             flags=flags.BOUNCE
     ), color=(*random_color(), 1.0))
 
-    app.insert_particle(ParticleRaw(
+    app.insert_particle(body.Body(
         position=complex(origin - (r*10), 0),
         mass=m,
         radius=r,
@@ -31,8 +30,8 @@ def on_activate(app: App):
         flags=flags.BOUNCE
     ), color=(*random_color(), 1.0))
 
-    app.model.speed = 10.0
-    app.client.coef_of_restitution = 0.99999
+    #app.model.speed = 10.0
+    #app.client.coef_of_restitution = 0.99999
 
 def run():
     app = App()

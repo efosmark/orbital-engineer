@@ -23,13 +23,13 @@ class ForceVectorRenderer(renderer.Renderer):
             return
         
         sb = self.orbital.get_particle(self.app.secondary_body)
-        sb_pos = sb.get_position()
+        sb_pos = sb.position
         
         forces = []
         for b in self.orbital:
-            pos = b.get_position()
-            f = abs(accel(b.get_mass(), b.get_mass(), (sb_pos - pos), GRAV_DEFAULT))
-            forces.append((b.idx, pos, f))
+            pos = b.position
+            f = abs(accel(np.float32(sb.mass), np.float32(b.mass), (sb_pos - pos), GRAV_DEFAULT))
+            forces.append((b.index, pos, f))
         forces_sorted = sorted(forces, key=lambda f:f[2])[-5:]
         
         cr.set_line_cap(cairo.LineCap.ROUND)

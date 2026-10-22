@@ -20,7 +20,7 @@ def populate(app: App):
     sol = create_primary(mass=1e7, flags=flags.MERGE|flags.FIXED_RADIUS)
     app.insert_particle(sol, color=SOL_COLOR)
     
-    dist_min, dist_max = dist_min + sol.get_radius(), dist_max + sol.get_radius()
+    dist_min, dist_max = dist_min + sol.radius, dist_max + sol.radius
     dist_norm = colors.Normalize(dist_min, dist_max)
     for i in range(N-1):
         mass = rng.uniform(mass_min, mass_max)

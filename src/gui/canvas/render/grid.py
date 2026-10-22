@@ -174,7 +174,7 @@ class GridRenderer(renderer.Renderer):
         
         if self.app.secondary_body:
             b = self.orbital.get_particle(self.app.secondary_body)
-            pos = b.get_position()
+            pos = b.position
         
             draw_x_label(cr, x1, pos.real-x1, height, scale, True)
             draw_y_label(cr, y1, pos.imag-y1, width, scale, True)

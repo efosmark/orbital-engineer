@@ -5,7 +5,7 @@ import psutil
 import pyopencl as cl
 import numpy as np
 
-from orbitalengineer import dtypes, flags
+from orbitalengineer import dtypes, flags, body
 from orbitalengineer.engine import log_timing, logger
 from orbitalengineer.engine.energy.energy import EnergyPipeline
 from orbitalengineer.engine.exception import InitKernelException
@@ -111,7 +111,7 @@ class SimController:
         logger.info("CL device set to (%s, %s)", platform_id, device_id)
     
     @log_timing
-    def init_sim(self, particles:Sequence[message.ParticleInit]):
+    def init_sim(self, particles:Sequence[body.Body]):
         self.pipeline_state.N = len(particles)
         self.pipeline_state.tick_id = 0
         self.pipeline_state.step_id = 0
@@ -120,8 +120,7 @@ class SimController:
         self.vec.initialize(len(particles))
         self.vec.populate(particles)
         
-        if not self._init_kernels():
-            return False
+        if not self._init_kernels(): return False
         
         self._interaction(self.cfg.DEFAULT_DT_BASE, self.vec)
         if self.cfg.NUDGE_ON_START_ENABLE:

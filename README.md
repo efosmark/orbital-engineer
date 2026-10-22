@@ -115,7 +115,6 @@ r_{ij}=\lVert\mathbf d_{ij}\rVert,\qquad
 \hat{\mathbf n}_{ij}=\frac{\mathbf d_{ij}}{r_{ij}}
 $$
 
-
 2. Compute the signed relative velocity along the normal:
 
 $$

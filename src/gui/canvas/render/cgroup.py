@@ -10,10 +10,10 @@ class CGroupRenderer(renderer.Renderer):
             self._colors = dict(self.app.props.particle_colors)
         
         for b in self.orbital:
-            cgroup = self.orbital.cgroup[b.idx]
+            cgroup = self.orbital.cgroup[b.index]
             if cgroup not in self._colors:
                 self._colors[cgroup] = random_color()
-            self.app.props.particle_colors[b.idx] = self._colors[cgroup]
+            self.app.props.particle_colors[b.index] = self._colors[cgroup]
 
 
 class CGroupConnectionRenderer(renderer.Renderer):
@@ -24,10 +24,10 @@ class CGroupConnectionRenderer(renderer.Renderer):
         cr.set_line_cap(cairo.LINE_CAP_ROUND)
         
         for b in self.orbital:
-            cgroup = int(self.orbital.cgroup[b.idx])
-            if cgroup != b.idx:
+            cgroup = int(self.orbital.cgroup[b.index])
+            if cgroup != b.index:
                 c = self.orbital.get_particle(cgroup)
                 
-                cr.move_to(*c.get_xy())
-                cr.line_to(*b.get_xy())
+                cr.move_to(c.position.real, c.position.imag)
+                cr.line_to(b.position.real, b.position.imag)
                 cr.stroke()

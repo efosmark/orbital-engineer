@@ -10,15 +10,14 @@ from dataclasses import fields
 import numpy as np
 from numpy.typing import NDArray
 
-from orbitalengineer import dtypes, flags
+from orbitalengineer import dtypes, flags, body
 from orbitalengineer.engine import config, logger
 from orbitalengineer.engine.device import DeviceStatus
-from orbitalengineer.engine.particle_cl import ParticleCL
 from orbitalengineer.engine.sim_config import SimConfig
-from orbitalengineer.engine.particle import Particle
 from orbitalengineer.ipc import message, transport
 from orbitalengineer.ipc.clock import SimClock
 from orbitalengineer.ipc.config import SERVER_IPC_HOST, SERVER_IPC_PORT
+from orbitalengineer.engine.primary_vectors import PrimaryStateVectors, HasStateVectors
 
 
 class ClientSocketConnection:
@@ -42,7 +41,7 @@ class ClientSocketConnection:
     position_B:NDArray[np.complex64|np.complex128]
     
     @property
-    def position(self):
+    def position(self) -> NDArray[np.complex64|np.complex128]:
         if self.buffer_id == 'A':
             return self.position_A
         else:
@@ -66,7 +65,7 @@ class ClientSocketConnection:
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.clock = SimClock()
         self._prev = None
-        self._uninitialized_bodies:list[message.ParticleInit] = []
+        self._uninitialized_bodies:list[body.Body] = []
 
     def connect(self, host=SERVER_IPC_HOST, port=SERVER_IPC_PORT, reset:bool=True):
         self._host = host
@@ -110,17 +109,17 @@ class ClientSocketConnection:
         if self.is_initialized:
             logger.warning("Cannot add_particle after initialization.")
         else:
-            self._uninitialized_bodies.append(message.ParticleInit(
+            self._uninitialized_bodies.append(body.Body(
                 flags=flags,
-                position=(position.real, position.imag),
-                velocity=(velocity.real, velocity.imag),
+                position=position,
+                velocity=velocity,
                 mass=mass,
                 radius=radius
             ))
         return len(self._uninitialized_bodies) - 1
 
-    def get_particle(self, particle_id:int) -> Particle:
-        return ParticleCL(particle_id, self)
+    def get_particle(self, particle_id:int) -> body.Body:
+        return body.Body(vec=cast(HasStateVectors, self), index=particle_id)
 
     def __iter__(self):
         for i in self.get_valid_indices():
