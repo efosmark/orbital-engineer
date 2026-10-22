@@ -5,12 +5,12 @@ import psutil
 import pyopencl as cl
 import numpy as np
 
-from orbitalengineer.engine import dtypes, log_timing, logger
+from orbitalengineer import dtypes, flags
+from orbitalengineer.engine import log_timing, logger
 from orbitalengineer.engine.energy.energy import EnergyPipeline
 from orbitalengineer.engine.exception import InitKernelException
 from orbitalengineer.engine.metric import MetricsProducer
 
-from orbitalengineer.engine import flags
 from orbitalengineer.engine.ledger.ledger import LedgerController
 from orbitalengineer.engine.named_shared_memory import NamedSharedMemory
 from orbitalengineer.engine.cgroup.cgroup import CGroupPipeline
