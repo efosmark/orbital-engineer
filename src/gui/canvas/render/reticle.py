@@ -79,9 +79,28 @@ class ReticleRenderer(renderer.Renderer):
         self.draw_tick_mark(cr, np.degrees(angle), radius, True, True)
         cr.restore()
 
+    def show_simplified_reticle(self, cr, radius):
+            cr.set_line_width(2/self.camera.zoom)
+            cr.set_source_rgba(1, 1, 1, 0.6)
+            reticle_count = 4
+            total_angle = 0
+
+            for i in range(reticle_count):
+                angle = (2.0*np.pi) / reticle_count
+                
+                reticle_start = radius + 10/self.camera.zoom
+                reticle_end = reticle_start + 10/self.camera.zoom
+                
+                cr.save()
+                cr.move_to(reticle_start, 0)
+                cr.line_to(reticle_end, 0)
+                cr.stroke()
+                total_angle += angle
+                cr.restore()
+                cr.rotate(angle)
+
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if not self.app.secondary_body:
-            return
+        if self.app.secondary_body is None: return
         
         body = self.orbital.get_particle(self.app.secondary_body)
 
@@ -100,30 +119,8 @@ class ReticleRenderer(renderer.Renderer):
         except cairo.Error:
             print(f"ERROR. Cannot translate {x} and {y}")
             return
-                
-        #if radius * self.camera.zoom < 5:
-        #    return
         
         if radius * self.camera.zoom < 30:
-
-            cr.set_line_width(2/self.camera.zoom)
-            cr.set_source_rgba(1,1,1,0.6)
-            reticle_count = 4
-            total_angle = 0
-
-            for i in range(reticle_count):
-                angle = (2.0*np.pi) / reticle_count
-                
-                reticle_start = radius + 10/self.camera.zoom
-                reticle_end = reticle_start + 10/self.camera.zoom
-                
-                cr.save()
-                cr.move_to(reticle_start, 0)
-                cr.line_to(reticle_end, 0)
-                cr.stroke()
-                total_angle += angle
-                cr.restore()
-                cr.rotate(angle)
-            
+            self.show_simplified_reticle(cr, radius)
         else:
             self.show_detailed_reticle(cr, radius, body)

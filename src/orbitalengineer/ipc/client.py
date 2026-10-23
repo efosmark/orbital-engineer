@@ -17,7 +17,7 @@ from orbitalengineer.engine.sim_config import SimConfig
 from orbitalengineer.ipc import message, transport
 from orbitalengineer.ipc.clock import SimClock
 from orbitalengineer.ipc.config import SERVER_IPC_HOST, SERVER_IPC_PORT
-from orbitalengineer.engine.primary_vectors import PrimaryStateVectors, HasStateVectors
+from orbitalengineer.engine.primary_vectors import HasStateVectors
 
 
 class ClientSocketConnection:

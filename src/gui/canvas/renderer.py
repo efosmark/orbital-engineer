@@ -1,6 +1,5 @@
 import cairo
 from gui.model import main
-from gui.audio.synth import ToneSynthController
 from gui.canvas import pz
 from gui.gtk4 import GObject, Graphene
 
@@ -12,13 +11,12 @@ class Renderer(GObject.GObject):
     camera = GObject.Property(type=object)
     orbital:ClientSocketConnection = GObject.Property(type=object) # type:ignore
     
-    def __init__(self, view:main.AppModel, camera:pz.Camera2D, orbital:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
+    def __init__(self, view:main.AppModel, camera:pz.Camera2D, orbital:ClientSocketConnection, clock:SimClock):
         super().__init__()
         self.app = view
         self.camera = camera
         self.orbital = orbital
         self.clock = clock
-        self.synth = synth
         self.initialize()
         
     def get_cairo(self, snapshot, width, height):

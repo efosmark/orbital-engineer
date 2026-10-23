@@ -3,16 +3,15 @@ Also needs to have computations performed outside of the rendering code.
 """
 
 import math
+import time
 import cairo
 from orbitalengineer.engine.orbitalnp.integrator.accel import force
 from gui.canvas import renderer
-from gui.gtk4 import Gtk
 import numpy as np
 from numpy.typing import NDArray
 
-from numba import njit, prange
+from numba import njit
 import matplotlib.pyplot as plt
-from matplotlib import colors
 
 cmap = plt.colormaps['cubehelix']
 
@@ -64,21 +63,13 @@ def compute_forces(forces, N, num_cols, num_rows, x_origin, y_origin, x_max, y_m
             x_pos = (col * resolution) + (resolution/2.0)
             
             for i in ix:
-                
                 dr =  position[i] - complex(x_origin + x_pos, y_origin + y_pos)
                 dist = np.abs(dr)
-                
-                if dist > MAX_DIST:# or (dist > max_dist_per_particle[i] and max_dist_per_particle[i] > 0):
-                    continue
-                
+                if dist > MAX_DIST:continue
                 forces[col, row] += mass[i] / (dist**3)
-                
-                # F = M / dist**3
-                # F/M = dist**3
-                # cbrt(F/M) = dist
     return forces
 
-RESOLUTION = 20
+RESOLUTION = 10
 
 class GravFieldRenderer(renderer.Renderer):
 
@@ -86,8 +77,15 @@ class GravFieldRenderer(renderer.Renderer):
     #    snapshot.push_blur(RESOLUTION)
     #    super().do_draw(snapshot, width, height)
     #    snapshot.pop()
+    
+    def initialize(self):
+        self.forces = None
+        self.forces_min = 0
+        self.forces_max = 0
+        self.last_computed_at = 0
 
     def draw(self, cr:cairo.Context, width:int, height:int):
+        if not self.app.show_grav_field: return
         N = self.orbital.N
         num_cols = math.ceil(width / RESOLUTION)
         num_rows = math.ceil(height / RESOLUTION)
@@ -96,23 +94,28 @@ class GravFieldRenderer(renderer.Renderer):
         mass = self.orbital.mass
         position = self.orbital.position
         
-        forces = np.empty((num_cols, num_rows), dtype=np.float64)
-        forces.fill(0)
-        compute_forces(forces, N, num_cols, num_rows, x_origin, y_origin, x_max, y_max, RESOLUTION/self.camera.zoom, position, mass)
-        
-        forces_min = min_nonzero(forces.flatten())/2.0
-        forces_max = max((np.abs(force(np.float32(1), mass[i], 1, np.float32(1.0))) for i in range(self.orbital.N)))
+        now = time.monotonic()
+        if self.forces is None or now - self.last_computed_at > 0.25:
+            self.last_computed_at = now
+            self.forces = np.empty((num_cols, num_rows), dtype=np.float64)
+            self.forces.fill(0)
+            
+            compute_forces(self.forces, N, num_cols, num_rows, x_origin, y_origin, x_max, y_max, RESOLUTION/self.camera.zoom, position, mass)
+            self.forces_min = min_nonzero(self.forces.flatten())/2.0
+            self.forces_max = max((np.abs(force(np.float32(1), mass[i], 1, np.float32(1.0))) for i in range(self.orbital.N)))
         
         y_offset = 0
         x_offset = 0
-        for row in range(num_rows):
-            for col in range(num_cols):
-                if forces[col, row] > 0:
-                    cr.set_source_rgb(*cmap(fast_lognorm(forces[col, row], forces_min, forces_max))[:3])
-                    cr.rectangle(x_offset, y_offset, RESOLUTION, RESOLUTION)
-                    cr.fill()
-                
-                x_offset += RESOLUTION
-            x_offset = 0
-            y_offset += RESOLUTION
-        
+        try:
+            for row in range(num_rows):
+                for col in range(num_cols):
+                    if self.forces[col, row] > 0:
+                        cr.set_source_rgb(*cmap(fast_lognorm(self.forces[col, row], self.forces_min, self.forces_max))[:3])
+                        cr.rectangle(x_offset, y_offset, RESOLUTION, RESOLUTION)
+                        cr.fill()
+                    
+                    x_offset += RESOLUTION
+                x_offset = 0
+                y_offset += RESOLUTION
+        except IndexError:
+            ... # Probably a resize. Wait for next computation.

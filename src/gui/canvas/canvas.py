@@ -9,7 +9,6 @@ from orbitalengineer import flags
 from gui.ui_config import DRAW_INTERVAL
 from gui.canvas.render.event_ledger import EventLedgerRenderer
 from gui.model import main
-from gui.audio.synth import ToneSynthController
 from gui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
 from gui.canvas.render.resource_monitor import ResourceMonitorRenderer
 from gui.canvas.render.osd import OSDRenderer
@@ -146,42 +145,41 @@ class OrbitalCanvas(Gtk.DrawingArea):
     last_draw_time:float = 0.0
     _cached_surface = None
 
-    def __init__(self, camera:Camera2D, app: main.AppModel, orbital:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
+    def __init__(self, camera:Camera2D, app: main.AppModel, orbital:ClientSocketConnection, clock:SimClock):
         super().__init__()
         self.camera = camera
         self.app = app
         self.clock = clock
-        self.synth = synth
         self.orbital = orbital
         self.camera_ctl = Camera2DController(self, self.camera, self.app)
         self.mouse_controller = MouseController(self, self.camera, self.orbital, self.app)
         self.move_particle_ctl = MoveParticleController(self, self.camera, self.orbital, self.app)
         
-        self.hud_renderers = [
-            BackgroundRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            GridRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            #EventLedgerRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+        self.bg_renderers = [
+            BackgroundRenderer(self.app, self.camera, self.orbital, self.clock),
+            GridRenderer(self.app, self.camera, self.orbital, self.clock),
+            #EventLedgerRenderer(self.app, self.camera, self.orbital, self.clock),
         ]
         
         self.scene_renderers = [
-            HistoryRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            HistoryRenderer(self.app, self.camera, self.orbital, self.clock),
             #ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
-            EllipseRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            ParticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            SelectionRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            ReticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            #PinpointRenderer(self.view, self.camera, self.orbital, self.clock, self.synth),
-            #CGroupRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            EllipseRenderer(self.app, self.camera, self.orbital, self.clock),
+            ParticleRenderer(self.app, self.camera, self.orbital, self.clock),
+            SelectionRenderer(self.app, self.camera, self.orbital, self.clock),
+            ReticleRenderer(self.app, self.camera, self.orbital, self.clock),
+            #PinpointRenderer(self.view, self.camera, self.orbital, self.clock),
+            #CGroupRenderer(self.app, self.camera, self.orbital, self.clock),
         ]
         
         self.hud_fg_renderers = [
-            #GravFieldRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            DebugInfoRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            FocusInfoRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            HudClockRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            ResourceMonitorRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            WarningRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
-            OSDRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
+            GravFieldRenderer(self.app, self.camera, self.orbital, self.clock),
+            DebugInfoRenderer(self.app, self.camera, self.orbital, self.clock),
+            FocusInfoRenderer(self.app, self.camera, self.orbital, self.clock),
+            HudClockRenderer(self.app, self.camera, self.orbital, self.clock),
+            ResourceMonitorRenderer(self.app, self.camera, self.orbital, self.clock),
+            WarningRenderer(self.app, self.camera, self.orbital, self.clock),
+            OSDRenderer(self.app, self.camera, self.orbital, self.clock),
         ]
         
         click_controller = Gtk.GestureClick.new()
@@ -218,12 +216,12 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.camera.zoom_at(0, 0, 0, 0, 1/0.9)
 
     def render_background_objects(self, cr, width, height):
-        for r in self.hud_renderers:
+        for r in self.bg_renderers:
             cr.save()
             try:
                 r.draw(cr, width, height)
             except Exception as e:
-                self.hud_renderers.remove(r)
+                self.bg_renderers.remove(r)
                 raise e
             cr.restore()
 

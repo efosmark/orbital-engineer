@@ -34,8 +34,5 @@ class HistoryRenderer(renderer.Renderer):
         cr.restore()
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if self.app.show_all_history:
-            for b in self.orbital:
-                self.draw_history(cr, b.index)
-        elif self.app.show_focused_history and self.app.secondary_body is not None:
+        if self.app.show_focused_history and self.app.secondary_body is not None:
             self.draw_history(cr, self.app.secondary_body)

@@ -42,7 +42,6 @@ class ToneSynthController:
         # Scale the data for int16
         data = np.clip(np.int16(np.multiply(buffer, SAMPLE_MAX)), SAMPLE_MIN, SAMPLE_MAX)
         
-        #print(data)    
         # Pack the sample data
         data = struct.pack("<" + "h" * len(data), *data) # type:ignore
         buf = Gst.Buffer.new_allocate(None, len(data), None)

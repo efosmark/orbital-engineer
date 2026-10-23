@@ -127,7 +127,4 @@ def make_name(seed):
     if curr is not None and curr[-1] in ('V', 'VV'):
        word.append(str(rng.choice([*NEUTRAL_C])))
 
-    # print()
-    # print(tpl)
-    # print(word)
     return "".join(word).title()

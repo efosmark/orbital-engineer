@@ -11,17 +11,14 @@ from gui import ui_config
 
 class MainWindow(Gtk.ApplicationWindow):
 
-    def __init__(self, application, title, camera, view: AppModel, ctl:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
+    def __init__(self, application, title, camera, app_model: AppModel, ctl:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
         Gtk.ApplicationWindow.__init__(self, application=application, title=title)
         self.ctl = ctl
         self.clock = clock
-        self._tick_sound = None
-        self._tick_audio_ready = False
-        
-        self.view = view
+        self.app_model = app_model
         self.synth = synth
         
-        self.canvas = canvas.OrbitalCanvas(camera, view, self.ctl, self.clock, self.synth)
+        self.canvas = canvas.OrbitalCanvas(camera, app_model, self.ctl, self.clock)
         self.canvas.set_hexpand(True)
         self.canvas.set_vexpand(True)
         self.canvas.set_halign(Gtk.Align.FILL)
@@ -50,13 +47,12 @@ class MainWindow(Gtk.ApplicationWindow):
         l = Gtk.Label()
                 
         def transform_to(_binding, value):
-            print(value)
             return str(value)  # Return int converted to a bool
 
         def transform_from(_binding, value):
             return str(value)  # Return bool converted to a int
 
-        self.view.engine.bind_property(
+        self.app_model.engine.bind_property(
             'clock-speed',
             l,
             'label',
@@ -87,9 +83,8 @@ class MainWindow(Gtk.ApplicationWindow):
             state = value.get_boolean()
             if name == "show_grid":
                 app.model.show_grid = state
-            #elif name == "show_history":
-                #self.view.show_focused_history = state
-            #    app.model.show_all_history = state
+            elif name == "show_history":
+                app.model.show_focused_history = state
             elif name == "show_force_vectors":
                 app.model.show_force_vectors = state
             elif name == "show_orbital_ellipse":

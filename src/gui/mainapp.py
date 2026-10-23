@@ -125,7 +125,7 @@ class App(Gtk.Application):
             application=self,
             title=ui_config.DEFAULT_WINDOW_TITLE,
             camera=self.camera,
-            view=self.model,
+            app_model=self.model,
             ctl=self.client,
             clock=self.client.clock,
             synth=self.synth
@@ -175,38 +175,3 @@ class App(Gtk.Application):
     
     def relative_zoom(self, factor):
         self.camera.zoom_at(0, 0, 0, 0, factor)
-
-    # def to_dict(self) -> dict:
-    #     return {
-    #         "camera": self.camera.to_dict(),
-    #         "orbital": self.client.to_dict(),
-    #         "view": self.view.to_dict(),
-    #     }
-    
-    # def load_from_file(self):
-    #     if self.resume_from_file is False: return
-
-    #     file_name = ui_config.DEFAULT_SCENARIO_FILE
-    #     if isinstance(self.resume_from_file, str):
-    #         file_name = self.resume_from_file
-    #     logger.info(f"Loading from {file_name}")
-    #     obj = cast(dict, json.load(open(file_name, "r")))
-        
-    #     self.platform_id = obj.get('platform_id', self.platform_id)
-    #     self.device_id = obj.get('device_id', self.device_id)
-        
-    #     #self.clock = SimClock()
-    #     #self.clock.speed = obj["clock"]["speed"]
-    #     #self.clock._duration = obj["clock"]["duration"]
-    #     #self.clock.running = obj["clock"]["running"]
-        
-    #     self.camera.zoom = obj["camera"]["zoom"]
-    #     self.camera.offset = obj["camera"]["offset"]
-        
-    #     self.view.load_from_dict(obj["view"])
-    #     self.orbital.load_from_dict(obj)
-    
-    # def save_scenario(self):
-    #     if self.client.is_initialized:
-    #         logger.info(f"Saving to {ui_config.DEFAULT_SCENARIO_FILE}")
-    #         json.dump(self.to_dict(), open(ui_config.DEFAULT_SCENARIO_FILE, "w"))

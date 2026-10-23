@@ -89,11 +89,7 @@ class DebugInfoRenderer(renderer.Renderer):
             DebugDisplayField("Zoom",   zoom, 1),
         ])
 
-        render_durations = self.app.durations['render'][-10:]
-        if len(render_durations) > 0:
-            t_render_ms = statistics.mean([d[1] for d in render_durations]) * 1000.0
-            display.append(DebugDisplayField("Render", t_render_ms, 2, 'ms', RENDER_MS_THRESHOLD))
-        
+
         frame_clock = cast(Gdk.FrameClock, self.app.frame_clock)
         fps = frame_clock.get_fps()
         frame_no = self.app.frame_clock.get_frame_counter()
@@ -113,18 +109,6 @@ class DebugInfoRenderer(renderer.Renderer):
             ])
         except AttributeError:
             pass
-        
-        tick_durations = self.app.durations['tick'][-10:]
-        if len(tick_durations) > 0:
-            t_tick = statistics.mean([d[1] for d in tick_durations])
-            t_tick_ms = t_tick * 1000.0
-            tick_rate = 1/t_tick
-            
-            display.extend([
-                DebugDisplayField("Rate",     tick_rate, 1, "/s", TICK_RATE_THRESHOLD),
-                DebugDisplayField("Interval", t_tick_ms, 1, 'ms')
-            ])
-
         return display
     
     
