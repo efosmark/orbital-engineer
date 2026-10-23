@@ -36,10 +36,14 @@ class LedgerEntry:
 
 class LedgerModel(GObject.GObject):
     entries:list[LedgerEntry] = GObject.Property(type=object) # type:ignore
+    last_ledger_id = GObject.Property(type=int)
+    last_tick_checked = GObject.Property(type=int)
     
     def __init__(self):
         super().__init__()
         self.entries = []
+        self.last_ledger_id = 0
+        self.last_tick_checked = 0
 
     def add_entry(self, entry):
         le = LedgerEntry.from_dtype(entry)
