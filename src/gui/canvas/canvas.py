@@ -1,8 +1,12 @@
+import time
 from typing import cast
 
+import cairo
 import numpy as np
 
 from orbitalengineer import flags
+
+from gui.ui_config import DRAW_INTERVAL
 from gui.canvas.render.event_ledger import EventLedgerRenderer
 from gui.model import main
 from gui.audio.synth import ToneSynthController
@@ -10,7 +14,6 @@ from gui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
 from gui.canvas.render.resource_monitor import ResourceMonitorRenderer
 from gui.canvas.render.osd import OSDRenderer
 from gui.gtk4 import Gtk, Gdk, Graphene
-from gui.canvas import renderer
 from gui.canvas.pz import Camera2D, Camera2DController
 from gui.canvas.render.hud_clock import HudClockRenderer
 from gui.canvas.render.warning import WarningRenderer
@@ -25,6 +28,7 @@ from gui.canvas.render.history import HistoryRenderer
 from gui.canvas.render.particle import ParticleRenderer
 from gui.canvas.render.pinpoint import PinpointRenderer
 from gui.canvas.render.reticle import ReticleRenderer
+from gui.canvas.render.gravfield import GravFieldRenderer
 
 from orbitalengineer.ipc.client import ClientSocketConnection
 from orbitalengineer.ipc.clock import SimClock
@@ -137,8 +141,10 @@ class MouseController:
             return
         self.app.hovered_over_particle = self.orbital.get_particle(bodies[0])
 
-
 class OrbitalCanvas(Gtk.DrawingArea):
+
+    last_draw_time:float = 0.0
+    _cached_surface = None
 
     def __init__(self, camera:Camera2D, app: main.AppModel, orbital:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
         super().__init__()
@@ -158,7 +164,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
         ]
         
         self.scene_renderers = [
-            #HistoryRenderer(self.view, self.camera, self.orbital, self.clock),
+            HistoryRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             #ForceVectorRenderer(self.view, self.camera, self.orbital, self.clock),
             EllipseRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             ParticleRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
@@ -169,6 +175,7 @@ class OrbitalCanvas(Gtk.DrawingArea):
         ]
         
         self.hud_fg_renderers = [
+            #GravFieldRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             DebugInfoRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             FocusInfoRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
             HudClockRenderer(self.app, self.camera, self.orbital, self.clock, self.synth),
@@ -210,59 +217,68 @@ class OrbitalCanvas(Gtk.DrawingArea):
     def zoom_out(self):
         self.camera.zoom_at(0, 0, 0, 0, 1/0.9)
 
-    def do_snapshot(self, snapshot: Gtk.Snapshot):
-        now = self.clock.time()
-        self.last_draw_time = now
+    def render_background_objects(self, cr, width, height):
+        for r in self.hud_renderers:
+            cr.save()
+            try:
+                r.draw(cr, width, height)
+            except Exception as e:
+                self.hud_renderers.remove(r)
+                raise e
+            cr.restore()
 
-        frame_clock = self.get_frame_clock()
-        if frame_clock:
-            self.app.frame_clock = frame_clock
-            frame_clock = cast(Gdk.FrameClock, frame_clock)
-            self.app.fps = frame_clock.get_fps()
-                        
+    def render_space_objects(self, cr, width, height):
+        cr.save()
+        cr.transform(self.camera.get_matrix(width, height))        
+
+        for r in self.scene_renderers:
+            cr.save()
+            try:
+                r.draw(cr, width, height)
+            except Exception as e:
+                self.scene_renderers.remove(r)
+                raise e
+            cr.restore()
+        
+        cr.restore()
+
+    def render_hud(self, cr, width, height):
+        for r in self.hud_fg_renderers:
+            cr.save()
+            try:
+                r.draw(cr, width, height)
+            except Exception as e:
+                self.hud_fg_renderers.remove(r)
+                raise e
+            cr.restore()
+
+    def do_snapshot(self, snapshot: Gtk.Snapshot):
         width = self.get_allocated_width()
         height = self.get_allocated_height()
+        now = time.monotonic()
         
-        try:
+        if self._cached_surface is None or self._cached_surface.get_width() != width or self._cached_surface.get_height() != height or now - self.last_draw_time >= DRAW_INTERVAL:
+            self._cached_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+            self.last_draw_time = now
+        
+            frame_clock = self.get_frame_clock()
+            if frame_clock:
+                self.app.frame_clock = frame_clock
+                frame_clock = cast(Gdk.FrameClock, frame_clock)
+                self.app.fps = frame_clock.get_fps()
+        
             if self.app.secondary_body is not None and self.app.follow_tracked_body:
                 fpos = self.app.engine.position[self.app.secondary_body]
                 self.camera.offset = [float(fpos.real), float(fpos.imag)]
 
-            cr = snapshot.append_cairo(Graphene.Rect().init(0, 0, width, height))
-            
-            for r in self.hud_renderers:
-                cr.save()
-                try:
-                    r.draw(cr, width, height)
-                except Exception as e:
-                    self.hud_renderers.remove(r)
-                    raise e
-                cr.restore()
-            
-            cr.save()
-            cr.transform(self.camera.get_matrix(width, height))        
+            cr = cairo.Context(self._cached_surface)
+            self.render_background_objects(cr, width, height)
+            self.render_space_objects(cr, width, height)
+            self.render_hud(cr, width, height)
 
-            for r in self.scene_renderers:
-                cr.save()
-                try:
-                    r.draw(cr, width, height)
-                except Exception as e:
-                    self.scene_renderers.remove(r)
-                    raise e
-                cr.restore()
-            
-            cr.restore()
-            
-            for r in self.hud_fg_renderers:
-                cr.save()
-                try:
-                    r.draw(cr, width, height)
-                except Exception as e:
-                    self.hud_fg_renderers.remove(r)
-                    raise e
-                cr.restore()
-
-        except Exception as e:
-            #print("EXCEPTION", e.wit)
-            #raise SystemExit
-            raise e
+        # Push cached surface into snapshot every frame
+        rect = Graphene.Rect()
+        rect.init(0, 0, width, height)
+        cr_out = snapshot.append_cairo(rect)
+        cr_out.set_source_surface(self._cached_surface, 0, 0)
+        cr_out.paint()

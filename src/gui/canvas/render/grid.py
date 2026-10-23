@@ -1,7 +1,6 @@
 import math
 import cairo
 from gui import ui_config
-from gui.gtk4 import Gtk, Graphene, Gdk
 from gui.canvas import renderer
 from gui.util.fmt import mag_format
 

@@ -31,3 +31,12 @@ AUDIO_PIPELINE  = (
     "! audioresample "
     "! pipewiresink"
 )
+
+
+###
+#
+###
+
+DRAW_INTERVAL = 1/20.0
+
+NUM_HISTORY_POSITIONS = 1000

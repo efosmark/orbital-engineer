@@ -1,3 +1,7 @@
+"""This works, but needs to be refactored. Should be kernel-backed.
+Also needs to have computations performed outside of the rendering code.
+"""
+
 import math
 import cairo
 from orbitalengineer.engine.orbitalnp.integrator.accel import force
@@ -50,7 +54,6 @@ def compute_forces(forces, N, num_cols, num_rows, x_origin, y_origin, x_max, y_m
         if not is_bounded(position[i], x_origin, x_max, y_origin, y_max):
             continue
         ix[ii] = i
-        #max_dist_per_particle[i] = np.cbrt((mass[i]/1e-5))
         ii += 1
     ix = ix[:ii]
     
@@ -79,10 +82,10 @@ RESOLUTION = 20
 
 class GravFieldRenderer(renderer.Renderer):
 
-    def do_draw(self, snapshot, width, height):
-        snapshot.push_blur(RESOLUTION)
-        super().do_draw(snapshot, width, height)
-        snapshot.pop()
+    #def do_draw(self, snapshot, width, height):
+    #    snapshot.push_blur(RESOLUTION)
+    #    super().do_draw(snapshot, width, height)
+    #    snapshot.pop()
 
     def draw(self, cr:cairo.Context, width:int, height:int):
         N = self.orbital.N
@@ -93,16 +96,12 @@ class GravFieldRenderer(renderer.Renderer):
         mass = self.orbital.mass
         position = self.orbital.position
         
-        #max_dist = max(y_max-y_origin, x_max-x_origin)/10
         forces = np.empty((num_cols, num_rows), dtype=np.float64)
         forces.fill(0)
         compute_forces(forces, N, num_cols, num_rows, x_origin, y_origin, x_max, y_max, RESOLUTION/self.camera.zoom, position, mass)
         
         forces_min = min_nonzero(forces.flatten())/2.0
-        #forces_min = min((np.abs(force(1, mass[i], RESOLUTION, 1.0)) for i in range(self.orbital.shm.N)))
-        #forces_max = forces.max()
         forces_max = max((np.abs(force(np.float32(1), mass[i], 1, np.float32(1.0))) for i in range(self.orbital.N)))
-        
         
         y_offset = 0
         x_offset = 0

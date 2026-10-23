@@ -1,23 +1,19 @@
 from collections import defaultdict, deque
-import numpy as np
 import cairo
 from gui.canvas import renderer
-
+from gui.ui_config import NUM_HISTORY_POSITIONS
 
 class HistoryRenderer(renderer.Renderer):
-    history_positions = defaultdict(lambda:deque(maxlen=200))
-
+    history_positions = defaultdict(lambda:deque(maxlen=NUM_HISTORY_POSITIONS))
 
     def draw_history(self, cr:cairo.Context, sb_id):
         cr.save()
 
         particle = self.orbital.get_particle(sb_id)
         r,g,b,a = self.app.particle_colors[sb_id]
-        #cr.set_line_join(cairo.LineJoin.MITER)        
         
         num_positions = float(len(self.history_positions[sb_id]))
         current_position = particle.position
-        radius = particle.radius / 2.0
         last_position = None
         for i,position in enumerate([*self.history_positions[sb_id], current_position]):
             if last_position is None:
@@ -33,13 +29,9 @@ class HistoryRenderer(renderer.Renderer):
             cr.line_to(position.real, position.imag)
             cr.stroke()
             last_position = position
-            
-    
-        #if self.orbital.tick_id % 2 == 0:
+        
         self.history_positions[sb_id].append(current_position)
-
         cr.restore()
-
 
     def draw(self, cr:cairo.Context, width:int, height:int):
         if self.app.show_all_history:
