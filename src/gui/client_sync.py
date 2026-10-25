@@ -37,7 +37,7 @@ class EngineModel(GObject.GObject):
        
     tick_id = GObject.Property(type=int, default=0)
     dt_step = GObject.Property(type=float, default=0)
-    is_initialized = GObject.Property(type=bool, default=True)
+    is_initialized = GObject.Property(type=bool, default=False)
     N = GObject.Property(type=int, default=0)
     accum = GObject.Property(type=float, default=0)
     valid_indices = GObject.Property(type=object)
@@ -95,19 +95,31 @@ class ClientSyncController(GObject.GObject):
         GLib.timeout_add(SYNC_RATE_MS, self.sync)
         
     def sync(self):
-        self.client.sync()
+        try:
+            self.client.sync()
+        except ConnectionResetError:
+            raise SystemExit
+        
+        if self.model.is_initialized != self.client.is_initialized:
+            self.model.is_initialized = self.client.is_initialized
+        if not self.client.is_initialized:
+            return
+        
         if self.model.clock_speed != self.client.clock.speed:
             self.model.props.clock_speed = self.client.clock.speed
             self.model.notify('clock-speed')
-
-        self.model.props.config = self.client.config
-        self.model.notify('config')
+        
+        try:
+            if self.model.props.config is None and self.client.config is not None:
+                self.model.props.config = self.client.config
+                self.model.notify('config')
+        except AttributeError:
+            ...
         self.model.props.clock_time = self.client.clock.time()
         if self.model.props.tick_id != self.client.tick_id:
             self.model.props.tick_id = self.client.tick_id
         if self.model.props.dt_step != self.client.dt_step:
             self.model.props.dt_step = self.client.dt_step
-        self.model.props.is_initialized = self.client.is_initialized
         self.model.props.N = self.client.N
         self.model.props.accum = self.client.accum
 
@@ -136,11 +148,10 @@ class ClientSyncController(GObject.GObject):
         self.model.force = self.client.force
         self.model.ledger = self.client.ledger
         self.model.cgroup = self.client.cgroup
-        self.model.props.n_direct_contacts = self.client.n_direct_contacts
-        self.model.props.direct_contacts = self.client.direct_contacts
-        self.model.props.kinetic_energy = self.client.kinetic_energy
-        self.model.props.grav_potential_energy = self.client.grav_potential_energy
-                
+        self.model.n_direct_contacts = self.client.n_direct_contacts
+        self.model.direct_contacts = self.client.direct_contacts
+        self.model.kinetic_energy = self.client.kinetic_energy
+        self.model.grav_potential_energy = self.client.grav_potential_energy
         return True
     
     def on_clock_speed_changed(self, model, param):

@@ -38,6 +38,7 @@ class SimController:
     
     def __init__(self):
         self.tr = EventTracer(self)
+        self.shm = NamedSharedMemory()
         self.reset()
         self.metrics = MetricsProducer(self.cfg.METRIC_SOCKET_PATH)
         self.cpu_num = psutil.Process().cpu_num()
@@ -48,6 +49,8 @@ class SimController:
         self.is_initialized = False
         self.cfg = SimConfig()
         self.pipeline_state = SimState()
+        
+        self.shm.disconnect()
         self.shm = NamedSharedMemory()
 
     def _init_queue(self):
@@ -266,6 +269,7 @@ class SimController:
         return self._cpu_utilization
 
     def sync(self, current_buffer):
+        if not self.is_initialized: return
         self.vec.sync(self.q, current_buffer)
         self.vec.sync_to_host(self._ledger.ledger, queue=self.q)
         #self.vec.sync_to_host(self._cgroup.group, queue=self.q)

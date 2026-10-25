@@ -72,6 +72,8 @@ class KeyInput(GObject.GObject):
                 self.mainapp.substep_once()
             else:
                 self.mainapp.tick_once()
+        elif keyval == Gdk.KEY_k:
+            self.app.show_grav_field = not self.app.show_grav_field
         return False
 
     def on_wasd(self, keyval):

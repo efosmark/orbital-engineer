@@ -251,6 +251,8 @@ class OrbitalCanvas(Gtk.DrawingArea):
             cr.restore()
 
     def do_snapshot(self, snapshot: Gtk.Snapshot):
+        if not self.app.engine.is_initialized: return
+        
         width = self.get_allocated_width()
         height = self.get_allocated_height()
         now = time.monotonic()

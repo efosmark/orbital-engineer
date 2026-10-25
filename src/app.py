@@ -13,9 +13,9 @@ cmap = plt.colormaps['gist_rainbow']
 SOL_COLOR = (1.0, 0.98, 0.45, 1.0)
 
 def populate(app: App):
-    N = 1024
-    mass_min, mass_max =  10_000, 50_000
-    dist_min, dist_max =   1_000, 20_000
+    N = 2048
+    mass_min, mass_max =  1_000,  5_000
+    dist_min, dist_max =  1_000, 20_000
     
     sol = create_primary(mass=1e7, flags=flags.MERGE|flags.FIXED_RADIUS)
     app.insert_particle(sol, color=SOL_COLOR)
@@ -34,20 +34,21 @@ def populate(app: App):
         ), color=cmap(1-dist_norm(abs(pos))))
 
 def on_activate(app: App):
-    app.bootstrap()
-    populate(app)
-    
-    app.client.init_sim(SimConfig(
-        DEFAULT_DT_BASE=1/30.0,
-        TARGET_TICKS_PER_SECOND=120,
-        SOFTENING_LENGTH=100.0,
-        COEF_OF_RESTITUTION=1.0,
-        COLLISION_MERGE_ENABLE=True,
-        COLLISION_BOUNCE_ENABLE=True
-    ))
+    app.bootstrap(reset=False)
+    if not app.client.is_initialized:
+        populate(app)
+        app.client.init_sim(SimConfig(
+            DEFAULT_DT_BASE=1/30.0,
+            TARGET_TICKS_PER_SECOND=120,
+            SOFTENING_LENGTH=100.0,
+            COEF_OF_RESTITUTION=1.0,
+            COLLISION_MERGE_ENABLE=False,
+            COLLISION_BOUNCE_ENABLE=False
+        ))
     app.model.show_focused_history = True
     app.model.show_debug_info = True
     app.model.show_focus_info = True
+    app.model.show_grav_field = True
     app.relative_zoom(1/50.0)
     app.show_message("Ready.", duration=10.0, desc="Press [space] to start.")
 

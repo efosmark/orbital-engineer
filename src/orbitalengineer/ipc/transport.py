@@ -38,6 +38,6 @@ def recv_message(sock: socket.socket, message_enum:type[MessageType]) -> tuple[i
     try:
         payload = json.loads(payload_data)
     except json.decoder.JSONDecodeError as e:
-        print(f"{payload_data=!r}")
+        print(f"JSONDecodeError {payload_data=!r}")
         raise e
     return version, message_enum(raw_type), payload

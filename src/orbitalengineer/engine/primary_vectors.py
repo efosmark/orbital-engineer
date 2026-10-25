@@ -123,7 +123,6 @@ class PrimaryStateVectors:
             id_host[i] = np.uint32(i)
             id_to_index_host[i] = np.uint32(i)
             flags_host[i] = np.uint32(p.flags)
-            print(p.velocity)
             velocity[i] = dtypes.COMPLEX(p.velocity.real, p.velocity.imag)
             mass[i] = np.float32(p.mass)
             radius[i] = np.float32(p.radius)

@@ -24,7 +24,7 @@ class App(Gtk.Application):
     merging = GObject.Signal(name='merging', arg_types=(object,),)
     
     def __init__(self, platform_id=-1, device_id=-1):
-        super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)        
+        super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)        
 
         self.model = main.AppModel()
         self.client = ClientSocketConnection()
@@ -64,6 +64,7 @@ class App(Gtk.Application):
 
     def bootstrap(self, reset:bool=True):
         self.client.connect(reset=reset)
+        self.client.sync()
         self.client.sync_full_state()
 
     def show_message(self, message:str, duration:float=1, desc:str|None=None):
