@@ -128,9 +128,10 @@ class OrbitalControlServer:
         )
 
     def _get_status_response(self):
-        gpu_status = None
         if hasattr(self.orbital, 'device'):
             gpu_status = self.orbital.device.gpu_status()
+        else:
+            gpu_status = message.DeviceStatus((-1, -1), 'n/a', 'n/a', 0, 0, 0)
         
         return message.StatusResponse(
             initialized=self.orbital.is_initialized,

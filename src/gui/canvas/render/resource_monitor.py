@@ -1,8 +1,7 @@
 from collections import deque
 import time
 
-from orbitalengineer.engine.device import DeviceStatus
-from orbitalengineer.ipc.message import HostStatus
+from orbitalengineer.ipc.message import HostStatus, DeviceStatus
 from gui.canvas import sparkline, renderer
 
 MARGIN = 35

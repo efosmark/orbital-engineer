@@ -3,7 +3,6 @@ from enum import IntEnum
 from typing import Literal, Self, Sequence, Protocol
 
 from orbitalengineer import body
-from orbitalengineer.engine.device import DeviceStatus
 from orbitalengineer.engine.sim_config import SimConfig
 from orbitalengineer.ipc.clock import SimClock
 
@@ -134,6 +133,26 @@ class HostStatus:
     id: int
     utilization: float|None
     temperature: float|None = None
+
+@dataclass
+class DeviceStatus:
+    id: tuple[int,int]
+    name:str
+    platform:str
+    utilization: float|None
+    temperature: float|None
+    power_watts: float|None
+    
+    @classmethod
+    def from_dict(cls, d:dict) -> Self:
+        return cls(
+            id=d['id'],
+            name=d['name'],
+            platform=d['platform'],
+            utilization=d['utilization'],
+            temperature=d['temperature'],
+            power_watts=d['power_watts']
+        )
 
 @dataclass
 class StatusResponse:

@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Self, cast
 import pyopencl as cl
 
+from orbitalengineer.ipc import message
+
 def read_int(p: Path):
     try:
         return int(p.read_text().strip())
@@ -51,25 +53,6 @@ def get_amd_drm_card(platform_id: int, device_id: int) -> int | None:
             return int(card.name.removeprefix("card"))
     return None
 
-@dataclass
-class DeviceStatus:
-    id: tuple[int,int]
-    name:str
-    platform:str
-    utilization: float|None
-    temperature: float|None
-    power_watts: float|None
-    
-    @classmethod
-    def from_dict(cls, d:dict) -> Self:
-        return cls(
-            id=d['id'],
-            name=d['name'],
-            platform=d['platform'],
-            utilization=d['utilization'],
-            temperature=d['temperature'],
-            power_watts=d['power_watts']
-        )
 
 class CLDeviceManager:
     
@@ -116,7 +99,7 @@ class CLDeviceManager:
         avg_temp = None
         if temps:
             avg_temp = sum(temps.values()) / len(temps)
-        return DeviceStatus(
+        return message.DeviceStatus(
             (self.platform_id, self.device_id),
             self.opencl_platform_name,
             self.opencl_device_name,

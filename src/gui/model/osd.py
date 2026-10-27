@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 import time
-from typing import Any
 from gui.gtk4 import GObject
 
 

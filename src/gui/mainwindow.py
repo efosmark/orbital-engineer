@@ -1,7 +1,6 @@
 from typing import Any, cast
 
 from gui import canvas
-from gui.audio.synth import ToneSynthController
 from gui.gtk4 import Gtk, Gio, GLib, GObject
 from gui.model.main import AppModel
 from orbitalengineer.ipc.clock import SimClock

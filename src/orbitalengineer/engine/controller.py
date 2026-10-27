@@ -27,7 +27,6 @@ from orbitalengineer.engine.position.position import PositionPipeline
 from orbitalengineer.engine.velocity.velocity import VelocityPipeline
 from orbitalengineer.engine.bounce.bounce import BouncePipeline
 from orbitalengineer.engine.velocity_along_normal.velocity_along_normal import VelocityAlongNormalPipeline
-from orbitalengineer.ipc import message
 
 mf = cl.mem_flags
 kernel_dir = Path(__file__).parent

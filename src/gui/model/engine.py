@@ -5,7 +5,6 @@ from numpy.typing import NDArray
 from gui.gtk4 import GObject
 
 from orbitalengineer import dtypes, body
-from orbitalengineer.engine.device import DeviceStatus
 from orbitalengineer.engine.primary_vectors import HasStateVectors
 from orbitalengineer.engine.sim_config import SimConfig
 from orbitalengineer.ipc import message
@@ -86,10 +85,12 @@ class EngineModel(GObject.GObject):
         self.clock_speed = SPEED_SCALE[idx]
 
     def pause(self):
-        self.clock_running = False
+        if self.clock_running:
+            self.clock_running = False
     
     def unpause(self):
-        self.clock_running = True
+        if not self.clock_running:
+            self.clock_running = True
 
     def __iter__(self):
         for i in self.valid_indices:

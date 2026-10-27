@@ -3,7 +3,6 @@ from gui.model import main
 from gui.canvas import pz
 from gui.gtk4 import GObject, Graphene
 
-from orbitalengineer.ipc.client import ClientSocketConnection
 
 class Renderer(GObject.GObject):
     app:main.AppModel = GObject.Property(type=object) # type:ignore

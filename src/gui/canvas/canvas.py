@@ -7,13 +7,14 @@ import numpy as np
 from orbitalengineer import flags
 
 from gui.ui_config import DRAW_INTERVAL
-from gui.canvas.render.event_ledger import EventLedgerRenderer
+from gui.gtk4 import Gtk, Gdk, Graphene
 from gui.model import main
+from gui.canvas.pz import Camera2D, Camera2DController
+
+from gui.canvas.render.event_ledger import EventLedgerRenderer
 from gui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
 from gui.canvas.render.resource_monitor import ResourceMonitorRenderer
 from gui.canvas.render.osd import OSDRenderer
-from gui.gtk4 import Gtk, Gdk, Graphene
-from gui.canvas.pz import Camera2D, Camera2DController
 from gui.canvas.render.hud_clock import HudClockRenderer
 from gui.canvas.render.warning import WarningRenderer
 from gui.canvas.render.selection import SelectionRenderer
@@ -28,9 +29,6 @@ from gui.canvas.render.particle import ParticleRenderer
 from gui.canvas.render.pinpoint import PinpointRenderer
 from gui.canvas.render.reticle import ReticleRenderer
 from gui.canvas.render.gravfield import GravFieldRenderer
-
-from orbitalengineer.ipc.client import ClientSocketConnection
-from orbitalengineer.ipc.clock import SimClock
 
 HOVER_MARGIN = 15
 DRAG_MARGIN = 50

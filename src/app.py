@@ -13,9 +13,9 @@ cmap = plt.colormaps['gist_rainbow']
 SOL_COLOR = (1.0, 0.98, 0.45, 1.0)
 
 def populate(app: App):
-    N = 1024 * 3
-    mass_min, mass_max =    100, 40_000
-    dist_min, dist_max =  1_000, 30_000
+    N = 1024
+    mass_min, mass_max =    100, 100_000
+    dist_min, dist_max = 10_000,  30_000
     
     sol = create_primary(mass=1e7, flags=flags.MERGE|flags.FIXED_RADIUS)
     app.insert_particle(sol, color=SOL_COLOR)

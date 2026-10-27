@@ -22,6 +22,7 @@ class EventLedgerRenderer(renderer.Renderer):
         cr.move_to(0, 0)
         
         for i, le in enumerate(reversed(self.app.ledger.get_entries())):
+            if le.start is None: continue
             cr.set_source_rgba(*TEXT_COLOR, 1.0 - ((time.monotonic() - le.start)/DISPLAY_DURATION))
             cr.move_to(0, (FONT_SIZE + 2) * -i)
             cr.show_text(str(le))

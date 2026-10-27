@@ -12,7 +12,6 @@ from numpy.typing import NDArray
 
 from orbitalengineer import dtypes, flags, body
 from orbitalengineer.engine import config, logger
-from orbitalengineer.engine.device import DeviceStatus
 from orbitalengineer.engine.sim_config import SimConfig
 from orbitalengineer.ipc import message, transport
 from orbitalengineer.ipc.clock import SimClock
@@ -33,7 +32,7 @@ class ClientSocketConnection:
     dt_step:float = config.DEFAULT_DT_BASE
     
     cfg:SimConfig = SimConfig()
-    gpu_status:DeviceStatus
+    gpu_status:message.DeviceStatus
     cpu_status:message.HostStatus
     
     buffer_id:Literal['A']|Literal['B']
@@ -64,6 +63,7 @@ class ClientSocketConnection:
     def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.clock = SimClock()
+        self.errors = []
         self._prev = None
         self._uninitialized_bodies:list[body.Body] = []
 
@@ -185,7 +185,7 @@ class ClientSocketConnection:
         elif message_type == transport.MessageType.ERROR:
             req = message.ErrorResponse(**payload)
             logger.error(req.error_message)
-            # TODO: Emit the error so it can be displayed by the interface
+            self.errors.append(req.error_message)
             return False
         
         return False
