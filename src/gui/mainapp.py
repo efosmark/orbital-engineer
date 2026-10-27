@@ -1,10 +1,8 @@
 from orbitalengineer import flags, body
-from gui import ui_config
-from gui.audio.synth import ToneSynthController
-from gui.client_sync import ClientSyncController
-from gui.controller.cmap_ctl import ColorizedMapController
-from gui.controller.ledger_ctl import LedgerMonitor
+from gui import ui_config, orbitapp
 from gui.model import main
+from gui.audio.synth import ToneSynthController
+from gui.controller.cmap_ctl import ColorizedMapController
 from gui.select_device_window import SelectDeviceWindow
 from gui.canvas import pz
 from gui.mainwindow import MainWindow
@@ -12,60 +10,25 @@ from gui.gtk4 import Gtk, Gio, GObject, GLib
 from gui.keyinput import KeyInput
 
 from orbitalengineer.engine import logger
-from orbitalengineer.ipc.client import ClientSocketConnection
 
-
-class App(Gtk.Application):
-    platform_id = GObject.Property(type=int, default=-1)
-    device_id = GObject.Property(type=int, default=-1)
-    
-    tick = GObject.Signal(name='tick', arg_types=(int,),)
-    bouncing = GObject.Signal(name='bouncing', arg_types=(object,),)
-    merging = GObject.Signal(name='merging', arg_types=(object,),)
+class App(orbitapp.OrbitApp):
     
     def __init__(self, platform_id=-1, device_id=-1):
-        super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)        
-
+        super().__init__(platform_id, device_id)
         self.model = main.AppModel()
-        self.client = ClientSocketConnection()
-        self.sync_ctl = ClientSyncController(self.client, self.model.engine)
-        self.cmap_ctl = ColorizedMapController(self.model)
-
-        self.ledger_ctl = LedgerMonitor(self.model, self.model.ledger)
-        self.ledger_ctl.connect('new-entry', self.on_ledger_entry_added)
+        self.model.engine = self.engine_model
+        self.model.ledger = self.ledger_model
         
+        self.cmap_ctl = ColorizedMapController(self.model)
         self.camera = pz.Camera2D()
         self.synth = ToneSynthController()
         
-        self.model.engine.connect("notify::paused", self.on_paused_changed)
-        self.model.engine.connect("notify::clock-speed", self.on_speed_changed)
-        self.model.engine.connect("notify::max-speed", self.on_max_speed_changed)
+        self.engine_model.connect("notify::paused", self.__on_paused_changed)
+        self.engine_model.connect("notify::clock-speed", self.on_speed_changed)
         self.model.connect("notify::show-grid", self.on_show_grid_changed)
         self.model.cmap.connect('notify::option', self.on_color_map_changed)
         self.model.cmap.connect('notify::gamma', self.on_color_map_changed)
         self.model.cmap.connect('notify::colormap', self.on_color_map_changed)
-        self.model.engine.paused = True
-        self.platform_id = platform_id
-        self.device_id = device_id
-        self.client.set_device(platform_id, device_id)
-
-        self.model.engine.connect("notify::tick-id", self.on_sim_tick_changed)
-
-    def on_sim_tick_changed(self, m, tick_id):
-        self.emit("tick", self.model.engine.tick_id)
-
-    def on_ledger_entry_added(self, m, le):
-        if le.action&flags.BOUNCE:
-            self.emit('bouncing', le)
-        elif (le.action&flags.MERGE_AS_PRIMARY) or (le.action&flags.MERGE_AS_SECONDARY):
-            if le.i == self.model.secondary_body and (le.action&flags.REMOVED):
-                self.shift_focus(le.j)
-            self.emit('merging', le)
-
-    def bootstrap(self, reset:bool=True):
-        self.client.connect(reset=reset)
-        self.client.sync()
-        self.client.sync_full_state()
 
     def show_message(self, message:str, duration:float=1, desc:str|None=None):
         self.model.osd.add_message(message, duration=duration, desc=desc)
@@ -77,46 +40,29 @@ class App(Gtk.Application):
         desc = None
         if mapping_type is not None:
             desc = f"Color map: {colormap}    Gamma: {self.model.cmap.gamma:.2f}"
-        
         self.model.osd.add_message(f"Showing: {mapping_type.name if mapping_type else 'Normal'}", desc=desc)
-
-    def on_max_speed_changed(self, model, param):
-        #if self.view.max_speed < self.view.speed:
-        #    self.view.props.speed = self.view.max_speed
-        ...
 
     def on_show_grid_changed(self, model, param):
         grid_state = "On" if self.model.show_grid else "Off"
         self.model.osd.add_message(f"Grid: {grid_state}")
 
-    def on_paused_changed(self, model, param):
-        self._toggle_paused()
-        if self.model.engine.paused:
-            if self.model.engine.tick_id > 0:
+    def __on_paused_changed(self, model, param):
+        if self.engine_model.tick_id <= 0: return
+        if self.engine_model.paused:
+            if self.engine_model.tick_id > 0:
                 self.model.osd.add_message("Paused", duration=3.0)
         else:
             self.model.osd.add_message("Running")
     
     def on_speed_changed(self, model, param):
-        speed = self.model.engine.clock_speed
+        if self.engine_model.tick_id <= 0: return
+        speed = self.engine_model.clock_speed
         precision = 1 if speed >= 0.1 else 2
         f_cur_speed = f"{speed:.{precision}f}"
         self.model.osd.add_message(f"Speed: {f_cur_speed}x")
-    
-    def _toggle_paused(self):
-        if self.model.engine.paused:
-            self.client.stop()
-        else:
-            self.client.start()
 
     def insert_particle(self, particle:body.Body, color:tuple[float, float, float, float]=(1,1,1,1)) -> int:
-        idx = self.client.add_particle(
-            position=particle.position,
-            velocity=particle.velocity,
-            mass=particle.mass,
-            radius=particle.radius,
-            flags=particle.flags
-        )
+        idx = super().insert_particle(particle)
         self.model.particle_colors[idx] = random_color() if color is None else color
         self.model.particle_names[idx] = f"body-{idx}"
         return idx
@@ -161,18 +107,6 @@ class App(Gtk.Application):
             return
         self.model.secondary_body = particle_id
         self.model.osd.add_message(f"Focus: {particle_id}", duration=0.5)
-
-    def tick_once(self):
-        if not hasattr(self, '_last_tick'):
-            self._last_tick = None
-        if self._last_tick is None or self.client.tick_id > self._last_tick:
-            self._last_tick = self.client.tick_id
-            self.model.osd.add_message("Tick", duration=0.25)
-            GLib.idle_add(self.client.tick_once)
-
-    def substep_once(self):
-        self.model.osd.add_message("Sub-step", duration=0.25)
-        self.client.substep_once()
     
     def relative_zoom(self, factor):
         self.camera.zoom_at(0, 0, 0, 0, factor)

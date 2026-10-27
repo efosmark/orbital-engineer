@@ -3,7 +3,6 @@ from gui.model import main
 from gui.canvas import pz
 from gui.gtk4 import GObject, Graphene
 
-from orbitalengineer.ipc.clock import SimClock
 from orbitalengineer.ipc.client import ClientSocketConnection
 
 class Renderer(GObject.GObject):
@@ -11,12 +10,11 @@ class Renderer(GObject.GObject):
     camera = GObject.Property(type=object)
     orbital:ClientSocketConnection = GObject.Property(type=object) # type:ignore
     
-    def __init__(self, view:main.AppModel, camera:pz.Camera2D, orbital:ClientSocketConnection, clock:SimClock):
+    def __init__(self, view:main.AppModel, camera:pz.Camera2D, orbital:ClientSocketConnection):
         super().__init__()
         self.app = view
         self.camera = camera
         self.orbital = orbital
-        self.clock = clock
         self.initialize()
         
     def get_cairo(self, snapshot, width, height):

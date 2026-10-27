@@ -102,7 +102,7 @@ class ReticleRenderer(renderer.Renderer):
     def draw(self, cr:cairo.Context, width:int, height:int):
         if self.app.secondary_body is None: return
         
-        body = self.orbital.get_particle(self.app.secondary_body)
+        body = self.app.engine.get_particle(self.app.secondary_body)
 
         cr.select_font_face(ui_config.DEFAULT_FONT_FAMILY, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(ui_config.DEFAULT_FONT_SIZE/self.camera.zoom)

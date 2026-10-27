@@ -9,7 +9,7 @@ class PinpointRenderer(renderer.Renderer):
         if len(self.app.pinpoint) == 0:
             return
                 
-        now = self.orbital.clock.time()
+        now = self.app.engine.clock_time
         existing_pinpoint = []
         for p in self.app.pinpoint:
             if 0 < p.until < now:

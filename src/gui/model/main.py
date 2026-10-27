@@ -1,18 +1,16 @@
-from typing import Any
-
-from gui.client_sync import EngineModel
+from gui.controller.client_sync import EngineModel
 from gui.gtk4 import GObject
 from gui.model.ledger import LedgerModel
 from gui.model.osd import OnScreenDisplayModel
 from gui.model.cmap import ColorMapModel
 
 class AppModel(GObject.GObject):
-    props:Any
     
-    osd:OnScreenDisplayModel
     engine:EngineModel
-    cmap:ColorMapModel
     ledger:LedgerModel
+    
+    cmap:ColorMapModel
+    osd:OnScreenDisplayModel
     
     secondary_body = GObject.Property(type=object, default=None)
     follow_tracked_body = GObject.Property(type=bool, default=True)
@@ -46,13 +44,11 @@ class AppModel(GObject.GObject):
     
     def __init__(self):
         super().__init__()
-        self.engine = EngineModel()
         self.osd = OnScreenDisplayModel()
         self.cmap = ColorMapModel()
-        self.ledger = LedgerModel()
         
-        self.props.particle_colors = {}
-        self.props.particle_names = {}
-        self.props.hover_position = (0, 0)
-        self.props.hovered_over_particle = None
-        self.props.fps = 1.0
+        self.particle_colors = {}
+        self.particle_names = {}
+        self.hover_position = (0, 0)
+        self.hovered_over_particle = None
+        self.fps = 1.0

@@ -86,13 +86,13 @@ class GravFieldRenderer(renderer.Renderer):
 
     def draw(self, cr:cairo.Context, width:int, height:int):
         if not self.app.show_grav_field: return
-        N = self.orbital.N
+        N = self.app.engine.N
         num_cols = math.ceil(width / RESOLUTION)
         num_rows = math.ceil(height / RESOLUTION)
         x_origin, y_origin = self.camera.screen_to_world(0, 0, width, height)
         x_max, y_max = self.camera.screen_to_world(width, height, width, height)
-        mass = self.orbital.mass
-        position = self.orbital.position
+        mass = self.app.engine.mass
+        position = self.app.engine.position
         
         now = time.monotonic()
         if self.forces is None or now - self.last_computed_at > 0.25:
@@ -102,7 +102,7 @@ class GravFieldRenderer(renderer.Renderer):
             
             compute_forces(self.forces, N, num_cols, num_rows, x_origin, y_origin, x_max, y_max, RESOLUTION/self.camera.zoom, position, mass)
             self.forces_min = min_nonzero(self.forces.flatten())/2.0
-            self.forces_max = max((np.abs(force(np.float32(1), mass[i], 1, np.float32(1.0))) for i in range(self.orbital.N)))
+            self.forces_max = max((np.abs(force(np.float32(1), mass[i], 1, np.float32(1.0))) for i in range(self.app.engine.N)))
         
         y_offset = 0
         x_offset = 0

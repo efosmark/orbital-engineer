@@ -16,12 +16,11 @@ class OSDMessage:
 
 
 class OnScreenDisplayModel(GObject.GObject):
-    props:Any
     osd_message = GObject.Property(type=object)
     
     def __init__(self):
         super().__init__()
-        self.props.osd_message = []
+        self.osd_message = []
         self._current_message = None     
 
     def add_message(self, message:str, duration:float=1, category:str|None=None, desc:str|None=None):

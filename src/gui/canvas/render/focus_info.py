@@ -122,7 +122,7 @@ class FocusInfoRenderer(renderer.Renderer):
         if self.app.hovered_over_particle is not None:
             b = self.app.hovered_over_particle
         elif self.app.secondary_body is not None:
-            b = self.orbital.get_particle(self.app.secondary_body)
+            b = self.app.engine.get_particle(self.app.secondary_body)
         else:
             return
         
@@ -144,14 +144,14 @@ class FocusInfoRenderer(renderer.Renderer):
         disp.extend([
             ("Velocity",  f"{mag_format(mag)} m/s"),
             ("Heading",   f"{angle_degrees:.1f}°"),
-            ("Group",     f"{self.orbital.cgroup[b.index]}"),
-            ("KE",        f"{mag_format(self.orbital.kinetic_energy[b.index])}J"),
-            ("Grav. PE",  f"{mag_format(self.orbital.grav_potential_energy[b.index])}J")
+            ("Group",     f"{self.app.engine.cgroup[b.index]}"),
+            ("KE",        f"{mag_format(self.app.engine.kinetic_energy[b.index])}J"),
+            ("Grav. PE",  f"{mag_format(self.app.engine.grav_potential_energy[b.index])}J")
         ])
         
-        n_contacting = self.orbital.n_direct_contacts[b.index]
-        offset = self.orbital.N * b.index
-        contacting = sorted(self.orbital.direct_contacts[offset:offset+n_contacting])
+        n_contacting = self.app.engine.n_direct_contacts[b.index]
+        offset = self.app.engine.N * b.index
+        contacting = sorted(self.app.engine.direct_contacts[offset:offset+n_contacting])
         if n_contacting > 0:
             disp.append(("In Contact", ",".join([str(c) for c in contacting])))
         
@@ -163,7 +163,7 @@ class FocusInfoRenderer(renderer.Renderer):
             for label, value in disp
         ])
         
-        focus = orbit.get_focus(b.index, self.orbital.N, self.orbital.force, self.app.engine)
+        focus = orbit.get_focus(b.index, self.app.engine.N, self.app.engine.force, self.app.engine)
         if focus is None: return
         
         primary, influence = focus

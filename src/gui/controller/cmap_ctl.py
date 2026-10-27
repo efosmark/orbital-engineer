@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from matplotlib import colors
 import matplotlib.pyplot as plt
@@ -5,6 +7,8 @@ import matplotlib.pyplot as plt
 from orbitalengineer.engine import logger
 from gui.model.main import AppModel
 from gui.model.cmap import OPT_KE, OPT_MASS, OPT_MOMENTUM, OPT_GPE, OPT_TE
+
+UPDATE_INTERVAL = 0.25
 
 class ColorizedMapController:
     original_colors:dict|None = None
@@ -21,14 +25,19 @@ class ColorizedMapController:
         self.app.engine.connect('notify::tick-id', self.on_color_map_changed)
     
     def on_color_map_changed(self, _model, param):
+        now = time.monotonic()
+        if self.last_time is not None and now - self.last_time < UPDATE_INTERVAL:
+            return
+        self.last_time = now
+        
         if self.model.option is None or self.model.colormap is None:
             if self.original_colors is not None:
-                self.app.props.particle_colors = self.original_colors
+                self.app.particle_colors = self.original_colors
                 self.original_colors = None
             return
         
         if self.original_colors is None:
-            self.original_colors = dict(self.app.props.particle_colors)
+            self.original_colors = dict(self.app.particle_colors)
         if self.colors is None:
             self.colors = dict()
         
@@ -60,4 +69,4 @@ class ColorizedMapController:
         
         for b in self.app.engine.valid_indices:
             self.colors[b] = cmap(norm(values[b]) * 0.95 + 0.05)
-            self.app.props.particle_colors[b] = self.colors[b]
+            self.app.particle_colors[b] = self.colors[b]

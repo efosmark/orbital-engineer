@@ -23,7 +23,7 @@ class HudClockRenderer(renderer.Renderer):
         self._last_tick = self.app.engine.tick_id
     
     def record_time_error(self):
-        if not self.orbital.clock.running or self.app.engine.tick_id == self._last_tick:
+        if self.app.engine.paused or self.app.engine.tick_id == self._last_tick:
             return
         time_error = self.app.engine.curr_tick_at - self.app.engine.next_tick_at
         if time_error < 0:
@@ -47,8 +47,7 @@ class HudClockRenderer(renderer.Renderer):
         speed = round(self.app.engine.clock_speed, 6)
         status = "  " if self.app.engine.paused else "▶"
 
-        txt = f"[{status}]   T+{format_time(self.clock.time())}   ({speed:.2f}x)"
-
+        txt = f"[{status}]   T+{format_time(self.app.engine.clock_time)}   ({speed:.2f}x)"
         te = cr.text_extents(txt)
         r_height = te.height + (Y_PADDING * 2)
         r_width = te.width + (X_PADDING * 2)
@@ -84,7 +83,7 @@ class HudClockRenderer(renderer.Renderer):
         
         meter_position_x = 0
         if time_error > 0:
-            time_error_steps = (time_error/self.orbital.dt_step)            
+            time_error_steps = (time_error/self.app.engine.dt_step)            
             x = time_error_steps
             log_val = math.log(x+1) / math.log(10)
             scaled = (log_val / (log_val + 1))

@@ -12,7 +12,7 @@ class SelectionRenderer(renderer.Renderer):
     def draw(self, cr:cairo.Context, width:int, height:int):
         cr.set_line_width(0.5)
         
-        if self.app.props.dragging_particle is not None:
+        if self.app.dragging_particle is not None:
             return
         
         if self.app.drag_start and self.app.drag_end:
@@ -29,10 +29,10 @@ class SelectionRenderer(renderer.Renderer):
             return
         
         cr.set_dash([])
-        valid_ids = self.orbital.get_valid_indices()
+        valid_ids = self.app.engine.get_valid_indices()
         for idx in self.app.selected_particles:
             if idx not in valid_ids: continue
-            b = self.orbital.get_particle(idx)
+            b = self.app.engine.get_particle(idx)
             radius = b.radius
             radius = max(radius, MIN_DISPLAY_RADIUS/self.camera.zoom)
             

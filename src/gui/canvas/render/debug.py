@@ -85,7 +85,7 @@ class DebugInfoRenderer(renderer.Renderer):
         
         display:list[DebugDisplayField|None] = []
         display.extend([
-            DebugDisplayField("Bodies", f"{self.orbital.get_valid_indices().size} / {int(num_bodies)}"),
+            DebugDisplayField("Bodies", f"{self.app.engine.get_valid_indices().size} / {int(num_bodies)}"),
             DebugDisplayField("Zoom",   zoom, 1),
         ])
 
@@ -105,7 +105,7 @@ class DebugInfoRenderer(renderer.Renderer):
         try:
             display.extend([
                 None,
-                DebugDisplayField('Tick #',   self.orbital.tick_id)
+                DebugDisplayField('Tick #',   self.app.engine.tick_id)
             ])
         except AttributeError:
             pass

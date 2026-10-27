@@ -164,7 +164,6 @@ class ClientSocketConnection:
 
     def _handle_response(self) -> bool:
         _, message_type, payload = transport.recv_message(self.s, transport.MessageType)
-        
         if message_type == transport.MessageType.SUCCESS:
             return True
         
@@ -200,26 +199,9 @@ class ClientSocketConnection:
     def set_device(self, platform_id:int, device_id:int):
         self.device = message.Device(platform_id, device_id)
 
-    def init_sim(self, cfg:SimConfig|None=None, *,
-        coef_of_restitution:float|None = None,
-        grav_constant:float|None = None,
-        eps_dist:float|None = None,
-        eps_time:float|None = None,
-        dv_max:float|None = None,
-        max_num_contacts_per_body:int|None = None,
-        enable_profiling:bool|None = None,
-        target_ticks_per_second:int|None = None,
-    ):
-        if cfg is None: cfg = SimConfig()
-        if coef_of_restitution is not None: cfg.COEF_OF_RESTITUTION = coef_of_restitution
-        if grav_constant is not None: cfg.GRAV_CONSTANT = grav_constant
-        if eps_dist is not None: cfg.EPS_DIST = eps_dist
-        if eps_time is not None: cfg.EPS_TIME = eps_time
-        if dv_max is not None: cfg.DV_MAX = dv_max
-        if max_num_contacts_per_body is not None: cfg.MAX_NUM_CONTACTS_PER_BODY = max_num_contacts_per_body
-        if enable_profiling is not None: cfg.ENABLE_PROFILING = enable_profiling
-        if target_ticks_per_second is not None: cfg.TARGET_TICKS_PER_SECOND = target_ticks_per_second
-        
+    def init_sim(self, cfg:SimConfig|None=None):
+        if cfg is None:
+            cfg = SimConfig()
         logger.info("Initializing sim with %s particles...", len(self._uninitialized_bodies))
         result = self.send_message(
             message.MessageType.INIT_REQ,
@@ -261,8 +243,7 @@ class ClientSocketConnection:
                 ids=ids,
                 op="add",
                 offset=(offset.real, offset.imag)
-            )
-        )
+            ))
 
     def rel_velocity(self, ids:Sequence[int], offset:complex):
         if not self.is_initialized: return False

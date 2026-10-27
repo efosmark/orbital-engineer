@@ -9,7 +9,7 @@ class HistoryRenderer(renderer.Renderer):
     def draw_history(self, cr:cairo.Context, sb_id):
         cr.save()
 
-        particle = self.orbital.get_particle(sb_id)
+        particle = self.app.engine.get_particle(sb_id)
         r,g,b,a = self.app.particle_colors[sb_id]
         
         num_positions = float(len(self.history_positions[sb_id]))

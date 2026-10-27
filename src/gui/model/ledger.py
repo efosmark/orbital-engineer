@@ -45,11 +45,12 @@ class LedgerModel(GObject.GObject):
         self.last_ledger_id = 0
         self.last_tick_checked = 0
 
-    def add_entry(self, entry):
+    def add_entry(self, entry) -> LedgerEntry:
         le = LedgerEntry.from_dtype(entry)
         le.start = time.monotonic()
         self.entries.append(le)
         self.notify('entries')
+        return le
     
     def prune(self):
         self.entries = [e for e in self.entries if e.start is None or e.start + DISPLAY_DURATION >= time.monotonic()]

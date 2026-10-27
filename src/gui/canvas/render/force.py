@@ -16,17 +16,17 @@ class ForceVectorRenderer(renderer.Renderer):
 
     def get_dash_offset(self, normalized_force:float) -> float:
         dash_speed = max(0.5, normalized_force * 2.0)
-        return -((self.orbital.tick_id*dash_speed) % sum(DASHES))/self.camera.zoom
+        return -((self.app.engine.tick_id*dash_speed) % sum(DASHES))/self.camera.zoom
 
     def draw(self, cr:cairo.Context, width:int, height:int):
         if not self.app.show_force_vectors or self.app.secondary_body is None:
             return
         
-        sb = self.orbital.get_particle(self.app.secondary_body)
+        sb = self.app.engine.get_particle(self.app.secondary_body)
         sb_pos = sb.position
         
         forces = []
-        for b in self.orbital:
+        for b in self.app.engine:
             pos = b.position
             f = abs(accel(np.float32(sb.mass), np.float32(b.mass), (sb_pos - pos), GRAV_DEFAULT))
             forces.append((b.index, pos, f))
@@ -37,8 +37,8 @@ class ForceVectorRenderer(renderer.Renderer):
             
             # com = center_of_mass_position(
             #     np.array([b_id, sb.idx], dtype=np.int64),
-            #     self.orbital.shm.mass[self.orbital.buffer_static],
-            #     self.orbital.shm.position[self.orbital.buffer_static]
+            #     self.app.engine.shm.mass[self.app.engine.buffer_static],
+            #     self.app.engine.shm.position[self.app.engine.buffer_static]
             # )
 
             cr.set_dash(

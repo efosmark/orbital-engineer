@@ -12,7 +12,7 @@ FONT_SIZE = 10
 class WarningRenderer(renderer.Renderer):
     
     def draw(self, cr, width:int, height:int):
-        step_overflow = (self.orbital.accum // self.orbital.cfg.DEFAULT_DT_BASE)
+        step_overflow = (self.app.engine.accum // self.app.engine.config.DEFAULT_DT_BASE)
         if step_overflow <= 10: return
 
         cr.select_font_face("Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)

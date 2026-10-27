@@ -9,9 +9,9 @@ from orbitalengineer.twobody import orbit
 class EllipseRenderer(renderer.Renderer):
 
     def draw_ellipse_for_body(self, cr:cairo.Context, body_id:int, faded:bool=False):
-        secondary = cast(body.Body, self.orbital.get_particle(body_id))
+        secondary = cast(body.Body, self.app.engine.get_particle(body_id))
         
-        focus = orbit.get_focus(body_id, self.orbital.N, self.orbital.force, self.app.engine)
+        focus = orbit.get_focus(body_id, self.app.engine.N, self.app.engine.force, self.app.engine)
         if focus is None: return
         
         primary, influence = focus
