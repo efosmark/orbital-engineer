@@ -37,10 +37,9 @@ DRAG_MARGIN = 50
 
 class MoveParticleController:
 
-    def __init__(self, canvas, camera, orbital:ClientSocketConnection, view_model:main.AppModel):
+    def __init__(self, canvas, camera, view_model:main.AppModel):
         self.canvas = canvas
         self.camera = camera
-        self.orbital = orbital
         self.app = view_model
             
         self._prev_dx = 0
@@ -107,7 +106,7 @@ class MoveParticleController:
             self._prev_dx = dx
             self._prev_dy = dy
             offset = complex(offset_x, offset_y)
-            self.orbital.rel_move(self.app.selected_particles, offset)
+            self.app.engine.rel_position(self.app.selected_particles, offset)
         
     def on_drag_end(self, gesture, start_x, start_y):
         self.app.dragging_particle = None
@@ -144,40 +143,39 @@ class OrbitalCanvas(Gtk.DrawingArea):
     last_draw_time:float = 0.0
     _cached_surface = None
 
-    def __init__(self, camera:Camera2D, app: main.AppModel, orbital:ClientSocketConnection, clock:SimClock):
+    def __init__(self, camera:Camera2D, app: main.AppModel):
         super().__init__()
         self.camera = camera
         self.app = app
-        self.clock = clock
         self.camera_ctl = Camera2DController(self, self.camera, self.app)
         self.mouse_controller = MouseController(self, self.camera, self.app)
-        self.move_particle_ctl = MoveParticleController(self, self.camera, orbital, self.app)
+        self.move_particle_ctl = MoveParticleController(self, self.camera, self.app)
         
         self.bg_renderers = [
-            BackgroundRenderer(self.app, self.camera, orbital),
-            GridRenderer(self.app, self.camera, orbital),
-            #EventLedgerRenderer(self.app, self.camera, orbital),
+            BackgroundRenderer(self.app, self.camera),
+            GridRenderer(self.app, self.camera),
+            #EventLedgerRenderer(self.app, self.camera),
         ]
         
         self.scene_renderers = [
-            HistoryRenderer(self.app, self.camera, orbital),
-            #ForceVectorRenderer(self.view, self.camera, orbital),
-            EllipseRenderer(self.app, self.camera, orbital),
-            ParticleRenderer(self.app, self.camera, orbital),
-            SelectionRenderer(self.app, self.camera, orbital),
-            ReticleRenderer(self.app, self.camera, orbital),
-            #PinpointRenderer(self.view, self.camera, orbital),
-            #CGroupRenderer(self.app, self.camera, orbital),
+            HistoryRenderer(self.app, self.camera),
+            #ForceVectorRenderer(self.view, self.camera),
+            EllipseRenderer(self.app, self.camera),
+            ParticleRenderer(self.app, self.camera),
+            SelectionRenderer(self.app, self.camera),
+            ReticleRenderer(self.app, self.camera),
+            #PinpointRenderer(self.view, self.camera),
+            #CGroupRenderer(self.app, self.camera),
         ]
         
         self.hud_fg_renderers = [
-            GravFieldRenderer(self.app, self.camera, orbital),
-            DebugInfoRenderer(self.app, self.camera, orbital),
-            FocusInfoRenderer(self.app, self.camera, orbital),
-            HudClockRenderer(self.app, self.camera, orbital),
-            ResourceMonitorRenderer(self.app, self.camera, orbital),
-            WarningRenderer(self.app, self.camera, orbital),
-            OSDRenderer(self.app, self.camera, orbital),
+            GravFieldRenderer(self.app, self.camera),
+            DebugInfoRenderer(self.app, self.camera),
+            FocusInfoRenderer(self.app, self.camera),
+            HudClockRenderer(self.app, self.camera),
+            ResourceMonitorRenderer(self.app, self.camera),
+            WarningRenderer(self.app, self.camera),
+            OSDRenderer(self.app, self.camera),
         ]
         
         click_controller = Gtk.GestureClick.new()

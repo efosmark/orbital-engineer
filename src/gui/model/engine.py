@@ -1,11 +1,14 @@
-from typing import cast
+from typing import Sequence, cast
 
 import numpy as np
 from numpy.typing import NDArray
 from gui.gtk4 import GObject
 
-from orbitalengineer import dtypes, flags, body
+from orbitalengineer import dtypes, body
+from orbitalengineer.engine.device import DeviceStatus
 from orbitalengineer.engine.primary_vectors import HasStateVectors
+from orbitalengineer.engine.sim_config import SimConfig
+from orbitalengineer.ipc import message
 
 _TENTHS = [v/10.0 for v in range(10)]
 _TENS = [
@@ -29,20 +32,22 @@ for i in range(10):
 
 class EngineModel(GObject.GObject): 
     
-    config = GObject.Property(type=object)
-       
-    tick_id = GObject.Property(type=int, default=0)
-    dt_step = GObject.Property(type=float, default=0)
-    is_initialized = GObject.Property(type=bool, default=False)
-    N = GObject.Property(type=int, default=0)
-    accum = GObject.Property(type=float, default=0)
-    valid_indices = GObject.Property(type=object)
+    shift_vector:GObject.Signal = GObject.Signal(name='shift-vector', arg_types=(object,),)
     
-    clock_running = GObject.Property(type=bool, default=False)
-    clock_speed = GObject.Property(type=float, default=1.0)
-    clock_time = GObject.Property(type=float, default=0.0)
-    curr_tick_at = GObject.Property(type=float, default=0.0)
-    next_tick_at = GObject.Property(type=float, default=0.0)
+    config:SimConfig = GObject.Property(type=object) #type:ignore
+    
+    tick_id:int = GObject.Property(type=int, default=0) #type:ignore
+    dt_step:float = GObject.Property(type=float, default=0) #type:ignore
+    is_initialized:bool = GObject.Property(type=bool, default=False) #type:ignore
+    N:int = GObject.Property(type=int, default=0) #type:ignore
+    accum:float = GObject.Property(type=float, default=0) #type:ignore
+    valid_indices:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
+    
+    clock_running:bool = GObject.Property(type=bool, default=False) #type:ignore
+    clock_speed:float = GObject.Property(type=float, default=1.0) #type:ignore
+    clock_time:float = GObject.Property(type=float, default=0.0) #type:ignore
+    curr_tick_at:float = GObject.Property(type=float, default=0.0) #type:ignore
+    next_tick_at:float = GObject.Property(type=float, default=0.0) #type:ignore
 
     id_to_index:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
     body_id:NDArray[np.uint32] = GObject.Property(type=object) #type:ignore
@@ -60,6 +65,9 @@ class EngineModel(GObject.GObject):
     grav_potential_energy:NDArray = GObject.Property(type=object) #type:ignore
     
     buffer_id = GObject.Property(type=str)
+
+    gpu_status:DeviceStatus = GObject.Property(type=object) #type:ignore
+    cpu_status:message.HostStatus = GObject.Property(type=object) #type:ignore
 
     def __init__(self):
         super().__init__()
@@ -108,3 +116,12 @@ class EngineModel(GObject.GObject):
         
         # Get the indices 
         return indices[mask]
+
+    def rel_position(self, ids:Sequence[int], offset:complex):
+        if not self.is_initialized: return False
+        self.emit('shift-vector', message.ShiftVectorsRequest(
+            vector_name='position',
+            ids=ids,
+            op="add",
+            offset=(offset.real, offset.imag)
+        ))

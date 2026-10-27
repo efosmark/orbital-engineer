@@ -8,13 +8,11 @@ from orbitalengineer.ipc.client import ClientSocketConnection
 class Renderer(GObject.GObject):
     app:main.AppModel = GObject.Property(type=object) # type:ignore
     camera = GObject.Property(type=object)
-    orbital:ClientSocketConnection = GObject.Property(type=object) # type:ignore
     
-    def __init__(self, view:main.AppModel, camera:pz.Camera2D, orbital:ClientSocketConnection):
+    def __init__(self, view:main.AppModel, camera:pz.Camera2D):
         super().__init__()
         self.app = view
         self.camera = camera
-        self.orbital = orbital
         self.initialize()
         
     def get_cairo(self, snapshot, width, height):

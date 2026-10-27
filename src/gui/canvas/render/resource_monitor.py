@@ -71,7 +71,7 @@ class ResourceMonitorRenderer(renderer.Renderer):
             start_y,
             width=GRAPH_WIDTH,
             height=GRAPH_HEIGHT,
-            label_format=f"Host Util {{value:.0f}}%   (core {self.orbital.cpu_status.id})",
+            label_format=f"Host Util {{value:.0f}}%   (core {self.app.engine.cpu_status.id})",
             label_color_hex=COLOR_HEX_HOST_UTIL_LABEL,
             bg_color_hex=COLOR_HEX_HOST_UTIL_BG,
             line_color_hex=COLOR_HEX_HOST_UTIL_LINE,
@@ -84,18 +84,18 @@ class ResourceMonitorRenderer(renderer.Renderer):
         
         t = time.monotonic()
         if t >= self.last_record_time + 0.25:
-            if self.orbital.gpu_status is not None:
-                self.device_history.append(self.orbital.gpu_status)
-            if self.orbital.cpu_status is not None:
-                self.cpu_history.append(self.orbital.cpu_status)
+            if self.app.engine.gpu_status is not None:
+                self.device_history.append(self.app.engine.gpu_status)
+            if self.app.engine.cpu_status is not None:
+                self.cpu_history.append(self.app.engine.cpu_status)
             self.last_record_time = t
 
         cr.save()
         graph_start_x = width - GRAPH_WIDTH - MARGIN
         graph_start_y = height - GRAPH_HEIGHT - MARGIN
-        if self.orbital.gpu_status is not None:
+        if self.app.engine.gpu_status is not None:
             self.draw_device_utilization(cr, graph_start_x, graph_start_y)
             graph_start_y = graph_start_y - GRAPH_HEIGHT - 5
-        if self.orbital.cpu_status is not None:
+        if self.app.engine.cpu_status is not None:
             self.draw_host_utilization(cr, graph_start_x, graph_start_y)
         cr.restore()

@@ -16,7 +16,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.clock = clock
         self.app_model = app_model
         
-        self.canvas = canvas.OrbitalCanvas(camera, app_model, ctl, self.clock)
+        self.canvas = canvas.OrbitalCanvas(camera, app_model)
         self.canvas.set_hexpand(True)
         self.canvas.set_vexpand(True)
         self.canvas.set_halign(Gtk.Align.FILL)

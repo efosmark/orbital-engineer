@@ -146,7 +146,7 @@ class StatusResponse:
     curr_tick_at: float
     next_tick_at: float
     dt_step: float
-    device_status: DeviceStatus|None
+    device_status: DeviceStatus
     host_status: HostStatus
     buffer:Literal['A']|Literal['B']
 
@@ -162,7 +162,7 @@ class StatusResponse:
             curr_tick_at=d['curr_tick_at'],
             next_tick_at=d['next_tick_at'],
             dt_step=d['dt_step'],
-            device_status=DeviceStatus(**d['device_status']) if d['device_status'] is not None else None,
+            device_status=DeviceStatus(**d['device_status']),
             host_status=HostStatus(**d['host_status']),
             buffer=d['buffer']
         )

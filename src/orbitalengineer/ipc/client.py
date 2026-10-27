@@ -33,7 +33,7 @@ class ClientSocketConnection:
     dt_step:float = config.DEFAULT_DT_BASE
     
     cfg:SimConfig = SimConfig()
-    gpu_status:DeviceStatus|None
+    gpu_status:DeviceStatus
     cpu_status:message.HostStatus
     
     buffer_id:Literal['A']|Literal['B']
@@ -74,12 +74,6 @@ class ClientSocketConnection:
         logger.info("Connected to %s %s", host, port)
         if reset:
             self.send_message(message.MessageType.RESET)
-
-    def reconnect(self):
-        self.connect(host=self._host, port=self._port, reset=False)
-    
-    #def disconnect(self):
-    #    return self.send_message(message.MessageType.DISCONNECT)
 
     def get_valid_indices(self) -> NDArray:
         if not self.is_initialized:
@@ -233,17 +227,17 @@ class ClientSocketConnection:
             return False
         return self.send_message(message.MessageType.SYNC_REQ, message.SyncRequest(self.buffer_id))
 
-    def rel_move(self, ids:Sequence[int], offset:complex):
-        if not self.is_initialized:
-            return False
-        self.send_message(
-            message.MessageType.SHIFT_VECTOR_REQ,
-            message.ShiftVectorsRequest(
-                vector_name='position',
-                ids=ids,
-                op="add",
-                offset=(offset.real, offset.imag)
-            ))
+    def shift_vector(self, svr: message.ShiftVectorsRequest):
+        if not self.is_initialized: return False
+        self.send_message(message.MessageType.SHIFT_VECTOR_REQ, svr)
+
+    def rel_position(self, ids:Sequence[int], offset:complex):
+        return self.shift_vector(message.ShiftVectorsRequest(
+            vector_name='position',
+            ids=ids,
+            op="add",
+            offset=(offset.real, offset.imag)
+        ))
 
     def rel_velocity(self, ids:Sequence[int], offset:complex):
         if not self.is_initialized: return False
