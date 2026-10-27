@@ -21,10 +21,9 @@ class OrbitApp(Gtk.Application):
     
     def __init__(self, platform_id=-1, device_id=-1, reset:bool=False):
         super().__init__(application_id=ui_config.APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)        
-        
+        self._should_reset_on_connect = reset        
         self.platform_id = platform_id
         self.device_id = device_id
-        self._should_reset_on_connect = reset
         
         self.client = ClientSocketConnection()
         self.client.set_device(platform_id, device_id)
@@ -40,7 +39,6 @@ class OrbitApp(Gtk.Application):
         self.engine_model.connect("notify::paused", self.__on_paused_changed)
 
         self.connect('activate', self.__on_activate)
-
 
     def __on_sim_tick_changed(self, m, tick_id):
        self.emit("tick", self.engine_model.tick_id)

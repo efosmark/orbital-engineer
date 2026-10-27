@@ -1,14 +1,12 @@
-from orbitalengineer import flags, body
 from gui import ui_config, orbitapp
 from gui.model import main
-from gui.audio.synth import ToneSynthController
 from gui.controller.cmap_ctl import ColorizedMapController
 from gui.select_device_window import SelectDeviceWindow
 from gui.canvas import pz
 from gui.mainwindow import MainWindow
-from gui.gtk4 import Gtk, Gio, GObject, GLib
 from gui.keyinput import KeyInput
 
+from orbitalengineer import body
 from orbitalengineer.engine import logger
 
 class App(orbitapp.OrbitApp):
@@ -21,7 +19,6 @@ class App(orbitapp.OrbitApp):
         
         self.cmap_ctl = ColorizedMapController(self.model)
         self.camera = pz.Camera2D()
-        self.synth = ToneSynthController()
         
         self.engine_model.connect("notify::paused", self.__on_paused_changed)
         self.engine_model.connect("notify::clock-speed", self.on_speed_changed)
@@ -36,7 +33,6 @@ class App(orbitapp.OrbitApp):
     def on_color_map_changed(self, model, param):
         mapping_type = self.model.cmap.option
         colormap = self.model.cmap.colormap
-        
         desc = None
         if mapping_type is not None:
             desc = f"Color map: {colormap}    Gamma: {self.model.cmap.gamma:.2f}"
@@ -74,8 +70,7 @@ class App(orbitapp.OrbitApp):
             camera=self.camera,
             app_model=self.model,
             ctl=self.client,
-            clock=self.client.clock,
-            synth=self.synth
+            clock=self.client.clock
         )
         self.key_input = KeyInput(self, win)
         win.present()

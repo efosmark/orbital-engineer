@@ -29,7 +29,7 @@ class SelectionRenderer(renderer.Renderer):
             return
         
         cr.set_dash([])
-        valid_ids = self.app.engine.get_valid_indices()
+        valid_ids = self.app.engine.valid_indices
         for idx in self.app.selected_particles:
             if idx not in valid_ids: continue
             b = self.app.engine.get_particle(idx)

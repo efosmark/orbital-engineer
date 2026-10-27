@@ -125,7 +125,7 @@ class KeyInput(GObject.GObject):
         return False
 
     def cycle_particles(self, direction:int):
-        valid_indices:list = self.mainapp.client.get_valid_indices().tolist()
+        valid_indices:list = self.mainapp.model.engine.valid_indices.tolist()
         try:
             idx_current = valid_indices.index(self.app.secondary_body)
             idx_new = idx_current + direction

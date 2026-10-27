@@ -1,5 +1,3 @@
-from typing import Any
-
 from gui.ui_config import SYNC_RATE_MS
 from gui.gtk4 import GObject, GLib
 from orbitalengineer.ipc.client import ClientSocketConnection
@@ -11,7 +9,7 @@ class ClientSyncController(GObject.GObject):
         super().__init__()
         self.client = client
         
-        self.model = model        
+        self.model = model
         self.model.connect('notify::clock-speed', self.on_clock_speed_changed)
         GLib.timeout_add(SYNC_RATE_MS, self.sync)
         
@@ -21,17 +19,19 @@ class ClientSyncController(GObject.GObject):
         except ConnectionResetError:
             raise SystemExit
         
+        self.model.clock_time = self.client.clock.time()
+        
         if self.model.is_initialized != self.client.is_initialized:
             self.model.is_initialized = self.client.is_initialized
 
-        if not self.client.is_initialized: return
+        if not self.client.is_initialized:
+            return
         
         if self.model.paused != (not self.client.clock.running):
            self.model.paused = not self.client.clock.running
         
         if self.model.clock_speed != self.client.clock.speed:
             self.model.clock_speed = self.client.clock.speed
-            self.model.notify('clock-speed')
         
         try:
             if self.model.config is None and self.client.config is not None:
@@ -39,16 +39,20 @@ class ClientSyncController(GObject.GObject):
                 self.model.notify('config')
         except AttributeError:
             ...
-        self.model.clock_time = self.client.clock.time()
+            
         if self.model.tick_id != self.client.tick_id:
             self.model.tick_id = self.client.tick_id
+        
         if self.model.dt_step != self.client.dt_step:
             self.model.dt_step = self.client.dt_step
-        self.model.N = self.client.N
+        
+        if self.model.N != self.client.N:
+            self.model.N = self.client.N
+        
         self.model.accum = self.client.accum
-
         self.model.curr_tick_at = self.client.curr_tick_at
         self.model.next_tick_at = self.client.next_tick_at
+    
         self.model.valid_indices = self.client.get_valid_indices()
         self.model.notify('valid-indices')
         

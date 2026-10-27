@@ -61,6 +61,10 @@ class EngineModel(GObject.GObject):
     
     buffer_id = GObject.Property(type=str)
 
+    def __init__(self):
+        super().__init__()
+        self.valid_indices = np.ndarray([], dtype=np.uint32)
+
     def increase_speed(self):
         idx = SPEED_SCALE.index(self.clock_speed) + 1
         if idx >= len(SPEED_SCALE):
@@ -80,22 +84,17 @@ class EngineModel(GObject.GObject):
         self.paused = False
 
     def __iter__(self):
-        for i in self.get_valid_indices():
+        for i in self.valid_indices:
             yield self.get_particle(int(i))
 
     def get_particle(self, particle_id:int) -> body.Body:
         return body.Body(vec=cast(HasStateVectors, self), index=particle_id)
 
-    def get_valid_indices(self) -> NDArray:
-        if not self.is_initialized:
-            return np.empty(0, dtype=np.uint32)
-        return np.where((self.flags & flags.REMOVED) != flags.REMOVED)[0]
-
     def find_bodies_at(self, x:float, y:float, margin:float=10):
         if not self.is_initialized:
             return np.empty(0, dtype=np.uint32)
         
-        indices = self.get_valid_indices()
+        indices = self.valid_indices
         
         # Apply a bit of margin to the radius (e.g. if a radius is too small, it cant be clicked)
         radius = self.radius[indices] + margin

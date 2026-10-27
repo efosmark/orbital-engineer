@@ -10,7 +10,7 @@ class HistoryRenderer(renderer.Renderer):
         cr.save()
 
         particle = self.app.engine.get_particle(sb_id)
-        r,g,b,a = self.app.particle_colors[sb_id]
+        r,g,b,a = self.app.particle_colors.get(sb_id, (1, 1, 1, 1))
         
         num_positions = float(len(self.history_positions[sb_id]))
         current_position = particle.position
@@ -35,4 +35,4 @@ class HistoryRenderer(renderer.Renderer):
 
     def draw(self, cr:cairo.Context, width:int, height:int):
         if self.app.show_focused_history and self.app.secondary_body is not None:
-            self.draw_history(cr, self.app.secondary_body)
+            self.draw_history(cr, int(self.app.secondary_body))

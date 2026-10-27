@@ -85,7 +85,7 @@ class DebugInfoRenderer(renderer.Renderer):
         
         display:list[DebugDisplayField|None] = []
         display.extend([
-            DebugDisplayField("Bodies", f"{self.app.engine.get_valid_indices().size} / {int(num_bodies)}"),
+            DebugDisplayField("Bodies", f"{self.app.engine.valid_indices.size} / {int(num_bodies)}"),
             DebugDisplayField("Zoom",   zoom, 1),
         ])
 
@@ -113,7 +113,7 @@ class DebugInfoRenderer(renderer.Renderer):
     
     
     def draw(self, cr, width:int, height:int):
-        if not self.app.show_debug_info:
+        if not self.app.show_debug_info or not self.app.engine.is_initialized:
             return
         
         cr.select_font_face("Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)

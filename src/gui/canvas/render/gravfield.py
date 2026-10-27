@@ -85,7 +85,7 @@ class GravFieldRenderer(renderer.Renderer):
         self.last_computed_at = 0
 
     def draw(self, cr:cairo.Context, width:int, height:int):
-        if not self.app.show_grav_field: return
+        if not self.app.show_grav_field or self.app.engine.N == 0: return
         N = self.app.engine.N
         num_cols = math.ceil(width / RESOLUTION)
         num_rows = math.ceil(height / RESOLUTION)

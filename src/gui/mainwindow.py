@@ -11,11 +11,10 @@ from gui import ui_config
 
 class MainWindow(Gtk.ApplicationWindow):
 
-    def __init__(self, application, title, camera, app_model: AppModel, ctl:ClientSocketConnection, clock:SimClock, synth:ToneSynthController):
+    def __init__(self, application, title, camera, app_model: AppModel, ctl:ClientSocketConnection, clock:SimClock):
         Gtk.ApplicationWindow.__init__(self, application=application, title=title)
         self.clock = clock
         self.app_model = app_model
-        self.synth = synth
         
         self.canvas = canvas.OrbitalCanvas(camera, app_model, ctl, self.clock)
         self.canvas.set_hexpand(True)

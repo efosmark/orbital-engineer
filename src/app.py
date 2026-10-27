@@ -45,16 +45,15 @@ def on_initialize(app: App):
     ))
 
 def on_activate(app: App):
-    print("ON ACTIVATE")
     app.model.show_focused_history = True
     app.model.show_debug_info = True
     app.model.show_focus_info = True
     app.model.show_grav_field = True
-    app.relative_zoom(1/50.0)
     if app.engine_model.tick_id > 0:
         app.show_message("Connected.", duration=10.0, desc="An active instance already existed.")
     else:
         app.show_message("Ready.", duration=10.0, desc="Press [space] to start.")
+    app.relative_zoom(1/50.0)
 
 def run():
     app = App(0, 0)
