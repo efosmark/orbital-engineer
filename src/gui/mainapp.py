@@ -20,7 +20,7 @@ class App(orbitapp.OrbitApp):
         self.cmap_ctl = ColorizedMapController(self.model)
         self.camera = pz.Camera2D()
         
-        self.engine_model.connect("notify::paused", self.__on_paused_changed)
+        self.engine_model.connect("notify::clock-running", self.__on_clock_running_changed)
         self.engine_model.connect("notify::clock-speed", self.on_speed_changed)
         self.model.connect("notify::show-grid", self.on_show_grid_changed)
         self.model.cmap.connect('notify::option', self.on_color_map_changed)
@@ -42,9 +42,9 @@ class App(orbitapp.OrbitApp):
         grid_state = "On" if self.model.show_grid else "Off"
         self.model.osd.add_message(f"Grid: {grid_state}")
 
-    def __on_paused_changed(self, model, param):
+    def __on_clock_running_changed(self, model, param):
         if self.engine_model.tick_id <= 0: return
-        if self.engine_model.paused:
+        if not self.engine_model.clock_running:
             if self.engine_model.tick_id > 0:
                 self.model.osd.add_message("Paused", duration=3.0)
         else:

@@ -97,7 +97,7 @@ class MoveParticleController:
         offset_y = (dy - self._prev_dy) / self.camera.zoom
 
         if offset_x > DRAG_MARGIN or offset_y > DRAG_MARGIN:
-            self.app.engine.paused = True
+            self.app.engine.clock_running = False
         
         self.app.drag_end = (self.app.drag_start[0]+offset_x, self.app.drag_start[1]+offset_y)
         

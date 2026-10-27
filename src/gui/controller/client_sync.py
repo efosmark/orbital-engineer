@@ -8,7 +8,6 @@ class ClientSyncController(GObject.GObject):
     def __init__(self, client:ClientSocketConnection, model:EngineModel):
         super().__init__()
         self.client = client
-        
         self.model = model
         self.model.connect('notify::clock-speed', self.on_clock_speed_changed)
         GLib.timeout_add(SYNC_RATE_MS, self.sync)
@@ -23,12 +22,12 @@ class ClientSyncController(GObject.GObject):
         
         if self.model.is_initialized != self.client.is_initialized:
             self.model.is_initialized = self.client.is_initialized
+        
+        if self.model.clock_running != self.client.clock.running:
+           self.model.clock_running = not self.client.clock.running
 
         if not self.client.is_initialized:
             return
-        
-        if self.model.paused != (not self.client.clock.running):
-           self.model.paused = not self.client.clock.running
         
         if self.model.clock_speed != self.client.clock.speed:
             self.model.clock_speed = self.client.clock.speed

@@ -38,7 +38,7 @@ class EngineModel(GObject.GObject):
     accum = GObject.Property(type=float, default=0)
     valid_indices = GObject.Property(type=object)
     
-    paused = GObject.Property(type=bool, default=True)
+    clock_running = GObject.Property(type=bool, default=False)
     clock_speed = GObject.Property(type=float, default=1.0)
     clock_time = GObject.Property(type=float, default=0.0)
     curr_tick_at = GObject.Property(type=float, default=0.0)
@@ -78,10 +78,10 @@ class EngineModel(GObject.GObject):
         self.clock_speed = SPEED_SCALE[idx]
 
     def pause(self):
-        self.paused = True
+        self.clock_running = False
     
     def unpause(self):
-        self.paused = False
+        self.clock_running = True
 
     def __iter__(self):
         for i in self.valid_indices:

@@ -23,7 +23,7 @@ class HudClockRenderer(renderer.Renderer):
         self._last_tick = self.app.engine.tick_id
     
     def record_time_error(self):
-        if self.app.engine.paused or self.app.engine.tick_id == self._last_tick:
+        if not self.app.engine.clock_running or self.app.engine.tick_id == self._last_tick:
             return
         time_error = self.app.engine.curr_tick_at - self.app.engine.next_tick_at
         if time_error < 0:
@@ -38,14 +38,14 @@ class HudClockRenderer(renderer.Renderer):
             return 0.0
     
     def draw(self, cr, width:int, height:int):
-        bg_color = "#8E535354" if self.app.engine.paused else "#538E8855"
-        border_color = "#4F252599" if self.app.engine.paused else "#1C393699"
+        bg_color = "#8E535354" if not self.app.engine.clock_running else "#538E8855"
+        border_color = "#4F252599" if not self.app.engine.clock_running else "#1C393699"
         
         cr.select_font_face("Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(FONT_SIZE)
 
         speed = round(self.app.engine.clock_speed, 6)
-        status = "  " if self.app.engine.paused else "▶"
+        status = "  " if not self.app.engine.clock_running else "▶"
 
         txt = f"[{status}]   T+{format_time(self.app.engine.clock_time)}   ({speed:.2f}x)"
         te = cr.text_extents(txt)

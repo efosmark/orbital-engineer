@@ -1,4 +1,3 @@
-import math
 import numpy as np
 import cairo
 from gui import ui_config

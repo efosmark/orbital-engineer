@@ -36,18 +36,18 @@ class OrbitApp(Gtk.Application):
         self.ledger_ctl.connect('new-entry', self.on_ledger_entry_added)
 
         self.engine_model.connect("notify::tick-id", self.__on_sim_tick_changed)
-        self.engine_model.connect("notify::paused", self.__on_paused_changed)
+        self.engine_model.connect("notify::clock-running", self.__on_clock_running_changed)
 
         self.connect('activate', self.__on_activate)
 
     def __on_sim_tick_changed(self, m, tick_id):
        self.emit("tick", self.engine_model.tick_id)
 
-    def __on_paused_changed(self, m, prop):
-        if self.engine_model.paused:
-            self.client.stop()
-        else:
+    def __on_clock_running_changed(self, m, prop):
+        if self.engine_model.clock_running:
             self.client.start()
+        else:
+            self.client.stop()
 
     def on_ledger_entry_added(self, m, le):
         if le.action&flags.BOUNCE:
@@ -64,12 +64,6 @@ class OrbitApp(Gtk.Application):
         self._bootstrap()
         if not self.engine_model.is_initialized or self._should_reset_on_connect:
             self.emit('initialize')
-
-    def toggle_paused(self):
-        if self.engine_model.paused:
-            self.client.stop()
-        else:
-            self.client.start()
 
     def insert_particle(self, particle:body.Body) -> int:
         return self.client.add_particle(

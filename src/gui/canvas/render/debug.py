@@ -1,5 +1,4 @@
 import math
-import statistics
 from dataclasses import dataclass
 from typing import cast
 import cairo

@@ -38,7 +38,7 @@ class LedgerMonitor(GObject.GObject):
                 self.ledger_model.last_ledger_id = le['id']
                 self.emit('new-entry', LedgerEntry(*le))
 
-            elif le['id'] <= prev_ledger_id:
+            elif int(le['id']) <= prev_ledger_id:
                 # Rolled over to older values
                 break
         

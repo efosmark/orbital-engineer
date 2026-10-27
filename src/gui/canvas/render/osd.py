@@ -1,9 +1,6 @@
-from typing import cast
-
 import cairo
 
 from gui.canvas import renderer
-from gui.model.osd import OSDMessage
 
 SLIDE_IN_TIME = 0.1
 SLIDE_OUT_TIME = 0.25

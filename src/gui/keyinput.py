@@ -64,10 +64,10 @@ class KeyInput(GObject.GObject):
             else:
                 self.mainapp.relative_zoom(1 / 0.9)
         elif keyval == Gdk.KEY_space:
-            if self.app.engine.paused:
-                self.app.engine.unpause()
-            else:
+            if self.app.engine.clock_running:
                 self.app.engine.pause()
+            else:
+                self.app.engine.unpause()
         elif keyval == Gdk.KEY_f:
             self.toggle_screen_size()
         elif keyval == Gdk.KEY_period:
