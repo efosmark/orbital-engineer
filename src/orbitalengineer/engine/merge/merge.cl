@@ -75,12 +75,15 @@ __kernel void compute_merging_collision_direct(
         position_out[i] = (flags[i]&FIXED_POSITION) ? position[i] : position_center_of_mass;
 
         // New radius based on updated mass
-        radius_out[i] = (flags[i]&FIXED_RADIUS) ? radius_out[i] : sqrt(mass_out[i] / 3.14159f);        
+        radius_out[i] = (flags[i]&FIXED_RADIUS) ? radius_out[i] : cbrt(mass_out[i] / 3.14159f);        
 
     } else if (wg_is_merging && lane == 0) {
         DEBUG_PRINTF("(coalesce) [%u] <-- %u", i, wg_leader);
 
         mass_out[i] = (flags[i]&FIXED_MASS) ? mass[i] : 0;
         flags_out[i] = flags[i]|REMOVED;
+        velocity_out[i] = velocity[i];
+        position_out[i] = position[i];
+        radius_out[i] = 0;
     }
 }

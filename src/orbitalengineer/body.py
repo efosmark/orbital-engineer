@@ -1,5 +1,6 @@
 from typing import Self, overload
 
+from orbitalengineer import flags
 from orbitalengineer.engine.primary_vectors import HasStateVectors
 
 class Body:
@@ -69,6 +70,10 @@ class Body:
         if self._vec is not None:
             self._flags = int(self._vec.flags[self.index])
         return self._flags
+
+    @property
+    def is_removed(self) -> bool:
+        return (self.flags & flags.REMOVED) == flags.REMOVED
 
     @classmethod
     def from_dict(cls, d:dict) -> Self:

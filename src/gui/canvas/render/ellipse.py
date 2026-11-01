@@ -37,6 +37,6 @@ class EllipseRenderer(renderer.Renderer):
         if self.app.secondary_body is not None:
             self.draw_ellipse_for_body(cr, self.app.secondary_body)
         
-        b = self.app.hovered_over_particle
-        if b is not None and b.index != self.app.secondary_body:
-            self.draw_ellipse_for_body(cr, b.index, True)
+        # b = self.app.hovered_over_particle
+        # if b is not None and b.index != self.app.secondary_body:
+        #     self.draw_ellipse_for_body(cr, b.index, True)

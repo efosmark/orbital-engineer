@@ -61,7 +61,11 @@ def draw_x_label(cr:cairo.Context, x1, x_offset, height, scale, highlight_label)
     
     # Rotate the label
     cr.save()
-    cr.translate(line, height)
+    try:
+        cr.translate(line, height)
+    except cairo.Error as e:
+        print(f"{line=} {height=} {x1=} {x_offset=} {scale=} {e}")
+        raise e
     cr.move_to(-LABEL_PADDING, -LABEL_PADDING)
     cr.rotate(3.14/-2)
     cr.show_text(label)
@@ -172,8 +176,9 @@ class GridRenderer(renderer.Renderer):
         y_lines(cr, width, y1, y2, spacing, scale)
         
         if self.app.secondary_body:
-            b = self.app.engine.get_particle(self.app.secondary_body)
-            pos = b.position
+           b = self.app.engine.get_particle(self.app.secondary_body)
+           if b.is_removed: return
+           pos = b.position
         
-            draw_x_label(cr, x1, pos.real-x1, height, scale, True)
-            draw_y_label(cr, y1, pos.imag-y1, width, scale, True)
+           draw_x_label(cr, x1, pos.real-x1, height, scale, True)
+           draw_y_label(cr, y1, pos.imag-y1, width, scale, True)

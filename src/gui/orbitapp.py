@@ -5,7 +5,6 @@ from gui.model import engine, ledger
 from gui.gtk4 import Gtk, Gio, GObject, GLib
 
 from orbitalengineer import flags, body
-from orbitalengineer.engine import logger
 from orbitalengineer.ipc.client import ClientSocketConnection
 
 

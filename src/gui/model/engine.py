@@ -126,3 +126,12 @@ class EngineModel(GObject.GObject):
             op="add",
             offset=(offset.real, offset.imag)
         ))
+
+    def rel_velocity(self, ids:Sequence[int], offset:complex):
+        if not self.is_initialized: return False
+        self.emit('shift-vector', message.ShiftVectorsRequest(
+            vector_name='velocity',
+            ids=ids,
+            op="add",
+            offset=(offset.real, offset.imag)
+        ))

@@ -5,20 +5,23 @@ from gui.select_device_window import SelectDeviceWindow
 from gui.canvas import pz
 from gui.mainwindow import MainWindow
 from gui.keyinput import KeyInput
+from gui import canvas
+from gui.gtk4 import Gtk
 
 from orbitalengineer import body
 from orbitalengineer.engine import logger
 
 class App(orbitapp.OrbitApp):
     
-    def __init__(self, platform_id=-1, device_id=-1):
-        super().__init__(platform_id, device_id)
+    def __init__(self, platform_id=-1, device_id=-1, reset:bool=False):
+        super().__init__(platform_id, device_id, reset)
         self.model = main.AppModel()
         self.model.engine = self.engine_model
         self.model.ledger = self.ledger_model
         
         self.cmap_ctl = ColorizedMapController(self.model)
         self.camera = pz.Camera2D()
+        self.canvas = canvas.OrbitalCanvas(self.camera, self.model)
         
         self.engine_model.connect("notify::clock-running", self.__on_clock_running_changed)
         self.engine_model.connect("notify::clock-speed", self.on_speed_changed)
@@ -54,8 +57,7 @@ class App(orbitapp.OrbitApp):
         if self.engine_model.tick_id <= 0: return
         speed = self.engine_model.clock_speed
         precision = 1 if speed >= 0.1 else 2
-        f_cur_speed = f"{speed:.{precision}f}"
-        self.model.osd.add_message(f"Speed: {f_cur_speed}x")
+        self.model.osd.add_message(f"Speed: {speed:.{precision}f}x")
 
     def insert_particle(self, particle:body.Body, color:tuple[float, float, float, float]=(1,1,1,1)) -> int:
         idx = super().insert_particle(particle)
@@ -64,17 +66,16 @@ class App(orbitapp.OrbitApp):
         return idx
     
     def init_mainwindow(self) -> MainWindow:
-        win = MainWindow(
+        self.main_window = MainWindow(
             application=self,
             title=ui_config.DEFAULT_WINDOW_TITLE,
-            camera=self.camera,
+            canvas=self.canvas,
             app_model=self.model,
-            ctl=self.client,
-            clock=self.client.clock
         )
-        self.key_input = KeyInput(self, win)
-        win.present()
-        return win
+        self.key_input = KeyInput(self, self.main_window)
+        self.main_window.present()
+        self.main_window.maximize()
+        return self.main_window
     
     def select_device(self):
         def _on_close_device_selection(dialog: SelectDeviceWindow):

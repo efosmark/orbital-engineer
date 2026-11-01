@@ -10,12 +10,11 @@ from gui import ui_config
 
 class MainWindow(Gtk.ApplicationWindow):
 
-    def __init__(self, application, title, camera, app_model: AppModel, ctl:ClientSocketConnection, clock:SimClock):
+    def __init__(self, application, title, canvas, app_model: AppModel):
         Gtk.ApplicationWindow.__init__(self, application=application, title=title)
-        self.clock = clock
         self.app_model = app_model
         
-        self.canvas = canvas.OrbitalCanvas(camera, app_model)
+        self.canvas = canvas
         self.canvas.set_hexpand(True)
         self.canvas.set_vexpand(True)
         self.canvas.set_halign(Gtk.Align.FILL)

@@ -1,4 +1,6 @@
+import sys
 import time
+import traceback
 from typing import cast
 
 import cairo
@@ -11,8 +13,6 @@ from gui.gtk4 import Gtk, Gdk, Graphene
 from gui.model import main
 from gui.canvas.pz import Camera2D, Camera2DController
 
-from gui.canvas.render.event_ledger import EventLedgerRenderer
-from gui.canvas.render.cgroup import CGroupConnectionRenderer, CGroupRenderer
 from gui.canvas.render.resource_monitor import ResourceMonitorRenderer
 from gui.canvas.render.osd import OSDRenderer
 from gui.canvas.render.hud_clock import HudClockRenderer
@@ -26,7 +26,6 @@ from gui.canvas.render.background import BackgroundRenderer
 from gui.canvas.render.ellipse import EllipseRenderer
 from gui.canvas.render.history import HistoryRenderer
 from gui.canvas.render.particle import ParticleRenderer
-from gui.canvas.render.pinpoint import PinpointRenderer
 from gui.canvas.render.reticle import ReticleRenderer
 from gui.canvas.render.gravfield import GravFieldRenderer
 
@@ -69,6 +68,7 @@ class MoveParticleController:
         )[0].tolist()
 
     def on_drag_begin(self, gesture, start_x, start_y):
+        if self.app.secondary_body is not None: return
         event = gesture.get_last_event(None)
         if event is None: return
 
@@ -88,6 +88,7 @@ class MoveParticleController:
         self.app.dragging_particle = bodies[0]
 
     def on_drag_update(self, gesture, dx, dy):
+        if self.app.secondary_body is not None: return
         if not self.app.drag_start: return
 
         offset_x = (dx - self._prev_dx) / self.camera.zoom
@@ -107,6 +108,7 @@ class MoveParticleController:
             self.app.engine.rel_position(self.app.selected_particles, offset)
         
     def on_drag_end(self, gesture, start_x, start_y):
+        if self.app.secondary_body is not None: return
         self.app.dragging_particle = None
         self.app.drag_start = None
         self.app.drag_end = None
@@ -152,18 +154,15 @@ class OrbitalCanvas(Gtk.DrawingArea):
         self.bg_renderers = [
             BackgroundRenderer(self.app, self.camera),
             GridRenderer(self.app, self.camera),
-            #EventLedgerRenderer(self.app, self.camera),
         ]
         
         self.scene_renderers = [
             HistoryRenderer(self.app, self.camera),
-            #ForceVectorRenderer(self.view, self.camera),
+            ForceVectorRenderer(self.app, self.camera),
             EllipseRenderer(self.app, self.camera),
             ParticleRenderer(self.app, self.camera),
             SelectionRenderer(self.app, self.camera),
             ReticleRenderer(self.app, self.camera),
-            #PinpointRenderer(self.view, self.camera),
-            #CGroupRenderer(self.app, self.camera),
         ]
         
         self.hud_fg_renderers = [
@@ -209,39 +208,15 @@ class OrbitalCanvas(Gtk.DrawingArea):
     def zoom_out(self):
         self.camera.zoom_at(0, 0, 0, 0, 1/0.9)
 
-    def render_background_objects(self, cr, width, height):
-        for r in self.bg_renderers:
+    def draw_renderers(self, cr, renderers, width, height):
+        for r in renderers:
             cr.save()
             try:
                 r.draw(cr, width, height)
             except Exception as e:
-                self.bg_renderers.remove(r)
-                raise e
-            cr.restore()
-
-    def render_space_objects(self, cr, width, height):
-        cr.save()
-        cr.transform(self.camera.get_matrix(width, height))        
-
-        for r in self.scene_renderers:
-            cr.save()
-            try:
-                r.draw(cr, width, height)
-            except Exception as e:
-                self.scene_renderers.remove(r)
-                raise e
-            cr.restore()
-        
-        cr.restore()
-
-    def render_hud(self, cr, width, height):
-        for r in self.hud_fg_renderers:
-            cr.save()
-            try:
-                r.draw(cr, width, height)
-            except Exception as e:
-                self.hud_fg_renderers.remove(r)
-                raise e
+                renderers.remove(r)
+                traceback.print_exception(e)
+                print(f"Removed renderer {r.__class__.__name__} due to exception.", file=sys.stdout)
             cr.restore()
 
     def do_snapshot(self, snapshot: Gtk.Snapshot):
@@ -263,13 +238,23 @@ class OrbitalCanvas(Gtk.DrawingArea):
         
             if self.app.secondary_body is not None and self.app.follow_tracked_body:
                 fpos = self.app.engine.position[self.app.secondary_body]
-                self.camera.offset = [float(fpos.real), float(fpos.imag)]
+                offset = [float(fpos.real), float(fpos.imag)]
+                if np.isnan(offset[0]) or np.isnan(offset[1]):
+                    self.camera.offset = [0, 0]
+                else:
+                    self.camera.offset = offset
 
             cr = cairo.Context(self._cached_surface)
-            self.render_background_objects(cr, width, height)
-            self.render_space_objects(cr, width, height)
-            self.render_hud(cr, width, height)
-
+            
+            self.draw_renderers(cr, self.bg_renderers, width, height)
+            
+            cr.save()
+            cr.transform(self.camera.get_matrix(width, height))        
+            self.draw_renderers(cr, self.scene_renderers, width, height)
+            cr.restore()
+            
+            self.draw_renderers(cr, self.hud_fg_renderers, width, height)
+            
         # Push cached surface into snapshot every frame
         rect = Graphene.Rect()
         rect.init(0, 0, width, height)

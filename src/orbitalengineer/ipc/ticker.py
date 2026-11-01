@@ -52,7 +52,7 @@ class TickController:
     
     def _logic_loop(self):
         while self.logic_running:
-            #self.dt_step = self._compute_dt_step()
+            self.dt_step = self._compute_dt_step()
             self._run_tick()
 
     def _compute_dt_step(self) -> float:

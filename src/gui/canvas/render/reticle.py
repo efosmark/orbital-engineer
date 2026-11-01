@@ -102,6 +102,7 @@ class ReticleRenderer(renderer.Renderer):
         if self.app.secondary_body is None: return
         
         body = self.app.engine.get_particle(self.app.secondary_body)
+        if body.is_removed:return
 
         cr.select_font_face(ui_config.DEFAULT_FONT_FAMILY, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(ui_config.DEFAULT_FONT_SIZE/self.camera.zoom)
